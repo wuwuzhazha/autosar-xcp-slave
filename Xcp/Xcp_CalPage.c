@@ -26,6 +26,11 @@ sint16 Xcp_CmdSetCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_R
     segment_number = data[2];
     page_number    = data[3];
 
+    if ((mode & (XCP_PAGE_MODE_ECU | XCP_PAGE_MODE_XCP)) == 0U)
+    {
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+    }
+
     if ((mode & (uint8)~(XCP_PAGE_MODE_ECU | XCP_PAGE_MODE_XCP | XCP_PAGE_MODE_ALL)) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
