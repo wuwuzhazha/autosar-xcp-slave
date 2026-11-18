@@ -10,10 +10,6 @@
 
 #define XCP_SECTORS  (g_xcp_channel.config_ptr->xcp_flash_sector_config)
 
-static uint8 Xcp_ProgramBuffer[XCP_MAX_PGM_BLOCK_SIZE];
-
-static uint32 Xcp_ProgramBufferIndex = 0U;
-
 static uint32 Xcp_ExpectedProgramSize = 0U;
 
 static boolean Xcp_CheckProgramRange(Xcp_Channel *ch, uint32 addr, uint32 len)
@@ -30,6 +26,20 @@ static boolean Xcp_CheckProgramRange(Xcp_Channel *ch, uint32 addr, uint32 len)
     }
 
     return FALSE;
+}
+
+/* PROGRAM_PREPARE 声明的块大小; 0 = 未声明(不限制) */
+static boolean Xcp_CheckProgramSize(Xcp_Channel *ch, uint32 data_size)
+{
+    if (Xcp_ExpectedProgramSize == 0U)
+    {
+        return TRUE;
+    }
+    if ((ch->runtime_ptr->pgm_size + data_size) > Xcp_ExpectedProgramSize)
+    {
+        return FALSE;
+    }
+    return TRUE;
 }
 
 sint16 Xcp_CmdProgramStart(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
@@ -59,7 +69,6 @@ sint16 Xcp_CmdProgramStart(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     ch->runtime_ptr->pgm_address = 0U;
     ch->runtime_ptr->pgm_size = 0U;
 
-    Xcp_ProgramBufferIndex = 0U;
     Xcp_ExpectedProgramSize = 0U;
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
@@ -105,10 +114,14 @@ sint16 Xcp_CmdProgramClear(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
 
     mode = cmd_data[1];
 
+    if (mode != 0x00U)
+    {
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+    }
+
     clear_range = ((uint32) cmd_data[4]) | ((uint32) cmd_data[5] << 8U) | ((uint32) cmd_data[6] << 16U)
                   | ((uint32) cmd_data[7] << 24U);
 
-    (void)mode;
     clear_address = ch->runtime_ptr->mta;
 
     boolean valid_address = FALSE;
@@ -210,21 +223,6 @@ sint16 Xcp_CmdProgram(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 
     if (number_of_data_elements == 0U)
     {
-
-        if (Xcp_ProgramBufferIndex > 0U)
-        {
-            result = Xcp_FlashProgram_Callout(ch->runtime_ptr->pgm_address, Xcp_ProgramBuffer,
-                                              Xcp_ProgramBufferIndex);
-
-            if (result != E_OK)
-            {
-                return Xcp_ResErr(res, XCP_ERR_GENERIC);
-            }
-
-            ch->runtime_ptr->mta += Xcp_ProgramBufferIndex;
-            Xcp_ProgramBufferIndex = 0U;
-        }
-
         ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
         return (sint16)(1U);
     }
@@ -239,6 +237,11 @@ sint16 Xcp_CmdProgram(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
     if (!Xcp_CheckProgramRange(&g_xcp_channel, ch->runtime_ptr->mta, data_size))
     {
         return Xcp_ResErr(res, XCP_ERR_GENERIC);
+    }
+
+    if (!Xcp_CheckProgramSize(ch, data_size))
+    {
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     ch->runtime_ptr->pgm_processor = XCP_PGM_STATUS_PROGRAMMING;
@@ -382,7 +385,6 @@ sint16 Xcp_CmdProgramPrepare(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
     }
 
     Xcp_ExpectedProgramSize = code_size;
-    Xcp_ProgramBufferIndex = 0U;
     ch->runtime_ptr->pgm_address = ch->runtime_ptr->mta;
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
@@ -462,6 +464,11 @@ sint16 Xcp_CmdProgramNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
         return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
+    if (!Xcp_CheckProgramSize(ch, data_size))
+    {
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
+    }
+
     result = Xcp_FlashProgram_Callout(ch->runtime_ptr->mta, &cmd_data[2], data_size);
 
     if (result != E_OK)
@@ -508,6 +515,11 @@ sint16 Xcp_CmdProgramMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
     if (!Xcp_CheckProgramRange(&g_xcp_channel, ch->runtime_ptr->mta, data_size))
     {
         return Xcp_ResErr(res, XCP_ERR_GENERIC);
+    }
+
+    if (!Xcp_CheckProgramSize(ch, data_size))
+    {
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     result = Xcp_FlashProgram_Callout(ch->runtime_ptr->mta, &cmd_data[1], data_size);
@@ -577,10 +589,7 @@ void Xcp_InitFlashProg(Xcp_Channel *ch)
     ch->runtime_ptr->pgm_address = 0U;
     ch->runtime_ptr->pgm_size = 0U;
 
-    Xcp_ProgramBufferIndex = 0U;
     Xcp_ExpectedProgramSize = 0U;
-
-    (void) memset(Xcp_ProgramBuffer, 0xFFU, XCP_MAX_PGM_BLOCK_SIZE);
 }
 
 const Xcp_FlashSectorType *Xcp_GetSectorConfig(uint8 sector_number)

@@ -24,7 +24,7 @@
     "files": {}
   },
   "xcp_preprocessor": {
-    "total": 166,
+    "total": 167,
     "files": {
       "Xcp/Xcp.c": 28,
       "Xcp/Xcp.h": 3,
@@ -41,7 +41,7 @@
       "Xcp/Xcp_DaqInt.h": 17,
       "Xcp/Xcp_DaqRun.c": 5,
       "Xcp/Xcp_DaqStim.c": 3,
-      "Xcp/Xcp_FlashProg.c": 11,
+      "Xcp/Xcp_FlashProg.c": 12,
       "Xcp/Xcp_FlashProg.h": 1,
       "Xcp/Xcp_Internal.h": 13,
       "Xcp/Xcp_Resume.c": 7,
