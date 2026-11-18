@@ -130,10 +130,3 @@ Tests/build_matrix.py       Cross-platform variant runner
 Tests/ratchet.py            Architecture ratchet (regression caps)
 ```
 
-## What is NOT in this repo (by design)
-
-- `AUTOSAR_SWS_XCP.pdf` / `AUTOSAR_SRS_XCP.pdf` — confidential ASAM docs, removed
-  before publication.
-- `.claude/`, `all.txt`, `avail.txt`, `cfg.txt`, `o.txt`, `used.txt` — session
-  scratch, ignored.
-- Generated `Tests/*.exe` — rebuilt on demand.

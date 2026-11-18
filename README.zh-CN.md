@@ -7,7 +7,6 @@
 
 单通道，C99，除你的集成钩子外无外部依赖。
 
-<!-- TODO: replace Harry with the actual GitHub user/org -->
 [![CI](https://github.com/Harry/Xcp/workflows/ci/badge.svg)](https://github.com/Harry/Xcp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 

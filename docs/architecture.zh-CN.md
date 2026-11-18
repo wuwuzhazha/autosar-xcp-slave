@@ -121,18 +121,11 @@ Config/xcp_base.toml  +  Config/profiles/*.toml (extends)
 ## 测试
 
 ```
-Tests/run_all_tests.bat     One-shot: regen → ratchet → build+run 6 variants
-                            → predef → xcpgen unit → 103-variant matrix
-Tests/test_main.c           ~317 asserts/variant — every command + error path
-Tests/test_matrix_func.c         Feature-adaptive smoke (varies with profile)
-Tests/test_predef.c         Static/predefined DAQ coverage
-Tests/build_matrix.py       Cross-platform variant runner
-Tests/ratchet.py            Architecture ratchet (regression caps)
+Tests/run_all_tests.bat     一键：regen → ratchet → 构建+运行 6 个变体
+                            → predef → xcpgen 单测 → 103 个变体矩阵
+Tests/test_main.c           ~317 断言/变体 — 每条命令 + 错误路径
+Tests/test_matrix_func.c    按特性自适应的冒烟测试
+Tests/test_predef.c         静态/预定义 DAQ 覆盖
+Tests/build_matrix.py       跨平台变体构建器
+Tests/ratchet.py            架构棘轮（回归上限）
 ```
-
-## 本仓库（刻意）不包含的内容
-
-- `AUTOSAR_SWS_XCP.pdf` / `AUTOSAR_SRS_XCP.pdf` —— ASAM 保密文档，发布前已移除。
-- `.claude/`、`all.txt`、`avail.txt`、`cfg.txt`、`o.txt`、`used.txt` —— 会话
-  临时文件，已被忽略。
-- 生成的 `Tests/*.exe` —— 按需重新构建。
