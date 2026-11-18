@@ -34,6 +34,13 @@ Single-channel, C99, no external dependencies beyond your integration hooks.
 >
 > Reports of incorrect behavior, spec misreads, or missing features are welcome via
 > the issue tracker.
+>
+> **Copyright / IP takedown.** Because the code was produced by an AI without human
+> authorship review, it is possible — though not intended — that some portion
+> inadvertently resembles copyrighted material (AUTOSAR / ASAM proprietary texts,
+> vendor code, or another OSS project). If you believe any content infringes your
+> rights, please open an issue or contact the maintainer. The offending files will
+> be removed promptly, or the repository taken private/deleted on request.
 
 ---
 

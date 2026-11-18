@@ -10,6 +10,10 @@ codebase small, portable, and honest about what it implements.
 > reports and fixes from domain experts are especially valuable — if a
 > behavior looks suspicious against the spec, open an issue and cite the
 > ASAM/AUTOSAR clause rather than just patching symptoms.
+>
+> If you believe any content infringes your copyright or IP, please open an
+> issue. The offending files will be removed promptly, or the repository
+> taken private/deleted on request.
 
 ## Setup
 
