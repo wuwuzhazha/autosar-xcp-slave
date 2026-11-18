@@ -538,10 +538,9 @@ uint32 Xcp_GetTimestamp(void)
 #if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP)
 #if (XCP_TIMESTAMP_SOURCE_OS == STD_ON)
 
-    static TickType os_last_tick   = 0U;
-    TickType        os_elapsed     = 0U;
+    TickType os_elapsed = 0U;
 
-    if (GetElapsedValue(XCP_OS_COUNTER, &os_last_tick, &os_elapsed) == E_OK)
+    if (GetElapsedValue(XCP_OS_COUNTER, &g_xcp_channel.runtime_ptr->os_last_tick, &os_elapsed) == E_OK)
     {
         g_xcp_channel.runtime_ptr->os_timestamp_acc += os_elapsed;
     }

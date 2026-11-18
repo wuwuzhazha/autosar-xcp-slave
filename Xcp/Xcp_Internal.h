@@ -160,6 +160,7 @@ typedef struct
 
     uint32 timestamp;
     uint32 os_timestamp_acc;
+    uint32 os_last_tick;
 
     uint8   protection_status;
     uint8   seed_resource;
