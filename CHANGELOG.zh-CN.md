@@ -1,0 +1,61 @@
+> **English**: [CHANGELOG.md](CHANGELOG.md)
+
+# 更新日志
+
+本文件记录项目的所有重要变更。
+
+格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
+版本号遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
+
+## [未发布]
+
+### 新增
+- 开源就绪：MIT LICENSE、README、CONTRIBUTING、CODE_OF_CONDUCT、
+  SECURITY、.github CI + 模板、.editorconfig、.gitattributes、
+  .clang-format、CHANGELOG
+- `docs/` — 架构、移植指南、特性矩阵（英文）
+- `examples/minimal/` — 主机可构建的最小 bring-up 示例
+- `XCP_DTO_QUEUE_DEPTH` 配置项（与 `XCP_MAX_ODT` 解耦）
+- `Xcp_ExtValid` 用于 `SET_MTA` 地址扩展合法性校验
+- `Xcp_EventChannelIdx` — event_channel_number → 配置表索引 查找
+
+### 修复
+- `SET_REQUEST`：`STORE_DAQ_NO_RESUME`（位 1）现在是合法组合
+  （存储 DAQ 但跳过 RESUME）；之前会返回 `ERR_OUT_OF_RANGE`
+- `GET_SEED mode=1` — 支持超过 `XCP_MAX_CTO-2` 的种子续传
+- `DOWNLOAD_NEXT` 在 `XCP_BLOCK_TRANSFER_ENABLED == STD_OFF` 时
+  返回 `ERR_CMD_UNKNOWN`
+- `BUILD_CHECKSUM` 现在先经 `Xcp_MemTranslate` 翻译 `mta` 再调用 callout
+- `START_STOP_SYNCH` mode 语义：0=stop_all、1=start_selected、
+  2=stop_selected
+- `GET_PAGE_INFO` 字节 2 返回 `ecu_page_properties`（原为 `segment_number`）
+- `GET_SEGMENT_INFO` mode 2 返回请求页的 `(ext, page_start)`
+- `START_STOP_DAQ_LIST` 的 FIRST_PID 在 relative PID 模式下返回 list 号
+- `PROGRAM_PREPARE` 声明的 size 在 `PROGRAM`/`NEXT`/`MAX` 上强制校验
+- `WRITE_DAQ` size 按 `XCP_ODT_ENTRY_SIZE_{DAQ,STIM}` 校验
+- `Xcp_Tl_SendDto` 移出 SchM 临界区
+- `SessionClose` 清除会话内运行时状态（`mta`、`seed_*`、`pgm_*`）
+- `FrIf_ReconfigLPdu` 现在传入 `XCP_FR_MAX_FRAME`（含头部）
+- 静态/外部 TX + 计数器状态收敛进 `Xcp_StorageType`/`Xcp_RuntimeType`
+- 移除 `Xcp_ProcessStim` 死代码（STIM 是 RX 推送，不是轮询）
+- 资源保护：`XCP_RESOURCE_DAQ`/`XCP_RESOURCE_STIM` 现在管控
+  DAQ 配置路径与 STIM 写入路径
+- `SessionOpen` 保留 `STORE_CAL_REQ`/`CLEAR_DAQ_REQ` 位供主站回读
+- `GET_DAQ_CLOCK` 按 `ts_size` 返回长度，并在
+  `XCP_TIMESTAMP_TYPE == NO_TIME_STAMP` 时返回 `ERR_CMD_UNKNOWN`
+- `PGM_PROPERTIES` 不再声明 `NON_SEQ_PGM_SUPPORTED`（未实现）
+
+### 移除
+- `Xcp_ProcessStim`（死代码 — STIM 为 RX 推送）
+- 只写不读的 `block_sequence_counter`/`expected_block_sequence` 字段
+- 非标准的 `TIMESTAMP_UNIT_{1,10,100}PS` 值
+- AUTOSAR 机密规范文档（`AUTOSAR_SWS_XCP.pdf`、`AUTOSAR_SRS_XCP.pdf`、
+  `srs.txt`、`sws.txt`）
+- `Docs/xcp-kernel.html`（内部架构草稿）
+- 仓库根部的零散分析文件
+
+## [0.1.0] — 2026-11-18
+
+首个公开发布。按 ASAM XCP Part 2 v1.1 实现 STD + CAL + PAG +
+DAQ + STIM + PGM + Seed&Key + RESUME 命令全覆盖，支持 CAN /
+FlexRay / Ethernet / CDD 传输。
