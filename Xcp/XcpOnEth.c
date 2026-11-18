@@ -105,7 +105,7 @@ uint16 Xcp_EthPackMessage(const uint8 *msg, uint8 msg_len, uint8 *frame, uint16 
 
 static Std_ReturnType Xcp_EthSend(const uint8 *data, uint8 length)
 {
-    uint8 frame[XCP_ETH_MAX_FRAME];
+    static uint8 frame[XCP_ETH_MAX_FRAME];
     PduInfoType pdu_info;
     uint16 used = Xcp_EthPackMessage(data, length, frame, (uint16) sizeof(frame));
 

@@ -126,7 +126,7 @@ Std_ReturnType Xcp_FrConfigureLPdu(void)
 
 static Std_ReturnType Xcp_FrSend(const uint8 *data, uint8 length)
 {
-    uint8 frame[XCP_FR_MAX_FRAME];
+    static uint8 frame[XCP_FR_MAX_FRAME];
     PduInfoType pdu_info;
     uint16 used = Xcp_FrPackMessage(data, length, frame, (uint16) sizeof(frame));
 
