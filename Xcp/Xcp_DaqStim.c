@@ -5,6 +5,7 @@
 #include "Xcp.h"
 #include "Xcp_Internal.h"
 #include "Xcp_Resume.h"
+#include "Xcp_SeedKey.h"
 
 #if (XCP_DAQ_ENABLED == STD_ON)
 
@@ -42,6 +43,13 @@ Std_ReturnType Xcp_ReceiveStimDto(Xcp_Channel *ch, const uint8 *dto_data, uint8 
     {
         return E_NOT_OK;
     }
+
+#if (XCP_SEED_KEY_ENABLED == STD_ON)
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_STIM))
+    {
+        return E_NOT_OK;
+    }
+#endif
 
     if (odt_no >= ch->storage_ptr->daq_list[daq_list_no].odt_count)
     {
