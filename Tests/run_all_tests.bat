@@ -87,7 +87,7 @@ echo.
 echo ==================================================================
 echo [8/9] Build+Run: DAQ_STATIC static DAQ
 echo ==================================================================
-gcc %FLAGS% -IGen\static -o Tests\xcp_test_static.exe Xcp\Xcp.c Xcp\Xcp_Cmd.c Xcp\Xcp_Std.c Xcp\Xcp_DaqCfg.c Xcp\Xcp_DaqRun.c Xcp\Xcp_DaqStim.c Xcp\Xcp_SeedKey.c Xcp\Xcp_CalPage.c Xcp\Xcp_FlashProg.c Xcp\Xcp_Resume.c Gen\static\Xcp_Cfg.c Xcp\XcpOnCan.c Xcp\XcpOnFr.c Xcp\XcpOnEth.c Xcp\XcpOnCdd.c Tests\test_stubs.c Tests\static_main.c || (echo BUILD FAILED & goto :fail)
+gcc %FLAGS% -IGen\static -o Tests\xcp_test_static.exe Xcp\Xcp.c Xcp\Xcp_Cmd.c Xcp\Xcp_Std.c Xcp\Xcp_DaqCfg.c Xcp\Xcp_DaqRun.c Xcp\Xcp_DaqStim.c Xcp\Xcp_SeedKey.c Xcp\Xcp_CalPage.c Xcp\Xcp_FlashProg.c Xcp\Xcp_Resume.c Gen\static\Xcp_Cfg.c Xcp\XcpOnCan.c Xcp\XcpOnFr.c Xcp\XcpOnEth.c Xcp\XcpOnCdd.c Tests\test_stubs.c Tests\test_static.c || (echo BUILD FAILED & goto :fail)
 Tests\xcp_test_static.exe
 if errorlevel 1 goto :fail
 
@@ -95,7 +95,7 @@ echo.
 echo ==================================================================
 echo [8b/9] Build+Run: 预定义 DAQ 列表 (XCP_MIN_DAQ=2)
 echo ==================================================================
-gcc %FLAGS% -IGen\predef -o Tests\xcp_test_predef.exe Xcp\Xcp.c Xcp\Xcp_Cmd.c Xcp\Xcp_Std.c Xcp\Xcp_DaqCfg.c Xcp\Xcp_DaqRun.c Xcp\Xcp_DaqStim.c Xcp\Xcp_SeedKey.c Xcp\Xcp_CalPage.c Xcp\Xcp_FlashProg.c Xcp\Xcp_Resume.c Gen\predef\Xcp_Cfg.c Xcp\XcpOnCan.c Xcp\XcpOnFr.c Xcp\XcpOnEth.c Xcp\XcpOnCdd.c Tests\test_stubs.c Tests\predef_main.c || (echo BUILD FAILED & goto :fail)
+gcc %FLAGS% -IGen\predef -o Tests\xcp_test_predef.exe Xcp\Xcp.c Xcp\Xcp_Cmd.c Xcp\Xcp_Std.c Xcp\Xcp_DaqCfg.c Xcp\Xcp_DaqRun.c Xcp\Xcp_DaqStim.c Xcp\Xcp_SeedKey.c Xcp\Xcp_CalPage.c Xcp\Xcp_FlashProg.c Xcp\Xcp_Resume.c Gen\predef\Xcp_Cfg.c Xcp\XcpOnCan.c Xcp\XcpOnFr.c Xcp\XcpOnEth.c Xcp\XcpOnCdd.c Tests\test_stubs.c Tests\test_predef.c || (echo BUILD FAILED & goto :fail)
 Tests\xcp_test_predef.exe
 if errorlevel 1 goto :fail
 

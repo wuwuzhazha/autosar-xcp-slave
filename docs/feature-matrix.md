@@ -1,7 +1,7 @@
 # XCP Feature Matrix
 
 Coverage against ASAM XCP Part 2 v1.1 commands. `✓` = implemented + covered by the
-test suite (`Tests/test_main.c`, `Tests/matrix_func.c`, `Tests/predef_main.c`).
+test suite (`Tests/test_main.c`, `Tests/test_matrix_func.c`, `Tests/test_predef.c`).
 
 ## Standard (STD)
 

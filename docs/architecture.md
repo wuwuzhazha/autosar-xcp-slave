@@ -123,8 +123,8 @@ profile into a temp dir and byte-compares with `Gen/<profile>/` to catch drift.
 Tests/run_all_tests.bat     One-shot: regen → ratchet → build+run 6 variants
                             → predef → xcpgen unit → 103-variant matrix
 Tests/test_main.c           ~317 asserts/variant — every command + error path
-Tests/matrix_func.c         Feature-adaptive smoke (varies with profile)
-Tests/predef_main.c         Static/predefined DAQ coverage
+Tests/test_matrix_func.c         Feature-adaptive smoke (varies with profile)
+Tests/test_predef.c         Static/predefined DAQ coverage
 Tests/build_matrix.py       Cross-platform variant runner
 Tests/ratchet.py            Architecture ratchet (regression caps)
 ```

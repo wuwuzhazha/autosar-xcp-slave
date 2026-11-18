@@ -26,24 +26,24 @@ MODULE_SRC = [
     "Xcp/Xcp_CalPage.c", "Xcp/Xcp_FlashProg.c", "Xcp/Xcp_Resume.c",
     "Xcp/XcpOnCan.c", "Xcp/XcpOnFr.c", "Xcp/XcpOnEth.c", "Xcp/XcpOnCdd.c",
 ]
-LINK_ONLY = ["Tests/test_stubs.c", "Tests/matrix_main.c"]
+LINK_ONLY = ["Tests/test_stubs.c", "Tests/test_matrix.c"]
 SYNTAX_ONLY = ["Xcp/Xcp_Callouts.c"]
 
-# These variants run the full functional test instead of sanity: matrix_main is replaced by test_main / predef_main
+# These variants run the full functional test instead of sanity: test_matrix is replaced by test_main / test_predef
 FUNC_TESTS = {
-    "can/default":      "Tests/matrix_func.c",
-    "can/interleaved":  "Tests/matrix_func.c",
-    "can/daq_static":   "Tests/matrix_func.c",
-    "can/predef":       "Tests/matrix_func.c",
-    "can/minimal":      "Tests/matrix_func.c",
-    "can/daq_off":      "Tests/matrix_func.c",
-    "can/seedkey_off":  "Tests/matrix_func.c",
-    "can/calpage_off":  "Tests/matrix_func.c",
-    "can/pgm_off":      "Tests/matrix_func.c",
-    "can/resume_off":   "Tests/matrix_func.c",
-    "fr/default":       "Tests/matrix_func.c",
-    "eth/default":      "Tests/matrix_func.c",
-    "cdd/default":      "Tests/matrix_func.c",
+    "can/default":      "Tests/test_matrix_func.c",
+    "can/interleaved":  "Tests/test_matrix_func.c",
+    "can/daq_static":   "Tests/test_matrix_func.c",
+    "can/predef":       "Tests/test_matrix_func.c",
+    "can/minimal":      "Tests/test_matrix_func.c",
+    "can/daq_off":      "Tests/test_matrix_func.c",
+    "can/seedkey_off":  "Tests/test_matrix_func.c",
+    "can/calpage_off":  "Tests/test_matrix_func.c",
+    "can/pgm_off":      "Tests/test_matrix_func.c",
+    "can/resume_off":   "Tests/test_matrix_func.c",
+    "fr/default":       "Tests/test_matrix_func.c",
+    "eth/default":      "Tests/test_matrix_func.c",
+    "cdd/default":      "Tests/test_matrix_func.c",
 }
 
 CFLAGS = [

@@ -10,7 +10,7 @@
 
 - [ ] `Tests\run_all_tests.bat` passes on Windows (or `python3 Tests/build_matrix.py` on Linux)
 - [ ] `python Tests/ratchet.py` — if counters went down, `--tighten` baseline committed
-- [ ] New behavior has at least one `CHECK()` in `Tests/test_main.c` or `Tests/matrix_func.c`
+- [ ] New behavior has at least one `CHECK()` in `Tests/test_main.c` or `Tests/test_matrix_func.c`
 
 ## ASAM / SWS references (if applicable)
 

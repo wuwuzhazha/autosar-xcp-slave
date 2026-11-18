@@ -38,8 +38,8 @@ VARIANTS = [
     ("rword",  "test_main",   "xcp_test_rword"),
     ("rwal",   "test_main",   "xcp_test_rwal"),
     ("cdd",    "test_main",   "xcp_test_cdd"),
-    ("static", "static_main", "xcp_test_static"),
-    ("predef", "predef_main", "xcp_test_predef"),
+    ("static", "test_static", "xcp_test_static"),
+    ("predef", "test_predef", "xcp_test_predef"),
 ]
 
 def run(cmd, cwd=None):

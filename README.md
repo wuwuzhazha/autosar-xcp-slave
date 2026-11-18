@@ -112,8 +112,8 @@ callout contract.
 
 - `Tests/test_main.c` — ~317 asserts/variant covering every implemented command +
   error paths (built per functional variant)
-- `Tests/matrix_func.c` — feature-adaptive smoke (103 profile/feature combos)
-- `Tests/predef_main.c` — predefined/static DAQ list coverage
+- `Tests/test_matrix_func.c` — feature-adaptive smoke (103 profile/feature combos)
+- `Tests/test_predef.c` — predefined/static DAQ list coverage
 - `Tests/test_xcpgen.py` — config generator unit tests
 - `Tests/ratchet.py` — architecture ratchet (forbids regressions on global-symbol
   use, preprocessor complexity, generated-file drift)

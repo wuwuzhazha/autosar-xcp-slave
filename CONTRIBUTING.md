@@ -49,8 +49,8 @@ harness uses stubs under `Tests/stubs/`.
   the diff. `Config/xcp_base.toml` + `Config/profiles/*.toml` are the source
   of truth.
 - **Tests**: every behavioral change must be covered by an assertion in
-  `Tests/test_main.c` (full variant), `Tests/matrix_func.c` (feature-gated
-  matrix), or `Tests/predef_main.c` (static/predefined DAQ). Test asserts are
+  `Tests/test_main.c` (full variant), `Tests/test_matrix_func.c` (feature-gated
+  matrix), or `Tests/test_predef.c` (static/predefined DAQ). Test asserts are
   identified by their section letter + index (e.g. `B3`, `E27`, `K12d`) — new
   checks get the next index in their section.
 - **Commits**: concise imperative subject in Chinese or English; one logical
