@@ -116,17 +116,24 @@ sint16 Xcp_CmdGetCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_R
         return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
+    if (((mode & (XCP_PAGE_MODE_ECU | XCP_PAGE_MODE_XCP)) == 0U)
+        || ((mode & (uint8)~(XCP_PAGE_MODE_ECU | XCP_PAGE_MODE_XCP)) != 0U))
+    {
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+    }
+
+    if ((mode & (XCP_PAGE_MODE_ECU | XCP_PAGE_MODE_XCP)) == (XCP_PAGE_MODE_ECU | XCP_PAGE_MODE_XCP))
+    {
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+    }
+
     if ((mode & XCP_PAGE_MODE_ECU) != 0U)
     {
         page_number = Xcp_SegmentRuntime[segment_number].active_page_ecu;
     }
-    else if ((mode & XCP_PAGE_MODE_XCP) != 0U)
-    {
-        page_number = Xcp_SegmentRuntime[segment_number].active_page_xcp;
-    }
     else
     {
-        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+        page_number = Xcp_SegmentRuntime[segment_number].active_page_xcp;
     }
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
