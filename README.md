@@ -5,7 +5,8 @@ organized as an AUTOSAR Classic Platform BSW module (R4.4.0 API surface).
 
 Single-channel, C99, no external dependencies beyond your integration hooks.
 
-[![CI](https://github.com/Harry/Xcp/workflows/ci/badge.svg)](https://github.com/Harry/Xcp/actions)
+<!-- TODO: replace YOUR_HANDLE with the actual GitHub user/org -->
+[![CI](https://github.com/YOUR_HANDLE/Xcp/workflows/ci/badge.svg)](https://github.com/YOUR_HANDLE/Xcp/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---

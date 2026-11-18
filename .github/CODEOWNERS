@@ -1,8 +1,9 @@
-# Default owner for everything — adjust to actual GitHub handles
-* @Harry
+# Default owner for everything — replace YOUR_HANDLE with the actual
+# GitHub user or team before publishing.
+* @YOUR_HANDLE
 
 # Protocol core
-Xcp/ @Harry
+Xcp/ @YOUR_HANDLE
 
 # Generated output — reviewers should not need to eyeball these
-Gen/ @Harry
+Gen/ @YOUR_HANDLE

@@ -15,7 +15,7 @@ Only the latest release tag receives security fixes.
 
 ## Reporting a Vulnerability
 
-**Preferred**: [GitHub private vulnerability reporting](https://github.com/Harry/Xcp/security/advisories/new)
+**Preferred**: [GitHub private vulnerability reporting](https://github.com/YOUR_HANDLE/Xcp/security/advisories/new)
 (if the repo is public on GitHub) — file a private advisory; maintainers see it
 before it is disclosed.
 
