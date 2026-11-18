@@ -85,10 +85,11 @@ if errorlevel 1 goto :fail
 
 echo.
 echo ==================================================================
-echo [8/9] Build: DAQ_STATIC 静态DAQ (编译验证)
+echo [8/9] Build+Run: DAQ_STATIC static DAQ
 echo ==================================================================
-gcc %FLAGS% -IGen\static -o Tests\xcp_test_static.exe %CORE% Gen\static\Xcp_Cfg.c Xcp\XcpOnCan.c Xcp\XcpOnFr.c Xcp\XcpOnEth.c Xcp\XcpOnCdd.c || (echo BUILD FAILED & goto :fail)
-echo DAQ_STATIC compile OK
+gcc %FLAGS% -IGen\static -o Tests\xcp_test_static.exe Xcp\Xcp.c Xcp\Xcp_Cmd.c Xcp\Xcp_Std.c Xcp\Xcp_DaqCfg.c Xcp\Xcp_DaqRun.c Xcp\Xcp_DaqStim.c Xcp\Xcp_SeedKey.c Xcp\Xcp_CalPage.c Xcp\Xcp_FlashProg.c Xcp\Xcp_Resume.c Gen\static\Xcp_Cfg.c Xcp\XcpOnCan.c Xcp\XcpOnFr.c Xcp\XcpOnEth.c Xcp\XcpOnCdd.c Tests\test_stubs.c Tests\static_main.c || (echo BUILD FAILED & goto :fail)
+Tests\xcp_test_static.exe
+if errorlevel 1 goto :fail
 
 echo.
 echo ==================================================================

@@ -1,4 +1,4 @@
-/* @generated default MemMap — 集成方以同名文件覆盖为本项目段 pragma */
+/* @generated default MemMap — the integrator overrides this with a same-named file providing the project section pragmas */
 #ifdef XCP_START_SEC_CONST_UNSPECIFIED
 #undef XCP_START_SEC_CONST_UNSPECIFIED
 #endif

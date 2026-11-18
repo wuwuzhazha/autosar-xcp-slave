@@ -34,7 +34,7 @@ static const Xcp_CmdEntryType XCP_CMD_TABLE[] = {
     { XCP_CMD_GET_DAQ_RESOLUTION_INFO, 1U, 0U,                 XCP_GUARD_NONE,               Xcp_CmdGetDaqResolutionInfo },
     { XCP_CMD_GET_DAQ_EVENT_INFO,      4U, 0U,                 XCP_GUARD_NONE,               Xcp_CmdGetDaqEventInfo },
     { XCP_CMD_FREE_DAQ,                1U, XCP_RESOURCE_DAQ,   XCP_GUARD_NONE,               Xcp_CmdFreeDaq },
-    { XCP_CMD_ALLOC_DAQ,               3U, XCP_RESOURCE_DAQ,   XCP_GUARD_NONE,               Xcp_CmdAllocDaq },
+    { XCP_CMD_ALLOC_DAQ,               4U, XCP_RESOURCE_DAQ,   XCP_GUARD_NONE,               Xcp_CmdAllocDaq },
     { XCP_CMD_ALLOC_ODT,               5U, XCP_RESOURCE_DAQ,   XCP_GUARD_NONE,               Xcp_CmdAllocOdt },
     { XCP_CMD_ALLOC_ODT_ENTRY,         6U, XCP_RESOURCE_DAQ,   XCP_GUARD_NONE,               Xcp_CmdAllocOdtEntry },
     { XCP_CMD_SET_DAQ_PTR,             6U, 0U,                 XCP_GUARD_NONE,               Xcp_CmdSetDaqPtr },

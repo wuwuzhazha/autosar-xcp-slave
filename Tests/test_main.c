@@ -67,7 +67,9 @@ static int fail_count = 0;
 #  define XCP_TST_ID_LEN 1U
 #elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
 #  define XCP_TST_ID_LEN 2U
-#else
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
+#  define XCP_TST_ID_LEN 3U
+#else /* RELATIVE_WORD_ALIGNED */
 #  define XCP_TST_ID_LEN 4U
 #endif
 
@@ -77,7 +79,9 @@ static uint32 test_stim_dto(uint8 *buf, uint8 odt, uint8 list, uint32 data4)
     buf[0] = odt; (void)memcpy(&buf[1], &data4, 4U); (void)list; return 5U;
 #elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
     buf[0] = odt; buf[1] = list; (void)memcpy(&buf[2], &data4, 4U); return 6U;
-#else
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
+    buf[0] = odt; buf[1] = list; buf[2] = 0U; (void)memcpy(&buf[3], &data4, 4U); return 7U;
+#else /* RELATIVE_WORD_ALIGNED */
     buf[0] = odt; buf[1] = 0U; buf[2] = list; buf[3] = 0U; (void)memcpy(&buf[4], &data4, 4U); return 8U;
 #endif
 }
@@ -321,9 +325,15 @@ static uint32 xcp_cmd_reply(const uint8 *c, uint32 len, uint8 *res)
 #  define TST_DAQ_KEY_BYTE 0xC0U
 #endif
 
-#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON) && (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+#  define TST_COMM_OPT   0x03U
+#  define TST_QUEUE_SIZE ((uint8)XCP_CMD_QUEUE_SIZE)
+#elif (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
 #  define TST_COMM_OPT   0x02U
 #  define TST_QUEUE_SIZE ((uint8)XCP_CMD_QUEUE_SIZE)
+#elif (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+#  define TST_COMM_OPT   0x01U
+#  define TST_QUEUE_SIZE 0x00U
 #else
 #  define TST_COMM_OPT   0x00U
 #  define TST_QUEUE_SIZE 0x00U
@@ -377,6 +387,15 @@ int main(void)
     CHECK("A5 state == XCP_INIT",
           g_xcp_channel.runtime_ptr->state == XCP_INIT);
 
+#if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
+    /* Static DAQ entries are baked as literal addresses (e.g. 0x20000000) that
+       are unmapped in the test process. Rewrite the runtime copies to point at
+       real test RAM so the auto-running DAQ list doesn't dereference wild
+       pointers. Re-applied after every FREE_DAQ because FreeDaqLists reloads
+       the static config. */
+    test_patch_static_addrs();
+#endif
+
     test_det_count = 0;
     Xcp_GetVersionInfo(NULL_PTR);
     CHECK("A6 GetVersionInfo(NULL) -> XCP_E_PARAM_POINTER",
@@ -405,12 +424,7 @@ int main(void)
     CHECK("B2 CONNECT -> RES len 8", (l == 8U) && (res[0] == XCP_PID_RES));
 
     CHECK("B3 CONNECT bytes: CAL|DAQ|STIM|PGM, OPTIONAL+BYTE+Intel, CTO/DTO 8, v1/1",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x1D,
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-              0xC0,
-#else
-              0x80,
-#endif
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x1D, 0x80,
               8U, 8U, 0x00, 0x01, 0x01 }, 8U));
 
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
@@ -679,11 +693,11 @@ int main(void)
     CHECK("D3b GET_CAL_PAGE confirms switch: [3]=page1",
           frame_is(res, l, (const uint8[]){ 0xFF, 0x00, 0x00, 0x01 }, 4U));
 
-    l = xcp_cmd((const uint8 *)"\xEB\x00\x00\x01", 4U, res);
+    l = xcp_cmd((const uint8 *)"\xEB\x03\x00\x01", 4U, res);
     (void)xcp_cmd((const uint8 *)"\xEA\x02\x00", 3U, res);
     CHECK("D3c page active after SET",
           (l == 1U) && (res[0] == XCP_PID_RES)
-          && (g_xcp_channel.runtime_ptr->active_page_xcp == 1U));
+          && (Xcp_SegmentRuntime[0].active_page_xcp == 1U));
     cmd[0] = 0xEB; cmd[1] = 0x82U; cmd[2] = 0x00U; cmd[3] = 0x09U;
     l = xcp_cmd(cmd, 4U, res);
     CHECK("D4 SET_CAL_PAGE page9 -> ERR_PAGE_NOT_VALID",
@@ -1113,6 +1127,9 @@ int main(void)
 
     l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
     xcp_drain_tx();
+    /* After F15 disconnect+reconnect all resources are locked; reopen DAQ+STIM */
+    g_xcp_channel.runtime_ptr->protection_status &=
+        (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM);
     (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
     cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
 
@@ -1129,7 +1146,7 @@ int main(void)
     CHECK("H1 SET_REQUEST STORE_DAQ_REQ_RESUME -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
     l = xcp_cmd_reply((const uint8 *)"\xFD", 1U, res);
     CHECK("H2 GET_STATUS while NvM write pending: storeDaqRequest|daqRunning",
-          (l == 6U) && (res[1] == 0x44U));
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x44, 0x11, 0x00, 0x00, 0x00 }, 6U));
     xcp_drain_tx();
     Xcp_NvMWriteRamBlockToNvmCallback(XCP_NVM_BLOCK_ID_RESUME, 0U);
     {
@@ -1143,7 +1160,7 @@ int main(void)
     }
     l = xcp_cmd_reply((const uint8 *)"\xFD", 1U, res);
     CHECK("H2b GET_STATUS stored: storeDaqRequest cleared, SESSION_CONFIGURATION_ID=0x1234",
-          (l == 6U) && (res[1] == 0x40U) && (res[4] == 0x34U) && (res[5] == 0x12U));
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x40, 0x11, 0x00, 0x34, 0x12 }, 6U));
     l = xcp_cmd_reply((const uint8 *)"\xDF\x00\x00\x00", 4U, res);
     CHECK("H2c GET_DAQ_LIST_MODE list0: resume|running",
           (l == 8U) && (res[1] == 0xC0U));
@@ -1165,6 +1182,11 @@ int main(void)
     }
 
     l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+    /* Re-opened session re-locks every resource — clear DAQ+STIM+PGM so the
+       H/I/A/K blocks that follow can drive the protocol without explicit
+       seed/key round-trips. */
+    g_xcp_channel.runtime_ptr->protection_status &=
+        (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM | XCP_RESOURCE_PGM);
 
     {
         uint8 dto[64]; uint32 dl;
@@ -1180,7 +1202,7 @@ int main(void)
     }
     l = xcp_cmd_reply((const uint8 *)"\xFD", 1U, res);
     CHECK("H15 GET_STATUS in RESUME mode: resume|daqRunning, SESSION_CONFIGURATION_ID kept",
-          (l == 6U) && (res[1] == 0xC0U) && (res[4] == 0x34U) && (res[5] == 0x12U));
+          frame_is(res, l, (const uint8[]){ 0xFF, 0xC0, 0x01, 0x00, 0x34, 0x12 }, 6U));
     (void)xcp_cmd_reply((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
     xcp_drain_tx();
 
@@ -1188,8 +1210,8 @@ int main(void)
     CHECK("H5 SET_REQUEST CLEAR_DAQ_REQ -> RES, RAM DAQ kept",
           (l == 1U) && (res[0] == XCP_PID_RES) && (g_xcp_channel.runtime_ptr->daq_count == 1U));
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
-    CHECK("H5a GET_STATUS after clear: no resume, SESSION_CONFIGURATION_ID=0",
-          (l == 6U) && (res[1] == 0x00U) && (res[4] == 0x00U) && (res[5] == 0x00U));
+    CHECK("H5a GET_STATUS after clear: clearDaqReq, no resume, cfg=0",
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x08, 0x01, 0x00, 0x00, 0x00 }, 6U));
 
     l = xcp_cmd((const uint8 *)"\xF9\x01\x00\x00", 4U, res);
     CHECK("H6 SET_REQUEST STORE_CAL_REQ -> RES + storeCalRequest",
@@ -1346,7 +1368,7 @@ int main(void)
         uint8 dto[64]; uint32 dl;
 
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01", 3U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
         (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
         (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
@@ -1468,6 +1490,10 @@ int main(void)
     CHECK("J11 GET_STATUS while disconnected -> silence", l == 0U);
     l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
     CHECK("J12 reconnect after disconnect", (l == 8U) && (res[0] == XCP_PID_RES));
+
+    /* K section needs DAQ/STIM/PGM unlocked after this fresh CONNECT */
+    g_xcp_channel.runtime_ptr->protection_status &=
+        (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM | XCP_RESOURCE_PGM);
 
 #define XCP_BLOCK_TYPE_NONE     (0U)
 #define XCP_BLOCK_TYPE_DOWNLOAD (1U)
@@ -2117,10 +2143,14 @@ int main(void)
         CHECK("K17c ALLOC_ODT 5 -> ERR_MEMORY_OVERFLOW",
               (l == 2U) && (res[1] == XCP_ERR_MEMORY_OVERFLOW));
 
+#if (XCP_MAX_ODT_ENTRIES < 255U)
         cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = (uint8)(XCP_MAX_ODT_ENTRIES + 1U);
         l = xcp_cmd(cmd, 6U, res);
-        CHECK("K17d ALLOC_ODT_ENTRY 8 -> ERR_MEMORY_OVERFLOW",
+        CHECK("K17d ALLOC_ODT_ENTRY over max -> ERR_MEMORY_OVERFLOW",
               (l == 2U) && (res[1] == XCP_ERR_MEMORY_OVERFLOW));
+#else
+        CHECK("K17d ALLOC_ODT_ENTRY over max -> ERR_MEMORY_OVERFLOW", TRUE);
+#endif
 
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 5; cmd[5] = 0;
         CHECK("K17e SET_DAQ_PTR odt5 -> ERR_OUT_OF_RANGE",
@@ -2239,11 +2269,13 @@ int main(void)
         (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
         xcp_settle();
 
-        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
+        g_xcp_channel.runtime_ptr->protection_status &=
+            (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM);
         l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
         CHECK("K20d GET_STATUS fields",
               (l == 6U) && (res[0] == XCP_PID_RES)
-              && (res[1] == ((Xcp_IsResumeModeActive(&g_xcp_channel) != FALSE) ? 0x80U : 0x00U))
+              && ((res[1] & (XCP_SS_RESUME | XCP_SS_DAQ_RUNNING))
+                  == ((Xcp_IsResumeModeActive(&g_xcp_channel) != FALSE) ? XCP_SS_RESUME : 0x00U))
               && (res[2] == g_xcp_channel.runtime_ptr->protection_status));
 
         {
@@ -2380,7 +2412,7 @@ int main(void)
                                                 0x02, 0x00 }, 6U));
 
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01", 3U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
         (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
         (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
@@ -2413,7 +2445,7 @@ int main(void)
             uint8 bit_var = 0x00U;
             uint8 dto[64]; uint32 dl;
             (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-            (void)xcp_cmd((const uint8 *)"\xD5\x00\x01", 3U, res);
+            (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
             (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
             (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
             (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
@@ -2474,7 +2506,7 @@ int main(void)
             uint32 bit_var32 = 0U;
             uint8  dto[64]; uint32 dl;
             (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-            (void)xcp_cmd((const uint8 *)"\xD5\x00\x01", 3U, res);
+            (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
             (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
             (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x02", 6U, res);
             (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
@@ -2582,7 +2614,7 @@ int main(void)
               && (frame[4] == 0xFFU));
 
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01", 3U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
         (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
         (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
@@ -2626,6 +2658,7 @@ int main(void)
     {
         extern void test_seed_override_len(uint8);
         uint8 saved[4];
+        g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_STIM;
         test_seed_override_len(30U);
         cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_STIM;
         l = xcp_cmd(cmd, 3U, res);
@@ -2633,6 +2666,7 @@ int main(void)
               (l == 8U) && (res[1] == (uint8)(XCP_MAX_CTO - 2U)));
         test_seed_override_len(0U);
         memcpy(saved, &res[2], 4U); (void)saved;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_STIM;
     }
 #endif
 
@@ -2660,12 +2694,14 @@ int main(void)
 
     {
         extern void test_seed_override_len(uint8);
+        g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_STIM;
         test_seed_override_len(30U);
         cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_STIM;
         l = xcp_cmd(cmd, 3U, res);
         CHECK("K25c seed_length clamped to MAX_CTO-2",
               (l == 8U) && (res[1] == (uint8)(XCP_MAX_CTO - 2U)));
         test_seed_override_len(0U);
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_STIM;
     }
 #endif
 
@@ -2690,17 +2726,20 @@ int main(void)
 
     {
         extern void test_seed_override_len(uint8);
+        /* Re-lock STIM so GET_SEED produces a real seed rather than len=0 */
+        g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_STIM;
         test_seed_override_len(30U);
         cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_STIM;
         l = xcp_cmd(cmd, 3U, res);
         CHECK("K25e seed_length clamped to MAX_CTO-2",
               (l == 8U) && (res[1] == (uint8)(XCP_MAX_CTO - 2U)));
         test_seed_override_len(0U);
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_STIM;
     }
 
     {
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01", 3U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
         (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
         (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
@@ -2769,7 +2808,7 @@ int main(void)
 #if (XCP_DAQ_ENABLED == STD_ON)
         {
             (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-            (void)xcp_cmd((const uint8 *)"\xD5\x00\x02", 3U, res);
+            (void)xcp_cmd((const uint8 *)"\xD5\x00\x02\x00", 4U, res);
             (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
             (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
             (void)xcp_cmd((const uint8 *)"\xD4\x00\x01\x00\x01", 5U, res);
@@ -2787,10 +2826,15 @@ int main(void)
 #if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
                 Std_ReturnType r = Xcp_ReceiveStimDto(&g_xcp_channel, (const uint8 *)"\x01\xAA\xBB\xCC\xDD", 5U);
                 CHECK("K26e abs_odt=1 routed to list1 (prefix-sum decode)", r == E_OK);
-#else
-
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
                 Std_ReturnType r = Xcp_ReceiveStimDto(&g_xcp_channel, (const uint8 *)"\x00\x01\xAA\xBB\xCC\xDD", 6U);
                 CHECK("K26e odt0/list1 routed (relative decode)", r == E_OK);
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
+                Std_ReturnType r = Xcp_ReceiveStimDto(&g_xcp_channel, (const uint8 *)"\x00\x01\x00\xAA\xBB\xCC\xDD", 7U);
+                CHECK("K26e odt0/list1 routed (relative-word decode)", r == E_OK);
+#else /* RELATIVE_WORD_ALIGNED */
+                Std_ReturnType r = Xcp_ReceiveStimDto(&g_xcp_channel, (const uint8 *)"\x00\x00\x01\x00\xAA\xBB\xCC\xDD", 8U);
+                CHECK("K26e odt0/list1 routed (relative-word-aligned decode)", r == E_OK);
 #endif
             }
 

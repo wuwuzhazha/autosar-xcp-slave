@@ -61,6 +61,9 @@ int main(void)
           g_xcp_channel.config_ptr->xcp_static_daq_list[1].write_protected == 1U);
     l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
     CHECK("P5 CONNECT -> RES", (l == 8U) && (res[0] == XCP_PID_RES));
+    /* DAQ/STIM commands need the resource unlocked — CONNECT re-locks all */
+    g_xcp_channel.runtime_ptr->protection_status &=
+        (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM);
     l = xcp_cmd((const uint8 *)"\xD8\x00\x00\x00", 4U, res);
     CHECK("P6 list0 info: PREDEFINED|EVENT_FIXED|DAQ",
           (l == 6U) && (res[1] == 0x07U));

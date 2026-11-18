@@ -114,7 +114,7 @@ Std_ReturnType Det_ReportError(uint16 module_id, uint8 instance_id, uint8 api_id
     return E_OK;
 }
 
-static uint8   nvm_store[16384];
+static uint8   nvm_store[256 * 1024];
 static uint32  nvm_store_size = 0;
 static boolean nvm_valid = FALSE;
 
