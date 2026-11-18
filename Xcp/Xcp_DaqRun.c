@@ -193,13 +193,13 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
             uint32 byte_addr = entry->address + ((uint32) entry->bit_offset >> 3U);
 
             local_dto_buffer[buffer_idx] = 0x00U;
-            if (XCP_CHECK_READ_ACCESS(byte_addr, 1U) == 0U)
+            if (XCP_CHECK_READ_ACCESS_EX(entry->address_extension, byte_addr, 1U) == 0U)
             {
                 local_dto_buffer[buffer_idx] =
                     (uint8) ((src_ptr[entry->bit_offset >> 3U] >> (entry->bit_offset & 0x07U)) & 0x01U);
             }
         }
-        else if (XCP_CHECK_READ_ACCESS(entry->address, entry->size) != 0U)
+        else if (XCP_CHECK_READ_ACCESS_EX(entry->address_extension, entry->address, entry->size) != 0U)
         {
             (void) memset(&local_dto_buffer[buffer_idx], 0x00, entry->size);
         }

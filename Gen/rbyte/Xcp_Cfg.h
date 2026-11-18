@@ -92,8 +92,14 @@
 #ifndef XCP_CHECK_READ_ACCESS
 #define XCP_CHECK_READ_ACCESS(addr, size) (0U)
 #endif
+#ifndef XCP_CHECK_READ_ACCESS_EX
+#define XCP_CHECK_READ_ACCESS_EX(ext, addr, size) XCP_CHECK_READ_ACCESS(addr, size)
+#endif
 #ifndef XCP_CHECK_WRITE_ACCESS
 #define XCP_CHECK_WRITE_ACCESS(addr, size) (0U)
+#endif
+#ifndef XCP_CHECK_WRITE_ACCESS_EX
+#define XCP_CHECK_WRITE_ACCESS_EX(ext, addr, size) XCP_CHECK_WRITE_ACCESS(addr, size)
 #endif
 /* SchM 临界区默认: RTE 提供 SchM_Xcp.h (-D/-include 可覆盖) */
 #if !defined(XCP_DTO_ENTER_CRITICAL) || !defined(XCP_DTO_EXIT_CRITICAL)

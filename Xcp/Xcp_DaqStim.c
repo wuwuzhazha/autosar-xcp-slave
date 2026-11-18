@@ -156,7 +156,7 @@ Std_ReturnType Xcp_ReceiveStimDto(const uint8 *dto_data, uint8 dto_length)
             uint8  mask      = (uint8) (1U << (entry->bit_offset & 0x07U));
             uint32 byte_addr = entry->address + byte_idx;
 
-            if (XCP_CHECK_WRITE_ACCESS(byte_addr, 1U) == 0U)
+            if (XCP_CHECK_WRITE_ACCESS_EX(entry->address_extension, byte_addr, 1U) == 0U)
             {
                 if ((dto_data[data_idx] & 0x01U) != 0U)
                 {
@@ -168,7 +168,7 @@ Std_ReturnType Xcp_ReceiveStimDto(const uint8 *dto_data, uint8 dto_length)
                 }
             }
         }
-        else if (XCP_CHECK_WRITE_ACCESS(entry->address, entry->size) == 0U)
+        else if (XCP_CHECK_WRITE_ACCESS_EX(entry->address_extension, entry->address, entry->size) == 0U)
         {
             (void) memcpy(dst_ptr, &dto_data[data_idx], entry->size);
         }

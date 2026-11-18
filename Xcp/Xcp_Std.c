@@ -79,6 +79,9 @@ sint16 Xcp_CmdConnect(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 #endif
 
     ch->storage_ptr->cto_buffer[2] = XCP_COMM_BASIC_OPTIONAL;
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    ch->storage_ptr->cto_buffer[2] |= XCP_COMM_BASIC_SLAVE_BLOCK_MODE;
+#endif
 
     ch->storage_ptr->cto_buffer[3] = XCP_MAX_CTO;
 
@@ -244,7 +247,7 @@ sint16 Xcp_CmdUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, X
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_READ_ACCESS(ch->runtime_ptr->mta, num_elements) != 0U)
+    if (XCP_CHECK_READ_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -280,7 +283,7 @@ sint16 Xcp_CmdShortUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_READ_ACCESS(address, num_elements) != 0U)
+    if (XCP_CHECK_READ_ACCESS_EX(address_extension, address, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -309,7 +312,7 @@ sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS(ch->runtime_ptr->mta, num_elements) != 0U)
+    if (XCP_CHECK_WRITE_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -375,7 +378,7 @@ sint16 Xcp_CmdShortDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS(address, num_elements) != 0U)
+    if (XCP_CHECK_WRITE_ACCESS_EX(address_extension, address, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -410,7 +413,7 @@ sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
 
     num_elements = cmd_length - 1U;
 
-    if (XCP_CHECK_WRITE_ACCESS(ch->runtime_ptr->mta, num_elements) != 0U)
+    if (XCP_CHECK_WRITE_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -507,12 +510,12 @@ sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
         return Xcp_ResErr(res, XCP_ERR_CMD_SYNTAX);
     }
 
-    if (XCP_CHECK_READ_ACCESS(ch->runtime_ptr->mta, 4U) != 0U)
+    if (XCP_CHECK_READ_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS(ch->runtime_ptr->mta, 4U) != 0U)
+    if (XCP_CHECK_WRITE_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }

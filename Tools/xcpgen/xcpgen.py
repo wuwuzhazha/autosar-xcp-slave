@@ -436,6 +436,9 @@ def emit_h(vals, src="--config"):
         elif kind == "func":
             sig = "(addr, size)" if name.endswith("Access") else "()"
             L += [f"#ifndef {m}", f"#define {m}{sig} {tok}", "#endif"]
+            if name.endswith("Access"):
+                ex = m + "_EX"
+                L += [f"#ifndef {ex}", f"#define {ex}(ext, addr, size) {m}(addr, size)", "#endif"]
         else:
             L.append(f"#define {m} {tok}")
     L += ["", "/* 派生 */",

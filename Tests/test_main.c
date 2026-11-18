@@ -405,7 +405,13 @@ int main(void)
     CHECK("B2 CONNECT -> RES len 8", (l == 8U) && (res[0] == XCP_PID_RES));
 
     CHECK("B3 CONNECT bytes: CAL|DAQ|STIM|PGM, OPTIONAL+BYTE+Intel, CTO/DTO 8, v1/1",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x1D, 0x80, 8U, 8U, 0x00, 0x01, 0x01 }, 8U));
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x1D,
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+              0xC0,
+#else
+              0x80,
+#endif
+              8U, 8U, 0x00, 0x01, 0x01 }, 8U));
 
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
 

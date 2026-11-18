@@ -26,7 +26,7 @@
     "files": {}
   },
   "xcp_preprocessor": {
-    "total": 168,
+    "total": 169,
     "files": {
       "Xcp/Xcp.c": 27,
       "Xcp/Xcp.h": 3,
@@ -50,7 +50,7 @@
       "Xcp/Xcp_Resume.h": 1,
       "Xcp/Xcp_SeedKey.c": 3,
       "Xcp/Xcp_SeedKey.h": 1,
-      "Xcp/Xcp_Std.c": 19,
+      "Xcp/Xcp_Std.c": 20,
       "Xcp/Xcp_Std.h": 1
     }
   },
