@@ -79,9 +79,6 @@ sint16 Xcp_CmdConnect(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 #endif
 
     ch->storage_ptr->cto_buffer[2] = XCP_COMM_BASIC_OPTIONAL;
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-    ch->storage_ptr->cto_buffer[2] |= XCP_COMM_BASIC_SLAVE_BLOCK_MODE;
-#endif
 
     ch->storage_ptr->cto_buffer[3] = XCP_MAX_CTO;
 
@@ -165,6 +162,9 @@ sint16 Xcp_CmdGetCommModeInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_
     ch->storage_ptr->cto_buffer[1] = 0x00U;
 
     ch->storage_ptr->cto_buffer[2] = 0x00U;
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    ch->storage_ptr->cto_buffer[2] |= XCP_COMM_OPT_MASTER_BLOCK_MODE;
+#endif
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
     ch->storage_ptr->cto_buffer[2] |= XCP_COMM_OPT_INTERLEAVED_MODE;
 #endif
