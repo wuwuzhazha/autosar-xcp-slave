@@ -19,14 +19,14 @@
     }
   },
   "xcp_preprocessor": {
-    "total": 185,
+    "total": 179,
     "files": {
       "Xcp/Xcp.c": 24,
       "Xcp/Xcp.h": 4,
       "Xcp/XcpOnCan.c": 1,
       "Xcp/XcpOnCdd.c": 1,
-      "Xcp/XcpOnEth.c": 4,
-      "Xcp/XcpOnFr.c": 3,
+      "Xcp/XcpOnEth.c": 3,
+      "Xcp/XcpOnFr.c": 2,
       "Xcp/Xcp_CalPage.c": 3,
       "Xcp/Xcp_CalPage.h": 2,
       "Xcp/Xcp_Callback.h": 8,
@@ -43,16 +43,10 @@
       "Xcp/Xcp_SeedKey.h": 2,
       "Xcp/Xcp_Std.c": 22,
       "Xcp/Xcp_Std.h": 2,
-      "Xcp/Xcp_Tl.c": 4,
       "Xcp/Xcp_Types.h": 1
     }
   },
-  "c_includes": [
-    "Xcp/Xcp_Tl.c -> XcpOnCan.c",
-    "Xcp/Xcp_Tl.c -> XcpOnFr.c",
-    "Xcp/Xcp_Tl.c -> XcpOnEth.c",
-    "Xcp/Xcp_Tl.c -> XcpOnCdd.c"
-  ],
+  "c_includes": [],
   "tx_symbols": {
     "tx_last_kind": {
       "total": 0,

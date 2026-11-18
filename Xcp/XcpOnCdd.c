@@ -3,6 +3,8 @@
 #include "Xcp_Types.h"
 #include "Xcp_Callback.h"
 
+/* CDD：报文即 XCP 帧，无链路头。接口名由生成宏 XCP_CDD_*_NAME 展开。 */
+
 #if (XCP_ON_CDD_ENABLED == STD_ON)
 #include "Cdd.h"
 
@@ -43,5 +45,4 @@ Std_ReturnType Xcp_Tl_SendDto(const uint8 *data, uint8 length)
 {
     return Xcp_Tl_SendCto(data, length);
 }
-
 #endif

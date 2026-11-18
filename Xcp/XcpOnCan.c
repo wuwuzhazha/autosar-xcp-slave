@@ -1,7 +1,8 @@
 #include <string.h>
 #include "Xcp_Internal.h"
 #include "Xcp_Types.h"
-#include "Xcp_Callback.h"
+
+/* CAN：报文即 XCP 帧，无链路头。 */
 
 #if (XCP_ON_CAN_ENABLED == STD_ON)
 #include "CanIf.h"
@@ -41,8 +42,6 @@ Std_ReturnType Xcp_Tl_SendCto(const uint8 *data, uint8 length)
 
 Std_ReturnType Xcp_Tl_SendDto(const uint8 *data, uint8 length)
 {
-
     return Xcp_Tl_SendCto(data, length);
 }
-
 #endif

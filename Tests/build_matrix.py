@@ -21,7 +21,7 @@ XCPGEN = "Tools/xcpgen/xcpgen.py"
 MODULE_SRC = [
     "Xcp/Xcp.c", "Xcp/Xcp_Cmd.c", "Xcp/Xcp_Std.c", "Xcp/Xcp_Daq.c", "Xcp/Xcp_SeedKey.c",
     "Xcp/Xcp_CalPage.c", "Xcp/Xcp_FlashProg.c", "Xcp/Xcp_Resume.c",
-    "Xcp/Xcp_Tl.c",
+    "Xcp/XcpOnCan.c", "Xcp/XcpOnFr.c", "Xcp/XcpOnEth.c", "Xcp/XcpOnCdd.c",
 ]
 LINK_ONLY = ["Tests/test_stubs.c", "Tests/matrix_main.c"]
 SYNTAX_ONLY = ["Xcp/Xcp_Callouts.c"]
