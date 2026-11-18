@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "g_xcp_manager": {
+    "total": 616,
+    "files": {
+      "Xcp/Xcp.c": 85,
+      "Xcp/XcpOnCan.c": 2,
+      "Xcp/XcpOnCdd.c": 2,
+      "Xcp/XcpOnEth.c": 5,
+      "Xcp/XcpOnFr.c": 3,
+      "Xcp/Xcp_CalPage.c": 36,
+      "Xcp/Xcp_Cmd.c": 1,
+      "Xcp/Xcp_Daq.c": 197,
+      "Xcp/Xcp_FlashProg.c": 92,
+      "Xcp/Xcp_Internal.h": 7,
+      "Xcp/Xcp_Resume.c": 10,
+      "Xcp/Xcp_SeedKey.c": 34,
+      "Xcp/Xcp_Std.c": 142
+    }
+  },
+  "xcp_preprocessor": {
+    "total": 185,
+    "files": {
+      "Xcp/Xcp.c": 24,
+      "Xcp/Xcp.h": 4,
+      "Xcp/XcpOnCan.c": 1,
+      "Xcp/XcpOnCdd.c": 1,
+      "Xcp/XcpOnEth.c": 4,
+      "Xcp/XcpOnFr.c": 3,
+      "Xcp/Xcp_CalPage.c": 3,
+      "Xcp/Xcp_CalPage.h": 2,
+      "Xcp/Xcp_Callback.h": 8,
+      "Xcp/Xcp_Cmd.c": 4,
+      "Xcp/Xcp_Config.h": 1,
+      "Xcp/Xcp_Daq.c": 56,
+      "Xcp/Xcp_Daq.h": 3,
+      "Xcp/Xcp_FlashProg.c": 11,
+      "Xcp/Xcp_FlashProg.h": 2,
+      "Xcp/Xcp_Internal.h": 14,
+      "Xcp/Xcp_Resume.c": 7,
+      "Xcp/Xcp_Resume.h": 2,
+      "Xcp/Xcp_SeedKey.c": 4,
+      "Xcp/Xcp_SeedKey.h": 2,
+      "Xcp/Xcp_Std.c": 22,
+      "Xcp/Xcp_Std.h": 2,
+      "Xcp/Xcp_Tl.c": 4,
+      "Xcp/Xcp_Types.h": 1
+    }
+  },
+  "c_includes": [
+    "Xcp/Xcp_Tl.c -> XcpOnCan.c",
+    "Xcp/Xcp_Tl.c -> XcpOnFr.c",
+    "Xcp/Xcp_Tl.c -> XcpOnEth.c",
+    "Xcp/Xcp_Tl.c -> XcpOnCdd.c"
+  ],
+  "tx_symbols": {
+    "tx_last_kind": {
+      "total": 24,
+      "files": {
+        "Xcp/Xcp.c": 11,
+        "Xcp/Xcp_Daq.c": 12,
+        "Xcp/Xcp_Internal.h": 1
+      }
+    },
+    "cto_busy": {
+      "total": 10,
+      "files": {
+        "Xcp/Xcp.c": 9,
+        "Xcp/Xcp_Internal.h": 1
+      }
+    },
+    "dto_busy": {
+      "total": 11,
+      "files": {
+        "Xcp/Xcp.c": 1,
+        "Xcp/Xcp_Daq.c": 9,
+        "Xcp/Xcp_Internal.h": 1
+      }
+    },
+    "cto_pending": {
+      "total": 14,
+      "files": {
+        "Xcp/Xcp.c": 11,
+        "Xcp/Xcp_Daq.c": 1,
+        "Xcp/Xcp_Internal.h": 1,
+        "Xcp/Xcp_Std.c": 1
+      }
+    }
+  },
+  "forbidden_includes": []
+}

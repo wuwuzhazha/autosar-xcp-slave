@@ -6,10 +6,6 @@
 #include "Xcp_Internal.h"
 #include "Xcp_Resume.h"
 
-#if (XCP_ON_CAN_ENABLED == STD_ON)
-#include "CanIf.h"
-#endif
-
 #if (XCP_DAQ_ENABLED == STD_ON)
 
 /* ODT0 是否携带时间戳：TIMESTAMP_FIXED 时恒带，否则看 DAQ 列表 mode */

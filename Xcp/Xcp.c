@@ -10,10 +10,6 @@
 #include "Os.h"
 #endif
 
-#if (XCP_ON_CAN_ENABLED == STD_ON)
-#include "CanIf.h"
-#endif
-
 #include <string.h>
 
 extern const Xcp_ConfigType xcp_config;

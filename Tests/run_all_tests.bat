@@ -7,6 +7,12 @@ set CORE=Xcp\Xcp.c Xcp\Xcp_Cmd.c Xcp\Xcp_Std.c Xcp\Xcp_Daq.c Xcp\Xcp_SeedKey.c X
 set FLAGS=-std=c99 -g -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -ITests\stubs -ITests -IXcp -include Tests\test_config.h
 
 echo ==================================================================
+echo [R] Architecture ratchet (counts + Gen drift)
+echo ==================================================================
+python Tests\ratchet.py || goto :fail
+
+echo.
+echo ==================================================================
 echo [0/9] Generate: 10 个变体配置 (Gen\*, 来源 Config\profiles\*.toml)
 echo ==================================================================
 %GEN% --profile can     --out Gen\can     || goto :fail
