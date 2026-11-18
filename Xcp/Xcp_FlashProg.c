@@ -427,7 +427,10 @@ sint16 Xcp_CmdProgramFormat(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
-    (void) access_method;
+    if (access_method > 1U)
+    {
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+    }
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
