@@ -210,7 +210,11 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length
     if (storage->dto_queue_count < (uint8) XCP_MAX_ODT)
     {
         uint8 head = storage->dto_queue_head;
-        (void) memcpy(storage->dto_queue[head], dto_data, (uint8) XCP_MAX_DTO);
+        (void) memcpy(storage->dto_queue[head], dto_data, (dto_length < (uint8) XCP_MAX_DTO) ? dto_length : (uint8) XCP_MAX_DTO);
+        if (dto_length < (uint8) XCP_MAX_DTO)
+        {
+            (void) memset(&storage->dto_queue[head][dto_length], 0x00, (uint8) XCP_MAX_DTO - dto_length);
+        }
         storage->dto_queue_head = (head + 1U) % (uint8) XCP_MAX_ODT;
         storage->dto_queue_count++;
     }
