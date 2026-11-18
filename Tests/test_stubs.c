@@ -52,7 +52,7 @@ Std_ReturnType SoAd_IfTransmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_
 }
 Std_ReturnType FrIf_DisableLPdu(uint16 lpdu_handle) { (void)lpdu_handle; return E_OK; }
 Std_ReturnType FrIf_ReconfigLPdu(uint16 lpdu_handle, uint16 frame_id, uint8 chn_idx,
-                                 uint8 cycle_rep, uint16 offset, uint8 len, uint16 cfg_idx)
+                                 uint8 cycle_rep, uint16 offset, uint16 len, uint16 cfg_idx)
 {
     (void)lpdu_handle;(void)frame_id;(void)chn_idx;(void)cycle_rep;(void)offset;(void)len;(void)cfg_idx;
     return E_OK;

@@ -113,7 +113,7 @@ Std_ReturnType Xcp_FrConfigureLPdu(void)
 
     return FrIf_ReconfigLPdu(cfg->xcp_fr_lpdu_handle, cfg->xcp_fr_frame_id,
                              cfg->xcp_fr_channel, cfg->xcp_fr_cycle_rep,
-                             cfg->xcp_fr_offset, (uint8) XCP_MAX_DTO, cfg->xcp_fr_config_idx);
+                             cfg->xcp_fr_offset, XCP_FR_MAX_FRAME, cfg->xcp_fr_config_idx);
 }
 
 static Std_ReturnType Xcp_FrSend(const uint8 *data, uint8 length)
