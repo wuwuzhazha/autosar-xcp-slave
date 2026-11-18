@@ -184,6 +184,8 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
+    boolean send_now = FALSE;
+
     XCP_DTO_ENTER_CRITICAL();
 
     if (runtime->tx_mode == XCP_TX_OFF)
@@ -194,19 +196,27 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length
 
     if (runtime->tx.state == XCP_TX_IDLE)
     {
-
         runtime->tx.dto_latch = TRUE;
         runtime->tx.state     = XCP_TX_DTO;
+        send_now = TRUE;
+    }
 
+    XCP_DTO_EXIT_CRITICAL();
+
+    if (send_now != FALSE)
+    {
         if (Xcp_Tl_SendDto(dto_data, dto_length) == E_OK)
         {
-            XCP_DTO_EXIT_CRITICAL();
             return;
         }
 
+        XCP_DTO_ENTER_CRITICAL();
         runtime->tx.dto_latch = FALSE;
         runtime->tx.state     = XCP_TX_IDLE;
+        XCP_DTO_EXIT_CRITICAL();
     }
+
+    XCP_DTO_ENTER_CRITICAL();
 
     if (storage->dto_queue_count < (uint8) XCP_MAX_ODT)
     {
