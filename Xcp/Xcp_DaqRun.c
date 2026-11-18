@@ -112,58 +112,12 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
 
     (void) memset(&local_dto_buffer[0], 0x00, XCP_MAX_DTO);
 
-    buffer_idx = 0U;
-
-#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
-
-    {
-        local_dto_buffer[buffer_idx] = (uint8) (Xcp_AbsPidEncode(daq_list_no, odt_no) & 0xFFU);
-        buffer_idx++;
-    }
-#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
-
-    local_dto_buffer[buffer_idx] = odt_no;
-    buffer_idx++;
-    local_dto_buffer[buffer_idx] = (uint8) daq_list_no;
-    buffer_idx++;
-#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
-
-    local_dto_buffer[buffer_idx] = odt_no;
-    buffer_idx++;
-    local_dto_buffer[buffer_idx] = (uint8) (daq_list_no & 0xFFU);
-    buffer_idx++;
-    local_dto_buffer[buffer_idx] = (uint8) ((daq_list_no >> 8U) & 0xFFU);
-    buffer_idx++;
-#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD_ALIGNED)
-
-    local_dto_buffer[buffer_idx] = odt_no;
-    buffer_idx++;
-    local_dto_buffer[buffer_idx] = 0x00U;
-    buffer_idx++;
-    local_dto_buffer[buffer_idx] = (uint8) (daq_list_no & 0xFFU);
-    buffer_idx++;
-    local_dto_buffer[buffer_idx] = (uint8) ((daq_list_no >> 8U) & 0xFFU);
-    buffer_idx++;
-#endif
-
-#if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP)
+    buffer_idx = Xcp_PidFieldEncode(&g_xcp_channel, daq_list_no, odt_no, &local_dto_buffer[0]);
 
     if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&g_xcp_channel.storage_ptr->daq_list[daq_list_no]))
     {
-        uint32 ts = Xcp_GetTimestamp();
-#if (XCP_TIMESTAMP_TYPE == XCP_FOUR_BYTE)
-        local_dto_buffer[buffer_idx++] = (uint8) (ts & 0xFFU);
-        local_dto_buffer[buffer_idx++] = (uint8) ((ts >> 8U) & 0xFFU);
-        local_dto_buffer[buffer_idx++] = (uint8) ((ts >> 16U) & 0xFFU);
-        local_dto_buffer[buffer_idx++] = (uint8) ((ts >> 24U) & 0xFFU);
-#elif (XCP_TIMESTAMP_TYPE == XCP_TWO_BYTE)
-        local_dto_buffer[buffer_idx++] = (uint8) (ts & 0xFFU);
-        local_dto_buffer[buffer_idx++] = (uint8) ((ts >> 8U) & 0xFFU);
-#elif (XCP_TIMESTAMP_TYPE == XCP_ONE_BYTE)
-        local_dto_buffer[buffer_idx++] = (uint8) (ts & 0xFFU);
-#endif
+        buffer_idx += Xcp_WriteTimestamp(Xcp_GetTimestamp(), &local_dto_buffer[buffer_idx]);
     }
-#endif
 
     for (entry_idx = 0U; entry_idx < odt->odt_entry_count; entry_idx++)
     {

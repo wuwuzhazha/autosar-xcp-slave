@@ -52,46 +52,16 @@ Std_ReturnType Xcp_ReceiveStimDto(const uint8 *dto_data, uint8 dto_length)
     Xcp_OdtEntryType *entry;
     uint8            *dst_ptr;
 
-#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE) || (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
-    const uint8 min_stim_len = 2U;
-#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
-    const uint8 min_stim_len = 4U;
-#else
-    const uint8 min_stim_len = 5U;
-#endif
-
-    if ((dto_data == NULL) || (dto_length < min_stim_len))
+    if (dto_data == NULL)
     {
         return E_NOT_OK;
     }
 
-#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
-
+    if (Xcp_PidFieldDecode(&g_xcp_channel, dto_data, dto_length, &daq_list_no, &odt_no, &data_idx) != E_OK)
     {
-        if (Xcp_AbsPidDecode((uint16) dto_data[0], &daq_list_no, &odt_no) != E_OK)
-        {
-            return E_NOT_OK;
-        }
+        return E_NOT_OK;
     }
 
-    data_idx = 1U;
-#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
-
-    odt_no = dto_data[0];
-    daq_list_no = (uint16) dto_data[1];
-    data_idx = 2U;
-#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
-
-    odt_no = dto_data[0];
-    daq_list_no = (uint16) dto_data[1] | ((uint16) dto_data[2] << 8U);
-    data_idx = 3U;
-#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD_ALIGNED)
-
-    odt_no = dto_data[0];
-
-    daq_list_no = (uint16) dto_data[2] | ((uint16) dto_data[3] << 8U);
-    data_idx = 4U;
-#endif
     if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
     {
         return E_NOT_OK;
@@ -114,19 +84,10 @@ Std_ReturnType Xcp_ReceiveStimDto(const uint8 *dto_data, uint8 dto_length)
 
     odt = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no];
 
-#if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP)
-
     if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&g_xcp_channel.storage_ptr->daq_list[daq_list_no]))
     {
-#if (XCP_TIMESTAMP_TYPE == XCP_FOUR_BYTE)
-        data_idx += 4U;
-#elif (XCP_TIMESTAMP_TYPE == XCP_TWO_BYTE)
-        data_idx += 2U;
-#elif (XCP_TIMESTAMP_TYPE == XCP_ONE_BYTE)
-        data_idx += 1U;
-#endif
+        data_idx += Xcp_TimestampSize();
     }
-#endif
     for (entry_idx = 0U; entry_idx < odt->odt_entry_count; entry_idx++)
     {
         boolean is_bit;

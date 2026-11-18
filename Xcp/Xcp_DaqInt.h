@@ -19,26 +19,26 @@
 extern uint16 Xcp_ActiveDaqIndices[XCP_MAX_DAQ];
 extern uint16 Xcp_ActiveDaqCount;
 
-static inline uint16 Xcp_AbsPidEncode(uint16 daq_list_no, uint8 odt_no)
+static inline uint16 Xcp_AbsPidEncode(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no)
 {
     uint16 abs_id = 0U;
     uint16 d_idx;
 
     for (d_idx = 0U; d_idx < daq_list_no; d_idx++)
     {
-        abs_id += g_xcp_channel.storage_ptr->daq_list[d_idx].odt_count;
+        abs_id += ch->storage_ptr->daq_list[d_idx].odt_count;
     }
     return (uint16)(abs_id + odt_no);
 }
 
-static inline Std_ReturnType Xcp_AbsPidDecode(uint16 abs_odt, uint16 *daq_list_no, uint8 *odt_no)
+static inline Std_ReturnType Xcp_AbsPidDecode(Xcp_Channel *ch, uint16 abs_odt, uint16 *daq_list_no, uint8 *odt_no)
 {
     uint16 prefix = 0U;
     uint16 d_idx;
 
-    for (d_idx = 0U; d_idx < g_xcp_channel.runtime_ptr->daq_count; d_idx++)
+    for (d_idx = 0U; d_idx < ch->runtime_ptr->daq_count; d_idx++)
     {
-        uint16 cnt = (uint16) g_xcp_channel.storage_ptr->daq_list[d_idx].odt_count;
+        uint16 cnt = (uint16) ch->storage_ptr->daq_list[d_idx].odt_count;
 
         if ((abs_odt >= prefix) && (abs_odt < (uint16)(prefix + cnt)))
         {
@@ -49,6 +49,106 @@ static inline Std_ReturnType Xcp_AbsPidDecode(uint16 abs_odt, uint16 *daq_list_n
         prefix = (uint16)(prefix + cnt);
     }
     return E_NOT_OK;
+}
+
+static inline uint8 Xcp_PidFieldEncode(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no, uint8 *buf)
+{
+    uint8 n = 0U;
+
+#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
+    buf[n++] = (uint8) (Xcp_AbsPidEncode(ch, daq_list_no, odt_no) & 0xFFU);
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
+    buf[n++] = odt_no;
+    buf[n++] = (uint8) daq_list_no;
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
+    buf[n++] = odt_no;
+    buf[n++] = (uint8) (daq_list_no & 0xFFU);
+    buf[n++] = (uint8) ((daq_list_no >> 8U) & 0xFFU);
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD_ALIGNED)
+    buf[n++] = odt_no;
+    buf[n++] = 0x00U;
+    buf[n++] = (uint8) (daq_list_no & 0xFFU);
+    buf[n++] = (uint8) ((daq_list_no >> 8U) & 0xFFU);
+#endif
+    return n;
+}
+
+static inline Std_ReturnType Xcp_PidFieldDecode(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length,
+                                              uint16 *daq_list_no, uint8 *odt_no, uint8 *data_idx)
+{
+#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
+    if (dto_length < 2U)
+    {
+        return E_NOT_OK;
+    }
+    if (Xcp_AbsPidDecode(ch, (uint16) dto_data[0], daq_list_no, odt_no) != E_OK)
+    {
+        return E_NOT_OK;
+    }
+    *data_idx = 1U;
+    return E_OK;
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_BYTE)
+    if (dto_length < 3U)
+    {
+        return E_NOT_OK;
+    }
+    *odt_no      = dto_data[0];
+    *daq_list_no = (uint16) dto_data[1];
+    *data_idx    = 2U;
+    return E_OK;
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD)
+    if (dto_length < 4U)
+    {
+        return E_NOT_OK;
+    }
+    *odt_no      = dto_data[0];
+    *daq_list_no = (uint16) ((uint16) dto_data[1] | ((uint16) dto_data[2] << 8U));
+    *data_idx    = 3U;
+    return E_OK;
+#elif (XCP_IDENTIFICATION_FIELD_TYPE == XCP_RELATIVE_WORD_ALIGNED)
+    if (dto_length < 5U)
+    {
+        return E_NOT_OK;
+    }
+    *odt_no      = dto_data[0];
+    *daq_list_no = (uint16) ((uint16) dto_data[2] | ((uint16) dto_data[3] << 8U));
+    *data_idx    = 4U;
+    return E_OK;
+#endif
+    (void)ch; (void)dto_length;
+    return E_NOT_OK;
+}
+
+static inline uint8 Xcp_TimestampSize(void)
+{
+#if (XCP_TIMESTAMP_TYPE == XCP_FOUR_BYTE)
+    return 4U;
+#elif (XCP_TIMESTAMP_TYPE == XCP_TWO_BYTE)
+    return 2U;
+#elif (XCP_TIMESTAMP_TYPE == XCP_ONE_BYTE)
+    return 1U;
+#else
+    return 0U;
+#endif
+}
+
+static inline uint8 Xcp_WriteTimestamp(uint32 ts, uint8 *buf)
+{
+    uint8 n = 0U;
+#if (XCP_TIMESTAMP_TYPE == XCP_FOUR_BYTE)
+    buf[n++] = (uint8) (ts & 0xFFU);
+    buf[n++] = (uint8) ((ts >> 8U) & 0xFFU);
+    buf[n++] = (uint8) ((ts >> 16U) & 0xFFU);
+    buf[n++] = (uint8) ((ts >> 24U) & 0xFFU);
+#elif (XCP_TIMESTAMP_TYPE == XCP_TWO_BYTE)
+    buf[n++] = (uint8) (ts & 0xFFU);
+    buf[n++] = (uint8) ((ts >> 8U) & 0xFFU);
+#elif (XCP_TIMESTAMP_TYPE == XCP_ONE_BYTE)
+    buf[n++] = (uint8) (ts & 0xFFU);
+#else
+    (void)ts; (void)buf;
+#endif
+    return n;
 }
 
 #endif
