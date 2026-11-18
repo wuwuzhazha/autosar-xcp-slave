@@ -86,6 +86,13 @@ typedef struct
     uint8 cto_buffer[XCP_MAX_CTO];
     uint8 cto_length;
 
+#if (XCP_ON_FLEXRAY_ENABLED == STD_ON)
+    uint8  fr_msg_counter;
+#endif
+#if (XCP_ON_ETHERNET_ENABLED == STD_ON)
+    uint16 eth_msg_counter;
+#endif
+
 #if (XCP_DAQ_ENABLED == STD_ON)
 
     Xcp_DaqListType  daq_list[XCP_MAX_DAQ];

@@ -73,10 +73,15 @@ Std_ReturnType Xcp_SoAdIfTriggerTransmit(PduIdType tx_pdu_id, PduInfoType *pdu_i
 
 uint16 Xcp_EthPackMessage(const uint8 *msg, uint8 msg_len, uint8 *frame, uint16 frame_capacity)
 {
-    static uint16 eth_counter = 0U;
     uint16 block;
+    uint16 ctr;
 
     if ((msg == NULL_PTR) || (frame == NULL_PTR) || (msg_len == 0U))
+    {
+        return 0U;
+    }
+
+    if (g_xcp_channel.storage_ptr == NULL_PTR)
     {
         return 0U;
     }
@@ -87,11 +92,13 @@ uint16 Xcp_EthPackMessage(const uint8 *msg, uint8 msg_len, uint8 *frame, uint16 
         return 0U;
     }
 
+    ctr = g_xcp_channel.storage_ptr->eth_msg_counter;
+    g_xcp_channel.storage_ptr->eth_msg_counter++;
+
     frame[0] = (uint8) (msg_len & 0xFFU);
     frame[1] = (uint8) ((msg_len >> 8U) & 0xFFU);
-    frame[2] = (uint8) (eth_counter & 0xFFU);
-    frame[3] = (uint8) ((eth_counter >> 8U) & 0xFFU);
-    eth_counter++;
+    frame[2] = (uint8) (ctr & 0xFFU);
+    frame[3] = (uint8) ((ctr >> 8U) & 0xFFU);
     (void) memcpy(&frame[XCP_ETH_HEADER_LEN], msg, msg_len);
     return block;
 }

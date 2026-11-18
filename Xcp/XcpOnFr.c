@@ -74,9 +74,14 @@ Std_ReturnType Xcp_FrIfTriggerTransmit(PduIdType tx_pdu_id, PduInfoType *pdu_inf
 uint16 Xcp_FrPackMessage(const uint8 *msg, uint8 msg_len, uint8 *frame, uint16 frame_capacity)
 {
     uint16 block;
-    static uint8 fr_counter = 0U;
+    uint8 ctr;
 
     if ((msg == NULL_PTR) || (frame == NULL_PTR) || (msg_len == 0U))
+    {
+        return 0U;
+    }
+
+    if (g_xcp_channel.storage_ptr == NULL_PTR)
     {
         return 0U;
     }
@@ -89,9 +94,12 @@ uint16 Xcp_FrPackMessage(const uint8 *msg, uint8 msg_len, uint8 *frame, uint16 f
         return 0U;
     }
 
+    ctr = g_xcp_channel.storage_ptr->fr_msg_counter;
+    g_xcp_channel.storage_ptr->fr_msg_counter++;
+
     frame[0] = (uint8) (msg_len & 0xFFU);
     frame[1] = (uint8) ((msg_len >> 8U) & 0xFFU);
-    frame[2] = fr_counter++;
+    frame[2] = ctr;
     (void) memcpy(&frame[XCP_FR_HEADER_LEN], msg, msg_len);
 
     if ((block - XCP_FR_HEADER_LEN - msg_len) == 1U)
