@@ -882,22 +882,27 @@ sint16 Xcp_CmdReadDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 sint16 Xcp_CmdGetDaqClock(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint32 timestamp;
+    uint8  ts_size;
 
     (void) cmd_data;
     (void) cmd_length;
 
     timestamp = Xcp_GetTimestamp();
+    ts_size   = Xcp_TimestampSize();
+
+    if (ts_size == 0U)
+    {
+        return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
+    }
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     ch->storage_ptr->cto_buffer[1] = 0x00U;
     ch->storage_ptr->cto_buffer[2] = 0x00U;
     ch->storage_ptr->cto_buffer[3] = 0x00U;
-    ch->storage_ptr->cto_buffer[4] = (uint8) (timestamp & 0xFFU);
-    ch->storage_ptr->cto_buffer[5] = (uint8) ((timestamp >> 8U) & 0xFFU);
-    ch->storage_ptr->cto_buffer[6] = (uint8) ((timestamp >> 16U) & 0xFFU);
-    ch->storage_ptr->cto_buffer[7] = (uint8) ((timestamp >> 24U) & 0xFFU);
 
-    return (sint16)(8U);
+    (void)Xcp_WriteTimestamp(timestamp, &ch->storage_ptr->cto_buffer[4U]);
+
+    return (sint16)(4U + ts_size);
 }
 
 #endif
