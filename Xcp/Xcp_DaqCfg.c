@@ -241,7 +241,7 @@ sint16 Xcp_CmdAllocDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
     (void) cmd_length;
     return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #else
-    uint16 daq_count = (uint16) cmd_data[2];
+    uint16 daq_count = Xcp_LeRead16(&cmd_data[2U]);
     uint16 i;
 
     (void) cmd_length;
