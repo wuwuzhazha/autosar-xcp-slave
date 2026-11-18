@@ -24,9 +24,9 @@
     "files": {}
   },
   "xcp_preprocessor": {
-    "total": 165,
+    "total": 166,
     "files": {
-      "Xcp/Xcp.c": 27,
+      "Xcp/Xcp.c": 28,
       "Xcp/Xcp.h": 3,
       "Xcp/XcpOnCan.c": 1,
       "Xcp/XcpOnCdd.c": 1,
