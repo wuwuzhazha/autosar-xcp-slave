@@ -208,9 +208,8 @@ sint16 Xcp_CmdGetSegmentInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, X
         ch->storage_ptr->cto_buffer[2] = 0x00U;
         ch->storage_ptr->cto_buffer[3] = 0x00U;
         ch->storage_ptr->cto_buffer[4] = 0x00U;
-        ch->storage_ptr->cto_buffer[5] = 0x00U;
 
-        return (sint16)(6U);
+        return (sint16)(5U);
     }
     else if (mode == 2U)
     {

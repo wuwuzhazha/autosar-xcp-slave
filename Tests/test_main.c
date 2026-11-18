@@ -701,8 +701,8 @@ int main(void)
           frame_is(res, l, (const uint8[]){ 0xFF, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00 }, 8U));
 
     l = xcp_cmd((const uint8 *)"\xE8\x01\x00\x00\x00", 5U, res);
-    CHECK("D6b GET_SEGMENT_INFO mode1: 2 pages, no mapping/compression/encryption",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x02, 0x00, 0x00, 0x00, 0x00 }, 6U));
+    CHECK("D6b GET_SEGMENT_INFO mode1: 2 pages, ext/map/access=0",
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x02, 0x00, 0x00, 0x00 }, 5U));
     l = xcp_cmd((const uint8 *)"\xE8\x02\x00\x00\x00", 5U, res);
     CHECK("D6c GET_SEGMENT_INFO mode2 mapping: ext=0x10, addr=seg0_page0",
           (l == 8U) && (res[0] == XCP_PID_RES) && (res[3] == 0x10U)
