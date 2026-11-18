@@ -5,6 +5,12 @@ Thanks for your interest. This project is an independent implementation of the
 ASAM XCP Part 2 v1.1 slave — contributions are welcome as long as they keep the
 codebase small, portable, and honest about what it implements.
 
+> **A note on provenance.** The bulk of this codebase was written by an AI
+> agent under self-test iteration (see README "Origin & Disclaimer"). Bug
+> reports and fixes from domain experts are especially valuable — if a
+> behavior looks suspicious against the spec, open an issue and cite the
+> ASAM/AUTOSAR clause rather than just patching symptoms.
+
 ## Setup
 
 ```bash

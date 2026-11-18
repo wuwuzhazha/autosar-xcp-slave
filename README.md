@@ -11,6 +11,32 @@ Single-channel, C99, no external dependencies beyond your integration hooks.
 
 ---
 
+> ## ⚠️ Origin & Disclaimer
+>
+> This repository is an **experiment in autonomous AI code generation**. Every line of the
+> implementation, configuration generator, test harness, and documentation was produced
+> by an LLM agent (Claude) driven only by:
+> - the public ASAM XCP Part 2 specification text,
+> - the AUTOSAR XCP R4.4.0 module requirements,
+> - an iterative self-test loop (write → build → run asserts → fix → repeat),
+>
+> with **no human-written reference code** copied or translated. The goal was to
+> measure how far an AI can carry a non-trivial protocol-stack implementation on its own.
+>
+> **Use at your own risk.** Although the code builds cleanly, passes ~3 000 host-side
+> asserts across 10 profiles plus a 103-variant feature matrix, and adheres to the
+> documented protocol surface, it has **not** been peer-reviewed by XCP/AUTOSAR
+> domain experts, has **not** been validated on real hardware against a commercial
+> master (CANape, INCA, etc.), and makes no claim of ASAM conformance, AUTOSAR
+> conformance, MISRA-C conformance, or fitness for any particular purpose. For any
+> production, safety-related, or customer-facing use you MUST conduct your own
+> conformance, robustness, and integration review before shipping.
+>
+> Reports of incorrect behavior, spec misreads, or missing features are welcome via
+> the issue tracker.
+
+---
+
 ## Features
 
 - **Standard commands** — CONNECT / DISCONNECT / GET_STATUS / SYNCH / GET_COMM_MODE_INFO /
