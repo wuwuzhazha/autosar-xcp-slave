@@ -32,7 +32,7 @@ static inline uint16 Xcp_AbsPidEncode(uint16 daq_list_no, uint8 odt_no)
 
     for (d_idx = 0U; d_idx < daq_list_no; d_idx++)
     {
-        abs_id += g_xcp_manager.storage_ptr->daq_list[d_idx].odt_count;
+        abs_id += g_xcp_channel.storage_ptr->daq_list[d_idx].odt_count;
     }
     return (uint16)(abs_id + odt_no);
 }
@@ -42,9 +42,9 @@ static inline Std_ReturnType Xcp_AbsPidDecode(uint16 abs_odt, uint16 *daq_list_n
     uint16 prefix = 0U;
     uint16 d_idx;
 
-    for (d_idx = 0U; d_idx < g_xcp_manager.runtime_ptr->daq_count; d_idx++)
+    for (d_idx = 0U; d_idx < g_xcp_channel.runtime_ptr->daq_count; d_idx++)
     {
-        uint16 cnt = (uint16) g_xcp_manager.storage_ptr->daq_list[d_idx].odt_count;
+        uint16 cnt = (uint16) g_xcp_channel.storage_ptr->daq_list[d_idx].odt_count;
 
         if ((abs_odt >= prefix) && (abs_odt < (uint16)(prefix + cnt)))
         {

@@ -160,7 +160,7 @@ static uint32 xcp_cmd(const uint8 *cmd, uint32 len, uint8 *res)
     Xcp_MainFunction();
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
     /* 交织模式每周期只出队一条：补泵至队列排空 */
-    while (g_xcp_manager.runtime_ptr->cmd_queue_count > 0U)
+    while (g_xcp_channel.runtime_ptr->cmd_queue_count > 0U)
     {
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();
@@ -197,8 +197,8 @@ static void xcp_drain_tx(void)
 /* 模拟一帧 DTO 在飞（共享PDU单在飞：须同时置归属） */
 static void test_sim_dto_inflight(void)
 {
-    g_xcp_manager.runtime_ptr->tx.dto_latch = TRUE;
-    g_xcp_manager.runtime_ptr->tx.state = XCP_TX_DTO;
+    g_xcp_channel.runtime_ptr->tx.dto_latch = TRUE;
+    g_xcp_channel.runtime_ptr->tx.state = XCP_TX_DTO;
 }
 
 static void xcp_settle(void)
@@ -208,11 +208,11 @@ static void xcp_settle(void)
     {
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();
-        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_manager.runtime_ptr->tx.dto_latch == FALSE)
-            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE)
-            && (g_xcp_manager.runtime_ptr->tx.state == XCP_TX_IDLE)
-            && (g_xcp_manager.runtime_ptr->cmd_pending == FALSE))
+        if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE)
+            && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+            && (g_xcp_channel.runtime_ptr->cmd_pending == FALSE))
         {
             break;
         }
@@ -235,10 +235,10 @@ static void xcp_quiesce(void)
         while (test_tx_pop(f, &fl) > 0U)
         {
         }
-        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_manager.runtime_ptr->tx.dto_latch == FALSE)
-            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE)
-            && (g_xcp_manager.storage_ptr->dto_queue_count == 0U))
+        if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE)
+            && (g_xcp_channel.storage_ptr->dto_queue_count == 0U))
         {
             break;
         }
@@ -246,7 +246,7 @@ static void xcp_quiesce(void)
     }
     for (i = 0U; i < XCP_MAX_EVENT_CHANNEL; i++)
     {
-        g_xcp_manager.runtime_ptr->event_channel_counter[i] = 0U;
+        g_xcp_channel.runtime_ptr->event_channel_counter[i] = 0U;
     }
 }
 
@@ -268,8 +268,8 @@ static boolean xcp_cmd_has_err(const uint8 *c, uint32 len, uint8 err)
         {
             Xcp_Tl_TxConfirmation(0U, E_OK);
             Xcp_MainFunction();
-            if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
-                && (g_xcp_manager.runtime_ptr->cmd_pending == FALSE))
+            if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
+                && (g_xcp_channel.runtime_ptr->cmd_pending == FALSE))
             {
                 break;
             }
@@ -312,11 +312,11 @@ static uint32 xcp_cmd_reply(const uint8 *c, uint32 len, uint8 *res)
     {
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();
-        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE)
-            && (g_xcp_manager.runtime_ptr->cmd_pending == FALSE)
+        if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE)
+            && (g_xcp_channel.runtime_ptr->cmd_pending == FALSE)
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-            && (g_xcp_manager.runtime_ptr->cmd_queue_count == 0U)
+            && (g_xcp_channel.runtime_ptr->cmd_queue_count == 0U)
 #endif
             )
         {
@@ -409,9 +409,9 @@ int main(void)
     printf("-- A. Init / VersionInfo\n");
     Xcp_Init(NULL_PTR);
     CHECK("A4 Xcp_Init(NULL) -> default config",
-          g_xcp_manager.config_ptr == &xcp_config);
+          g_xcp_channel.config_ptr == &xcp_config);
     CHECK("A5 state == XCP_INIT",
-          g_xcp_manager.runtime_ptr->state == XCP_INIT);
+          g_xcp_channel.runtime_ptr->state == XCP_INIT);
 
     test_det_count = 0;
     Xcp_GetVersionInfo(NULL_PTR);
@@ -543,7 +543,7 @@ int main(void)
         l = xcp_cmd(cmd, 6U, res);
         CHECK("G2 UNLOCK correct key -> RES + cleared bit",
               (l >= 1U) && (res[0] == XCP_PID_RES)
-              && ((g_xcp_manager.runtime_ptr->protection_status & XCP_RESOURCE_CAL_PAG) == 0U));
+              && ((g_xcp_channel.runtime_ptr->protection_status & XCP_RESOURCE_CAL_PAG) == 0U));
         /* 错误key */
         cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_PGM;
         l = xcp_cmd(cmd, 3U, res); memcpy(seed, &res[2], 4U);
@@ -554,7 +554,7 @@ int main(void)
               (l == 2U) && (res[1] == XCP_ERR_ACCESS_LOCKED));
         /* [ASAM] 错key → 会话断开 + 采集停止 */
         CHECK("G3b wrong key -> disconnected",
-              g_xcp_manager.runtime_ptr->connection_state == XCP_DISCONNECTED);
+              g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED);
         /* 重新连接继续后续测试 */
         l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
         CHECK("G3d reconnect after wrong-key", (l >= 1U) && (res[0] == XCP_PID_RES));
@@ -588,7 +588,7 @@ int main(void)
         for (i = 0U; i < 4U; i++) { cmd[2U + i] = (uint8)(seed[i] ^ 0xFFU); }
         (void)xcp_cmd(cmd, 6U, res);
         CHECK("G5 all resources unlocked",
-              g_xcp_manager.runtime_ptr->protection_status == 0U);
+              g_xcp_channel.runtime_ptr->protection_status == 0U);
     }
 
     /*---------------- C: MTA/UPLOAD/DOWNLOAD -----------------------------------*/
@@ -725,7 +725,7 @@ int main(void)
     (void)xcp_cmd((const uint8 *)"\xEA\x02\x00", 3U, res);
     CHECK("D3c page active after SET",
           (l == 1U) && (res[0] == XCP_PID_RES)
-          && (g_xcp_manager.runtime_ptr->active_page_xcp == 1U));
+          && (g_xcp_channel.runtime_ptr->active_page_xcp == 1U));
     cmd[0] = 0xEB; cmd[1] = 0x82U; cmd[2] = 0x00U; cmd[3] = 0x09U;  /* ALL|XCP 越界页 */
     l = xcp_cmd(cmd, 4U, res);
     CHECK("D4 SET_CAL_PAGE page9 -> ERR_PAGE_NOT_VALID",
@@ -807,7 +807,7 @@ int main(void)
     cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 2; cmd[3] = 0;   /* ALLOC_DAQ 2 */
     l = xcp_cmd(cmd, 4U, res);
     CHECK("E5 ALLOC_DAQ 2 -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
-    CHECK("E6 daq_count == 2", g_xcp_manager.runtime_ptr->daq_count == 2U);
+    CHECK("E6 daq_count == 2", g_xcp_channel.runtime_ptr->daq_count == 2U);
 
     cmd[0] = 0xD4; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 2;  /* ALLOC_ODT list0, 2 odts */
     l = xcp_cmd(cmd, 5U, res);
@@ -970,17 +970,17 @@ int main(void)
     l = xcp_cmd_reply((const uint8 *)"\xDD\x01", 2U, res);                   /* start selected */
     CHECK("E32 START_STOP_SYNCH start selected -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
     CHECK("E33 only the selected list0 RUNNING",
-          (g_xcp_manager.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING)
-          && (g_xcp_manager.storage_ptr->daq_list[1].state != XCP_DAQ_STATE_RUNNING));
+          (g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING)
+          && (g_xcp_channel.storage_ptr->daq_list[1].state != XCP_DAQ_STATE_RUNNING));
     l = xcp_cmd_reply((const uint8 *)"\xDF\x00\x00\x00", 4U, res);
     CHECK("E34 after start selected: running set, selected cleared", (l == 8U) && (res[1] == 0x40U));
     (void)xcp_cmd_reply((const uint8 *)"\xDE\x02\x01\x00", 4U, res);         /* SELECT list1 */
     (void)xcp_cmd_reply((const uint8 *)"\xDE\x02\x00\x00", 4U, res);         /* SELECT list0 */
     l = xcp_cmd_reply((const uint8 *)"\xDD\x02", 2U, res);                   /* stop selected */
     CHECK("E35 START_STOP_SYNCH stop selected: list0 stopped, flags cleared",
-          (l == 1U) && (g_xcp_manager.storage_ptr->daq_list[0].state != XCP_DAQ_STATE_RUNNING)
-          && (g_xcp_manager.storage_ptr->daq_list[0].selected == FALSE)
-          && (g_xcp_manager.storage_ptr->daq_list[1].selected == FALSE));
+          (l == 1U) && (g_xcp_channel.storage_ptr->daq_list[0].state != XCP_DAQ_STATE_RUNNING)
+          && (g_xcp_channel.storage_ptr->daq_list[0].selected == FALSE)
+          && (g_xcp_channel.storage_ptr->daq_list[1].selected == FALSE));
     l = xcp_cmd_reply((const uint8 *)"\xDE\x03\x00\x00", 4U, res);
     CHECK("E36 START_STOP_DAQ_LIST mode3 -> ERR_MODE_NOT_VALID",
           (l == 2U) && (res[1] == XCP_ERR_MODE_NOT_VALID));
@@ -1191,7 +1191,7 @@ int main(void)
     l = xcp_cmd((const uint8 *)"\xCF", 1U, res);
     CHECK("F14 PROGRAM_RESET -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
     CHECK("F15 PROGRAM_RESET -> disconnected",
-          g_xcp_manager.runtime_ptr->connection_state == XCP_DISCONNECTED);
+          g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED);
 
     /*---------------- H: RESUME 模式 -------------------------------------------*/
     printf("-- H. resume mode\n");
@@ -1236,7 +1236,7 @@ int main(void)
     /* 断电重启: Init 同步恢复 DAQ 配置并自主发 EV_RESUME_MODE */
     xcp_drain_tx();
     Xcp_Init(NULL_PTR);
-    CHECK("H3 resume: daq_count restored", g_xcp_manager.runtime_ptr->daq_count == 1U);
+    CHECK("H3 resume: daq_count restored", g_xcp_channel.runtime_ptr->daq_count == 1U);
     {
         uint8 ev[64]; uint32 el;
         boolean found = FALSE;
@@ -1257,7 +1257,7 @@ int main(void)
     {
         uint8 dto[64]; uint32 dl;
         CHECK("H13 resumed list0 auto-RUNNING",
-              g_xcp_manager.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
+              g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
         /* 事件2触发即出DTO；内容校验条目（含 BIT_OFFSET=0xFF）已随 RESUME 持久化 */
         test_ram_var32 = 0x11223344UL;
         xcp_drain_tx();
@@ -1275,7 +1275,7 @@ int main(void)
     /* CLEAR_DAQ_REQ: 只清 NV 中的配置，RAM 中的 DAQ 列表保留 */
     l = xcp_cmd((const uint8 *)"\xF9\x08\x00\x00", 4U, res);
     CHECK("H5 SET_REQUEST CLEAR_DAQ_REQ -> RES, RAM DAQ kept",
-          (l == 1U) && (res[0] == XCP_PID_RES) && (g_xcp_manager.runtime_ptr->daq_count == 1U));
+          (l == 1U) && (res[0] == XCP_PID_RES) && (g_xcp_channel.runtime_ptr->daq_count == 1U));
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
     CHECK("H5a GET_STATUS after clear: no resume, SESSION_CONFIGURATION_ID=0",
           (l == 6U) && (res[1] == 0x00U) && (res[4] == 0x00U) && (res[5] == 0x00U));
@@ -1284,7 +1284,7 @@ int main(void)
     l = xcp_cmd((const uint8 *)"\xF9\x01\x00\x00", 4U, res);
     CHECK("H6 SET_REQUEST STORE_CAL_REQ -> RES + storeCalRequest",
           (l == 1U) && (res[0] == XCP_PID_RES)
-          && ((g_xcp_manager.runtime_ptr->session_status & 0x01U) != 0U));
+          && ((g_xcp_channel.runtime_ptr->session_status & 0x01U) != 0U));
     /* STORE_DAQ_REQ_NO_RESUME 不支持 → 显式拒绝 */
     l = xcp_cmd((const uint8 *)"\xF9\x02\x00\x00", 4U, res);
     CHECK("H7 SET_REQUEST STORE_DAQ_REQ_NO_RESUME -> ERR_OUT_OF_RANGE",
@@ -1307,7 +1307,7 @@ int main(void)
     CHECK("H8b store_pending cleared", g_xcp_resume_runtime.store_pending == FALSE);
     /* 读完成回调（restore_pending置位后由回调推进恢复） */
     g_xcp_resume_runtime.restore_pending = TRUE;
-    g_xcp_manager.runtime_ptr->daq_count = 0U;   /* 模拟未恢复状态 */
+    g_xcp_channel.runtime_ptr->daq_count = 0U;   /* 模拟未恢复状态 */
     xcp_drain_tx();
     Xcp_NvMReadRamBlockFromNvmCallback(XCP_NVM_BLOCK_ID_RESUME, 0U);
     CHECK("H9a restore_pending consumed by read callback",
@@ -1325,10 +1325,10 @@ int main(void)
     /* 剩余API: GetTimestamp / IsProgrammingActive / IsResumeModeActive */
 #if (XCP_TIMESTAMP_SOURCE_OS == STD_ON)
     CHECK("H10 GetTimestamp == OS-derived acc",
-          Xcp_GetTimestamp() == g_xcp_manager.runtime_ptr->os_timestamp_acc);
+          Xcp_GetTimestamp() == g_xcp_channel.runtime_ptr->os_timestamp_acc);
 #else
     CHECK("H10 GetTimestamp == runtime timestamp",
-          Xcp_GetTimestamp() == g_xcp_manager.runtime_ptr->timestamp);
+          Xcp_GetTimestamp() == g_xcp_channel.runtime_ptr->timestamp);
 #endif
     CHECK("H11 IsProgrammingActive == FALSE (PGM reset后)",
           Xcp_IsProgrammingActive() == FALSE);
@@ -1455,8 +1455,8 @@ int main(void)
         uint8 b[8];
         /* 先产生一个待发送响应? 用最后 cto_buffer 内容 */
         out.sdu_data_ptr = b; out.sdu_length = 8; out.meta_data_ptr = NULL;
-        g_xcp_manager.storage_ptr->cto_buffer[0] = 0xAB;
-        g_xcp_manager.storage_ptr->cto_length = 3U;
+        g_xcp_channel.storage_ptr->cto_buffer[0] = 0xAB;
+        g_xcp_channel.storage_ptr->cto_length = 3U;
         Std_ReturnType r = Xcp_Tl_TriggerTransmit(0U, &out);
         CHECK("J2 TriggerTransmit copies cto_buffer",
               (r == E_OK) && (out.sdu_length == 3U) && (b[0] == 0xABU));
@@ -1479,7 +1479,7 @@ int main(void)
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();         /* 处理唯一命令 → 发送失败 */
         CHECK("J5 TX fail -> no frame, busy cleared",
-              (test_tx_pop(res, &l) == 0U) && (g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO));
+              (test_tx_pop(res, &l) == 0U) && (g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO));
     }
     test_tx_fail_next = FALSE;
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
@@ -1488,7 +1488,7 @@ int main(void)
     test_tx_fail_next = TRUE;
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
     CHECK("J5 TX fail -> no frame, busy cleared",
-          (l == 0U) && (g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO));
+          (l == 0U) && (g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO));
     /* 恢复：J5 的命令仍在队列 → 先消费重叠命令的 ERR_CMD_BUSY，再泵出 J5 的 RES */
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
     CHECK("J6a overlapped -> ERR_CMD_BUSY", (l == 2U) && (res[0] == XCP_PID_ERR));
@@ -1516,7 +1516,7 @@ int main(void)
     l = xcp_cmd((const uint8 *)"\xFE", 1U, res);
     CHECK("J7 DISCONNECT -> RES + state",
           (l == 1U) && (res[0] == XCP_PID_RES)
-          && (g_xcp_manager.runtime_ptr->connection_state == XCP_DISCONNECTED));
+          && (g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED));
 
     /* 断开后除CONNECT外命令被静默丢弃 [SWS gating] */
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
@@ -1559,10 +1559,10 @@ int main(void)
             }
         }
         CHECK("K1a DTO queue count capped at XCP_MAX_ODT",
-              g_xcp_manager.storage_ptr->dto_queue_count == XCP_MAX_ODT);
+              g_xcp_channel.storage_ptr->dto_queue_count == XCP_MAX_ODT);
 
-        g_xcp_manager.runtime_ptr->tx.dto_latch = FALSE; /* 释放通道,周期排空 */
-        g_xcp_manager.runtime_ptr->tx.state = XCP_TX_IDLE;
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE; /* 释放通道,周期排空 */
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
         {
             uint8  ev[64]; uint32 el;
             boolean found = FALSE;
@@ -1605,9 +1605,9 @@ int main(void)
 
         /* 场景A: 环绕临近但未超时 — last_received=0xFFFFFF90, timestamp=50
            elapsed = 50 + (0xFFFFFFFF-0xFFFFFF90) + 1 = 162 >= 100ms → 超时触发 */
-        g_xcp_manager.runtime_ptr->timestamp = 50U;
-        g_xcp_manager.runtime_ptr->stim_last_received[0] = 0xFFFFFF90UL;
-        g_xcp_manager.runtime_ptr->stim_timeout_flag[0] = FALSE;
+        g_xcp_channel.runtime_ptr->timestamp = 50U;
+        g_xcp_channel.runtime_ptr->stim_last_received[0] = 0xFFFFFF90UL;
+        g_xcp_channel.runtime_ptr->stim_timeout_flag[0] = FALSE;
         xcp_drain_tx();
         Xcp_MainFunction();
         {
@@ -1618,12 +1618,12 @@ int main(void)
             }
             CHECK("K2a wraparound elapsed=162ms -> EV_STIM_TIMEOUT", found);
             CHECK("K2b timeout_flag set after wrap",
-                  g_xcp_manager.runtime_ptr->stim_timeout_flag[0] == TRUE);
+                  g_xcp_channel.runtime_ptr->stim_timeout_flag[0] == TRUE);
         }
 
         /* 场景B: 未环绕且未超时 — last_received=current 不误报 */
-        g_xcp_manager.runtime_ptr->stim_timeout_flag[0] = FALSE;
-        g_xcp_manager.runtime_ptr->stim_last_received[0] = g_xcp_manager.runtime_ptr->timestamp;
+        g_xcp_channel.runtime_ptr->stim_timeout_flag[0] = FALSE;
+        g_xcp_channel.runtime_ptr->stim_last_received[0] = g_xcp_channel.runtime_ptr->timestamp;
         xcp_drain_tx();
         Xcp_MainFunction();
         {
@@ -1643,29 +1643,29 @@ int main(void)
         Std_ReturnType r;
 
         /* K3a: 已活动时再次启动 -> E_NOT_OK */
-        g_xcp_manager.runtime_ptr->block_transfer_active = TRUE;
-        g_xcp_manager.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
-        g_xcp_manager.runtime_ptr->block_transfer_remaining = 100U;
+        g_xcp_channel.runtime_ptr->block_transfer_active = TRUE;
+        g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
+        g_xcp_channel.runtime_ptr->block_transfer_remaining = 100U;
         r = Xcp_StartBlockTransfer(XCP_BLOCK_TYPE_DOWNLOAD, 200U, 8U);
         CHECK("K3a StartBlockTransfer while active -> E_NOT_OK", r == E_NOT_OK);
         CHECK("K3b state preserved after rejected start",
-              g_xcp_manager.runtime_ptr->block_transfer_active == TRUE
-              && g_xcp_manager.runtime_ptr->block_transfer_remaining == 100U);
+              g_xcp_channel.runtime_ptr->block_transfer_active == TRUE
+              && g_xcp_channel.runtime_ptr->block_transfer_remaining == 100U);
 
         /* K3c: 类型不匹配的Validate -> 状态重置 + E_NOT_OK */
         r = Xcp_ValidateBlockSequence(XCP_BLOCK_TYPE_UPLOAD, 4U);
         CHECK("K3c type-mismatch Validate -> E_NOT_OK", r == E_NOT_OK);
         CHECK("K3d type-mismatch resets block state",
-              g_xcp_manager.runtime_ptr->block_transfer_active == FALSE
-              && g_xcp_manager.runtime_ptr->block_transfer_remaining == 0U);
+              g_xcp_channel.runtime_ptr->block_transfer_active == FALSE
+              && g_xcp_channel.runtime_ptr->block_transfer_remaining == 0U);
 
         /* K3e: 数据大于剩余 -> remaining 钳到0, active 清除(传输完成) */
-        g_xcp_manager.runtime_ptr->block_transfer_active = TRUE;
-        g_xcp_manager.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
-        g_xcp_manager.runtime_ptr->block_transfer_remaining = 4U;
+        g_xcp_channel.runtime_ptr->block_transfer_active = TRUE;
+        g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
+        g_xcp_channel.runtime_ptr->block_transfer_remaining = 4U;
         r = Xcp_ValidateBlockSequence(XCP_BLOCK_TYPE_DOWNLOAD, 10U);
         CHECK("K3e oversize data clamped, transfer completes",
-              (r == E_OK) && (g_xcp_manager.runtime_ptr->block_transfer_active == FALSE));
+              (r == E_OK) && (g_xcp_channel.runtime_ptr->block_transfer_active == FALSE));
     }
 
     /* K4: STIM DTO malformado / RxIndication inválida */
@@ -1687,8 +1687,8 @@ int main(void)
         info.sdu_data_ptr = NULL; info.sdu_length = 4U; info.meta_data_ptr = NULL;
         Xcp_Tl_RxIndication(0U, &info);
         CHECK("K4d NULL pdu/sdu -> no pending cmd",
-              g_xcp_manager.runtime_ptr->cmd_pending == FALSE
-              && g_xcp_manager.runtime_ptr->busy_pending == FALSE);
+              g_xcp_channel.runtime_ptr->cmd_pending == FALSE
+              && g_xcp_channel.runtime_ptr->busy_pending == FALSE);
 
         /* comando > XCP_MAX_CTO -> descartado em EnqueueCommand */
         {
@@ -1696,7 +1696,7 @@ int main(void)
             memset(big, 0xFD, sizeof(big));
             xcp_inject(big, sizeof(big));
             CHECK("K4e cmd > XCP_MAX_CTO dropped",
-                  g_xcp_manager.runtime_ptr->cmd_pending == FALSE);
+                  g_xcp_channel.runtime_ptr->cmd_pending == FALSE);
         }
     }
 
@@ -1716,7 +1716,7 @@ int main(void)
         tinfo.sdu_data_ptr = tbuf; tinfo.sdu_length = 64U; tinfo.meta_data_ptr = NULL;
         r = Xcp_Tl_TriggerTransmit(0U, &tinfo);
         CHECK("K5b TriggerTransmit ok -> E_OK + cto_length",
-              (r == E_OK) && (tinfo.sdu_length == g_xcp_manager.storage_ptr->cto_length));
+              (r == E_OK) && (tinfo.sdu_length == g_xcp_channel.storage_ptr->cto_length));
 
 #if (XCP_DEV_ERROR_DETECT == STD_ON)
         r = Xcp_Tl_TriggerTransmit(0U, NULL);
@@ -1745,7 +1745,7 @@ int main(void)
 
         /* Event gera DTO sem confirmacao -> dto_busy=TRUE */
         Xcp_Event(0U);
-        CHECK("K6a DTO in-flight sets dto_busy", g_xcp_manager.runtime_ptr->tx.dto_latch == TRUE);
+        CHECK("K6a DTO in-flight sets dto_busy", g_xcp_channel.runtime_ptr->tx.dto_latch == TRUE);
 
         /* 新语义：DTO 在飞期间到达的 RES 暂存延迟槽（cto_pending），不占 cto_busy */
         {
@@ -1754,19 +1754,19 @@ int main(void)
             Xcp_MainFunction(); /* dispatch -> cto_pending=TRUE, 直发被在飞DTO抑制 */
         }
         CHECK("K6b RES deferred while DTO busy -> pending",
-              g_xcp_manager.runtime_ptr->tx.parked == TRUE
-              && g_xcp_manager.runtime_ptr->tx.dto_latch == TRUE);
+              g_xcp_channel.runtime_ptr->tx.parked == TRUE
+              && g_xcp_channel.runtime_ptr->tx.dto_latch == TRUE);
 
         /* DTO 确认消费归属 -> 立即补发延迟 CTO */
         Xcp_Tl_TxConfirmation(0U, E_OK);
         CHECK("K6c DTO conf -> pending CTO sent (cto_busy)",
-              g_xcp_manager.runtime_ptr->tx.parked == FALSE
-              && g_xcp_manager.runtime_ptr->tx.state == XCP_TX_CTO);
+              g_xcp_channel.runtime_ptr->tx.parked == FALSE
+              && g_xcp_channel.runtime_ptr->tx.state == XCP_TX_CTO);
 
         /* 2a confirmacao limpa CTO */
         Xcp_Tl_TxConfirmation(0U, E_OK);
         CHECK("K6d second conf clears cto_busy",
-              g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO);
+              g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO);
 
         /* Retry: CTO 确认失败 -> 无重传源，记录错误并释放通道 */
         {
@@ -1777,8 +1777,8 @@ int main(void)
         }
         Xcp_Tl_TxConfirmation(0U, E_NOT_OK);
         CHECK("K6e CTO conf fail -> busy cleared + error",
-              g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO
-              && g_xcp_manager.runtime_ptr->tx.last_error == 1U);
+              g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO
+              && g_xcp_channel.runtime_ptr->tx.last_error == 1U);
 
         cmd[0] = 0xDE; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
@@ -1812,7 +1812,7 @@ int main(void)
     /* K8: dto_busy watchdog — conf perdida, MainFunction recupera apos 200 ciclos */
     {
         test_sim_dto_inflight();  /* simula confirmacao perdida: DTO 在飞且归属登记 */
-        g_xcp_manager.storage_ptr->dto_queue_count = 0U;
+        g_xcp_channel.storage_ptr->dto_queue_count = 0U;
         {
             uint32 wi;
             for (wi = 0U; wi < 201U; wi++)
@@ -1821,7 +1821,7 @@ int main(void)
             }
         }
         CHECK("K8a dto_busy cleared after watchdog timeout",
-              g_xcp_manager.runtime_ptr->tx.dto_latch == FALSE);
+              g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE);
         /* busy volta a ligar quando ha DTO na fila — confirma drenagem pos-watchdog */
         {
             uint32 wi;
@@ -1832,7 +1832,7 @@ int main(void)
             }
         }
         CHECK("K8b queue drains and idle after watchdog",
-              g_xcp_manager.storage_ptr->dto_queue_count == 0U);
+              g_xcp_channel.storage_ptr->dto_queue_count == 0U);
     }
 
     /* K9: SET_REQUEST — 位组合、短帧与保留位 */
@@ -1842,10 +1842,10 @@ int main(void)
         CHECK("K9a SET_REQUEST clear+store_resume -> RES",
               (l == 1U) && (res[0] == XCP_PID_RES));
         CHECK("K9b sessionStatus.storeDaqRequest pending",
-              (g_xcp_manager.runtime_ptr->session_status & 0x04U) != 0U);
+              (g_xcp_channel.runtime_ptr->session_status & 0x04U) != 0U);
         Xcp_NvMWriteRamBlockToNvmCallback(XCP_NVM_BLOCK_ID_RESUME, 0U);
         CHECK("K9c NvM write done clears storeDaqRequest",
-              (g_xcp_manager.runtime_ptr->session_status & 0x04U) == 0U);
+              (g_xcp_channel.runtime_ptr->session_status & 0x04U) == 0U);
         xcp_settle();
 
         /* SET_REQUEST = mode + SESSION_CONFIGURATION_ID(WORD)：短帧拒绝 */
@@ -1886,7 +1886,7 @@ int main(void)
         (void)xcp_cmd(cmd, 8U, res);
 
         /* pós-reconnect tudo re-trancado: destrava CAL_PAG p/ exercitar o branch feliz */
-        g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_CAL_PAG;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_CAL_PAG;
         test_ram_var32 = 0x1234ABCDUL;
         l = xcp_cmd((const uint8 *)"\xEC\x00\x00\x00\xFF\x00", 6U, res);
         CHECK("K11a MODIFY_BITS xor 0x00FF -> RES",
@@ -1894,11 +1894,11 @@ int main(void)
         CHECK("K11b MODIFY_BITS applied", test_ram_var32 == 0x123400FFUL);
 
         /* recurso trancado -> ERR_ACCESS_LOCKED */
-        g_xcp_manager.runtime_ptr->protection_status |= XCP_RESOURCE_CAL_PAG;
+        g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_CAL_PAG;
         l = xcp_cmd((const uint8 *)"\xEC\x00\x00\x00\xFF\x00", 6U, res);
         CHECK("K11c MODIFY_BITS locked -> ERR_ACCESS_LOCKED",
               (l == 2U) && (res[1] == XCP_ERR_ACCESS_LOCKED));
-        g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_CAL_PAG;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_CAL_PAG;
 
         /* GET_SEED recurso invalido -> OUT_OF_RANGE; ja desbloqueado -> len0 */
         l = xcp_cmd((const uint8 *)"\xF8\x00\x7F", 3U, res);
@@ -1909,23 +1909,23 @@ int main(void)
               (l == 2U) && (res[0] == XCP_PID_RES) && (res[1] == 0U));
 
         /* UNLOCK len declarado maior que o cmd -> ERR_CMD_SYNTAX */
-        g_xcp_manager.runtime_ptr->protection_status |= XCP_RESOURCE_DAQ;
+        g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_DAQ;
         l = xcp_cmd((const uint8 *)"\xF8\x00\x04", 3U, res); /* GET_SEED DAQ */
         l = xcp_cmd((const uint8 *)"\xF7\x08\x01\x02", 4U, res); /* len=8 > cmd=4 */
         CHECK("K11f UNLOCK declared len > cmd -> ERR_CMD_SYNTAX",
               (l == 2U) && (res[1] == XCP_ERR_CMD_SYNTAX));
         /* seed_requested permanece para o unlock correto? nao — fluxo segue; limpa */
-        g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
-        g_xcp_manager.runtime_ptr->seed_requested = FALSE;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
+        g_xcp_channel.runtime_ptr->seed_requested = FALSE;
         xcp_settle();
     }
 
     /* K12: PGM caminhos de erro */
     {
         /* PROGRAM_RESET da secao F ja desconectou; H reconectou. PGM nao esta started. */
-        g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
 
-        g_xcp_manager.runtime_ptr->pgm_started = FALSE;
+        g_xcp_channel.runtime_ptr->pgm_started = FALSE;
         l = xcp_cmd((const uint8 *)"\xD1\x00\x00\x00\x00\x40\x00\x00", 8U, res); /* CLEAR sem start */
         CHECK("K12a PROGRAM_CLEAR before START -> ERR_SEQUENCE",
               (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
@@ -1938,40 +1938,40 @@ int main(void)
         CHECK("K12c PROGRAM_MAX before START -> ERR_SEQUENCE",
               (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
 
-        g_xcp_manager.runtime_ptr->pgm_started = TRUE;
+        g_xcp_channel.runtime_ptr->pgm_started = TRUE;
 
         /* CLEAR com range que estoura uint32 (end < addr) -> GENERIC */
-        g_xcp_manager.runtime_ptr->mta = 0xFFFFFF00UL;
+        g_xcp_channel.runtime_ptr->mta = 0xFFFFFF00UL;
         l = xcp_cmd((const uint8 *)"\xD1\x00\x00\x00\x00\x10\x00\x00", 8U, res);
         CHECK("K12d PROGRAM_CLEAR range overflow -> ERR_GENERIC",
               (l == 2U) && (res[1] == XCP_ERR_GENERIC));
 
         /* CLEAR em buraco de endereco (fora de qualquer setor) -> GENERIC */
-        g_xcp_manager.runtime_ptr->mta = 0x08020000UL; /* fim do sector3: fora de qualquer setor */
+        g_xcp_channel.runtime_ptr->mta = 0x08020000UL; /* fim do sector3: fora de qualquer setor */
         l = xcp_cmd((const uint8 *)"\xD1\x00\x00\x00\x00\x10\x00\x00", 8U, res);
         CHECK("K12e PROGRAM_CLEAR address hole -> ERR_GENERIC",
               (l == 2U) && (res[1] == XCP_ERR_GENERIC));
 
         /* PROGRAM com mais bytes declarados que o CTO carrega -> OUT_OF_RANGE */
-        g_xcp_manager.runtime_ptr->mta = 0x08000000UL;
+        g_xcp_channel.runtime_ptr->mta = 0x08000000UL;
         l = xcp_cmd((const uint8 *)"\xD0\x08\xAA\xBB", 4U, res); /* declara 8, manda 2 */
         CHECK("K12f PROGRAM declared > payload -> ERR_OUT_OF_RANGE",
               (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
         /* PROGRAM em endereco fora do setor -> GENERIC */
-        g_xcp_manager.runtime_ptr->mta = 0xDEAD0000UL;
+        g_xcp_channel.runtime_ptr->mta = 0xDEAD0000UL;
         l = xcp_cmd((const uint8 *)"\xD0\x02\xAA\xBB", 4U, res);
         CHECK("K12g PROGRAM outside sector -> ERR_GENERIC",
               (l == 2U) && (res[1] == XCP_ERR_GENERIC));
 
         /* PROGRAM_MAX len1 (0 dados) -> OUT_OF_RANGE */
-        g_xcp_manager.runtime_ptr->mta = 0x08000000UL;
+        g_xcp_channel.runtime_ptr->mta = 0x08000000UL;
         l = xcp_cmd((const uint8 *)"\xC9", 1U, res);
         CHECK("K12h PROGRAM_MAX empty -> ERR_OUT_OF_RANGE",
               (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
-        g_xcp_manager.runtime_ptr->pgm_started = FALSE;
-        g_xcp_manager.runtime_ptr->protection_status |= XCP_RESOURCE_PGM;
+        g_xcp_channel.runtime_ptr->pgm_started = FALSE;
+        g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_PGM;
         xcp_settle();
     }
 
@@ -1998,7 +1998,7 @@ int main(void)
               (l == 2U) && (res[1] == XCP_ERR_PAGE_NOT_VALID));
 
         /* COPY_CAL_PAGE dst page0 -> WRITE_PROTECTED (CAL_PAG destravado em K11) */
-        g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_CAL_PAG;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_CAL_PAG;
         l = xcp_cmd((const uint8 *)"\xE4\x00\x01\x00\x00", 5U, res); /* src s0p1 -> dst s0p0 */
         CHECK("K13e COPY_CAL_PAGE dst page0 -> ERR_WRITE_PROTECTED",
               (l == 2U) && (res[1] == XCP_ERR_WRITE_PROTECTED));
@@ -2023,12 +2023,12 @@ int main(void)
         /* TriggerTransmit antes de Init -> DET UNINIT (estado so se nao-init;
            simulo UNINIT, restauro depois) */
         {
-            uint8 saved = g_xcp_manager.runtime_ptr->state;
+            uint8 saved = g_xcp_channel.runtime_ptr->state;
             uint32 det_before = test_det_count;
             PduInfoType ti;
             uint8 tb[8];
             Std_ReturnType r;
-            g_xcp_manager.runtime_ptr->state = XCP_UNINIT;
+            g_xcp_channel.runtime_ptr->state = XCP_UNINIT;
             ti.sdu_data_ptr = tb; ti.sdu_length = 8U; ti.meta_data_ptr = NULL;
             r = Xcp_Tl_TriggerTransmit(0U, &ti);
 #if (XCP_DEV_ERROR_DETECT == STD_ON)
@@ -2037,7 +2037,7 @@ int main(void)
 #else
             CHECK("K14b TriggerTransmit UNINIT -> E_NOT_OK", r == E_NOT_OK);
 #endif
-            g_xcp_manager.runtime_ptr->state = saved;
+            g_xcp_channel.runtime_ptr->state = saved;
         }
     }
 
@@ -2147,7 +2147,7 @@ int main(void)
         g_xcp_resume_runtime.restore_pending = TRUE;
         Xcp_NvMReadRamBlockFromNvmCallback((uint16)(XCP_NVM_BLOCK_ID_RESUME + 1U), 0U);
         CHECK("K15i wrong block_id -> ignored",
-              g_xcp_manager.runtime_ptr->connection_state == XCP_CONNECTED
+              g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED
               && g_xcp_resume_runtime.restore_pending == TRUE);
         g_xcp_resume_runtime.restore_pending = FALSE;
         xcp_settle();
@@ -2173,11 +2173,11 @@ int main(void)
 
         /* UPLOAD 0 elementos -> RES len1, MTA nao move */
         {
-            uint32 mta0 = g_xcp_manager.runtime_ptr->mta;
+            uint32 mta0 = g_xcp_channel.runtime_ptr->mta;
             l = xcp_cmd((const uint8 *)"\xF5\x00", 2U, res);
             CHECK("K16c UPLOAD 0 -> RES len1, MTA fixed",
                   (l == 1U) && (res[0] == XCP_PID_RES)
-                  && (g_xcp_manager.runtime_ptr->mta == mta0));
+                  && (g_xcp_channel.runtime_ptr->mta == mta0));
         }
 
         /* SHORT_UPLOAD count > CTO-1 -> OUT_OF_RANGE */
@@ -2204,11 +2204,11 @@ int main(void)
 
         /* DOWNLOAD_MAX len1 (so o cmd): num_elements=0 -> RES sem escrever */
         {
-            uint32 mta0 = g_xcp_manager.runtime_ptr->mta;
+            uint32 mta0 = g_xcp_channel.runtime_ptr->mta;
             l = xcp_cmd((const uint8 *)"\xEE", 1U, res);
             CHECK("K16g DOWNLOAD_MAX len1 -> RES len1, no write",
                   (l == 1U) && (res[0] == XCP_PID_RES)
-                  && (g_xcp_manager.runtime_ptr->mta == mta0));
+                  && (g_xcp_channel.runtime_ptr->mta == mta0));
         }
 
         /* USER_CMD ecoa payload */
@@ -2286,7 +2286,7 @@ int main(void)
         memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         CHECK("K18a WRITE_DAQ advances entry ptr",
-              g_xcp_manager.runtime_ptr->odt_entry_ptr == 1U);
+              g_xcp_channel.runtime_ptr->odt_entry_ptr == 1U);
 
         /* segundo write aponta entry1 -> ainda dentro do range */
         memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var8}, 4U);
@@ -2295,7 +2295,7 @@ int main(void)
         CHECK("K18b WRITE_DAQ entry1 -> RES",
               (l == 1U) && (res[0] == XCP_PID_RES));
         CHECK("K18c entry ptr now 2",
-              g_xcp_manager.runtime_ptr->odt_entry_ptr == 2U);
+              g_xcp_channel.runtime_ptr->odt_entry_ptr == 2U);
 
         /* terceiro write estoura entry_count=2 -> OUT_OF_RANGE */
         l = xcp_cmd(cmd, 8U, res);
@@ -2318,11 +2318,11 @@ int main(void)
         {
             xcp_inject(&gs, 1U);
         }
-        CHECK("K19a queue filled to MAX", g_xcp_manager.runtime_ptr->cmd_queue_count == XCP_CMD_QUEUE_SIZE);
+        CHECK("K19a queue filled to MAX", g_xcp_channel.runtime_ptr->cmd_queue_count == XCP_CMD_QUEUE_SIZE);
 
         /* proximo comando -> busy_pending, descartado */
         xcp_inject(&gs, 1U);
-        CHECK("K19b overflow sets busy_pending", g_xcp_manager.runtime_ptr->busy_pending == TRUE);
+        CHECK("K19b overflow sets busy_pending", g_xcp_channel.runtime_ptr->busy_pending == TRUE);
 
         /* MainFunction emite ERR_CMD_BUSY e drena 1 por ciclo */
         xcp_drain_tx();
@@ -2358,16 +2358,16 @@ int main(void)
             xcp_settle();
             xcp_inject(dto_c7, 8U);
             CHECK("K20a PID 0xC7 -> STIM route, no cmd pending",
-                  g_xcp_manager.runtime_ptr->cmd_pending == FALSE);
+                  g_xcp_channel.runtime_ptr->cmd_pending == FALSE);
         }
 
         /* PID 0xC8 (PROGRAM_VERIFY) -> comando; PGM trancado -> ERR_ACCESS_LOCKED */
         {
             uint8 ver[8] = {0xC8, 0,0,0,0,0,0,0};
-            g_xcp_manager.runtime_ptr->protection_status |= XCP_RESOURCE_PGM;
+            g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_PGM;
             CHECK("K20b PID 0xC8 -> cmd route (ERR_ACCESS_LOCKED)",
                   xcp_cmd_has_err(ver, 8U, XCP_ERR_ACCESS_LOCKED));
-            g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
+            g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
         }
 
         /* DISCONNECT libera todas as DAQ lists [SWS] */
@@ -2375,25 +2375,25 @@ int main(void)
         cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 2; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
         (void)xcp_cmd((const uint8 *)"\xFE", 1U, res);
         CHECK("K20c DISCONNECT frees DAQ (daq_count=0)",
-              g_xcp_manager.runtime_ptr->daq_count == 0U);
+              g_xcp_channel.runtime_ptr->daq_count == 0U);
         (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res); /* reconecta */
         xcp_settle();
 
         /* GET_STATUS: [1]=SESSION_STATUS（无运行列表，至多 resume 位） [2]=保护状态 */
-        g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
         l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
         CHECK("K20d GET_STATUS fields",
               (l == 6U) && (res[0] == XCP_PID_RES)
               && (res[1] == ((Xcp_IsResumeModeActive() != FALSE) ? 0x80U : 0x00U))
-              && (res[2] == g_xcp_manager.runtime_ptr->protection_status));
+              && (res[2] == g_xcp_channel.runtime_ptr->protection_status));
 
         /* GET_ID type0 -> len>0 + MTA aponta pro texto; type1 -> len0 */
         {
-            uint32 mta_before = g_xcp_manager.runtime_ptr->mta;
+            uint32 mta_before = g_xcp_channel.runtime_ptr->mta;
             l = xcp_cmd((const uint8 *)"\xFA\x00", 2U, res);
             CHECK("K20e GET_ID type0 -> len>0 + MTA set",
                   (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] > 0U)
-                  && (g_xcp_manager.runtime_ptr->mta != mta_before));
+                  && (g_xcp_channel.runtime_ptr->mta != mta_before));
             l = xcp_cmd((const uint8 *)"\xFA\x01", 2U, res);
             CHECK("K20f GET_ID type1 -> len0",
                   (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] == 0U));
@@ -2461,7 +2461,7 @@ int main(void)
         }
 
         /* ResetStimTimeout: flag setada, novo STIM chega -> flag limpa */
-        g_xcp_manager.runtime_ptr->stim_timeout_flag[0] = TRUE;
+        g_xcp_channel.runtime_ptr->stim_timeout_flag[0] = TRUE;
         {
             PduInfoType info;
             uint8 stim[8] = {0};
@@ -2470,7 +2470,7 @@ int main(void)
             xcp_inject(stim, stim_len);
         }
         CHECK("K21d STIM reception clears timeout flag",
-              g_xcp_manager.runtime_ptr->stim_timeout_flag[0] == FALSE);
+              g_xcp_channel.runtime_ptr->stim_timeout_flag[0] == FALSE);
 
         cmd[0] = 0xDE; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
@@ -2479,12 +2479,12 @@ int main(void)
 
     /* K22: PGM limites de setor */
     {
-        g_xcp_manager.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
-        g_xcp_manager.runtime_ptr->pgm_started = TRUE;
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
+        g_xcp_channel.runtime_ptr->pgm_started = TRUE;
 
         /* CLEAR cruzando 2 setores validos contiguos (0x08002000 len 0x6000 -> cobre s0 fim + s1 todo) -> RES */
         memset(test_flash_mem, 0xAA, sizeof(test_flash_mem));
-        g_xcp_manager.runtime_ptr->mta = 0x08002000UL;
+        g_xcp_channel.runtime_ptr->mta = 0x08002000UL;
         l = xcp_cmd((const uint8 *)"\xD1\x00\x00\x00\x00\x60\x00\x00", 8U, res);
         CHECK("K22a CLEAR cross-sector valid -> RES",
               (l == 1U) && (res[0] == XCP_PID_RES));
@@ -2492,7 +2492,7 @@ int main(void)
               (test_flash_mem[0x2000] == 0xFFU) && (test_flash_mem[0x7FFF] == 0xFFU));
 
         /* PROGRAM cruzando boundary de setor (data_size > restante do setor) -> GENERIC */
-        g_xcp_manager.runtime_ptr->mta = 0x08003FF8UL;
+        g_xcp_channel.runtime_ptr->mta = 0x08003FF8UL;
         l = xcp_cmd((const uint8 *)"\xD0\x05\x01\x02\x03\x04\x05", 7U, res); /* 5B, restam 8 -> ok? 0x4000-0x3FF8=8 >=5 -> RES */
         CHECK("K22c PROGRAM within sector tail -> RES",
               (l == 1U) && (res[0] == XCP_PID_RES));
@@ -2501,8 +2501,8 @@ int main(void)
         CHECK("K22d PROGRAM crossing sector end -> ERR_GENERIC",
               xcp_cmd_has_err((const uint8 *)"\xD0\x04\x01\x02\x03\x04", 6U, XCP_ERR_GENERIC));
 
-        g_xcp_manager.runtime_ptr->pgm_started = FALSE;
-        g_xcp_manager.runtime_ptr->protection_status |= XCP_RESOURCE_PGM;
+        g_xcp_channel.runtime_ptr->pgm_started = FALSE;
+        g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_PGM;
         xcp_settle();
     }
 
@@ -2518,7 +2518,7 @@ int main(void)
         (void)xcp_cmd(cmd, 8U, res);
 
         /* READ_DAQ devolve o entry escrito (entry_ptr avancou p/ 1: volte p/ 0) */
-        g_xcp_manager.runtime_ptr->odt_entry_ptr = 0U;
+        g_xcp_channel.runtime_ptr->odt_entry_ptr = 0U;
         l = xcp_cmd((const uint8 *)"\xDB", 1U, res);
         CHECK("K23a READ_DAQ returns written entry",
               (l == 8U) && (res[0] == XCP_PID_RES) && (res[1] == 0xFFU) && (res[2] == 4U)
@@ -2747,12 +2747,12 @@ int main(void)
         (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
         (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
         CHECK("K24b0 DAQ running pre-close",
-              g_xcp_manager.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
+              g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
         CHECK("K24b socket close -> disconnected",
               Xcp_SoAdConnectionClosed() == TRUE
-              && g_xcp_manager.runtime_ptr->connection_state == XCP_DISCONNECTED);
+              && g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED);
         CHECK("K24b2 socket close stops DAQ",
-              g_xcp_manager.storage_ptr->daq_list[0].state != XCP_DAQ_STATE_RUNNING);
+              g_xcp_channel.storage_ptr->daq_list[0].state != XCP_DAQ_STATE_RUNNING);
         CHECK("K24c socket close idle -> FALSE",
               Xcp_SoAdConnectionClosed() == FALSE);
         l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);  /* 重连 */
@@ -2904,7 +2904,7 @@ int main(void)
             test_nvm_corrupt(bad, sizeof(bad));
             Xcp_InitResumeMode();
             CHECK("K26b corrupted NvM -> no crash, state recovered",
-                  g_xcp_manager.runtime_ptr->state == XCP_INIT);
+                  g_xcp_channel.runtime_ptr->state == XCP_INIT);
         }
 #endif
 
@@ -2976,12 +2976,12 @@ int main(void)
                 test_sim_dto_inflight();                                  /* 一帧在飞占住通道 */
                 Xcp_Event(0U);                                            /* list0 DTO 入队 */
                 CHECK("K26f1 DTO queued behind in-flight frame",
-                      g_xcp_manager.storage_ptr->dto_queue_count > 0U);
-                g_xcp_manager.runtime_ptr->tx.dto_latch = FALSE;          /* 释放在飞帧 */
-                g_xcp_manager.runtime_ptr->tx.state = XCP_TX_IDLE;
+                      g_xcp_channel.storage_ptr->dto_queue_count > 0U);
+                g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;          /* 释放在飞帧 */
+                g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
                 (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);            /* FREE_DAQ: 队列必须清空 */
                 CHECK("K26f2 FREE_DAQ clears queued DTOs",
-                      g_xcp_manager.storage_ptr->dto_queue_count == 0U);
+                      g_xcp_channel.storage_ptr->dto_queue_count == 0U);
             }
             (void)xcp_cmd((const uint8 *)"\xDE\x00\x01\x00", 4U, res); /* stop list1 */
             (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);             /* FREE_DAQ */
@@ -3004,11 +3004,11 @@ int main(void)
         for (fi = 0U; fi < (uint8) sizeof(all_cmds); fi++)
         {
             /* 前条命令的模糊负载可能已断开连接（UNLOCK错key/DISCONNECT）：先恢复再扫 */
-            if (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED)
+            if (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
             {
                 l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
                 CHECK("K27 reconnect after disconnecting cmd",
-                      g_xcp_manager.runtime_ptr->connection_state == XCP_CONNECTED);
+                      g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED);
             }
             for (len_i = 1U; len_i <= XCP_MAX_CTO; len_i++)
             {
@@ -3027,22 +3027,22 @@ int main(void)
                 Xcp_MainFunction();
                 pumps++;
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-                if (g_xcp_manager.runtime_ptr->cmd_queue_count == 0U
-                    && g_xcp_manager.runtime_ptr->cmd_pending == FALSE) { break; }
+                if (g_xcp_channel.runtime_ptr->cmd_queue_count == 0U
+                    && g_xcp_channel.runtime_ptr->cmd_pending == FALSE) { break; }
 #else
-                if (g_xcp_manager.runtime_ptr->cmd_pending == FALSE) { break; }
+                if (g_xcp_channel.runtime_ptr->cmd_pending == FALSE) { break; }
 #endif
             }
         }
         CHECK("K27a fuzz sweep processed without crash",
-              g_xcp_manager.runtime_ptr->state == XCP_INIT && sent > 0U);
+              g_xcp_channel.runtime_ptr->state == XCP_INIT && sent > 0U);
         /* 模糊后连接仍可正常响应（末条命令可能已断开：先补一次重连） */
-        if (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED)
+        if (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
         {
             l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
             /* 不校验帧长: 模糊残留帧可能先被弹出; 连接状态是唯一判据 */
             CHECK("K27 final reconnect",
-                  g_xcp_manager.runtime_ptr->connection_state == XCP_CONNECTED);
+                  g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED);
         }
         xcp_drain_tx();
         l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
@@ -3071,7 +3071,7 @@ int main(void)
                 {
                     cmd[0] = all_cmds[rng % (uint8) sizeof(all_cmds)];
                 }
-                if (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED)
+                if (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
                 {
                     (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
                 }
@@ -3080,8 +3080,8 @@ int main(void)
                 Xcp_MainFunction();
             }
             CHECK("K27c random-payload fuzz: no crash",
-                  g_xcp_manager.runtime_ptr->state == XCP_INIT);
-            if (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED)
+                  g_xcp_channel.runtime_ptr->state == XCP_INIT);
+            if (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
             {
                 (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
             }
@@ -3105,7 +3105,7 @@ int main(void)
         det_cnt = test_det_count;
         CHECK("K24a rx==tx PDU -> XCP_E_INV_CONFIG",
               (det_cnt > 0U) && (test_det_api == XCP_SID_INIT)
-              && (g_xcp_manager.runtime_ptr->state == XCP_UNINIT));
+              && (g_xcp_channel.runtime_ptr->state == XCP_UNINIT));
         Xcp_Init(NULL_PTR);                    /* 恢复 */
         (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
         xcp_drain_tx();

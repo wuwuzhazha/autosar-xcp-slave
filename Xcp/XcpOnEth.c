@@ -16,7 +16,7 @@ void Xcp_SoAdIfRxIndication(PduIdType rx_pdu_id, const PduInfoType *pdu_info_ptr
 {
     XCP_TL_CHECK_INIT(XCP_SID_RX_INDICATION)
     XCP_TL_CHECK_RX_PARAMS(XCP_SID_RX_INDICATION, pdu_info_ptr,
-                         rx_pdu_id, g_xcp_manager.config_ptr->xcp_rx_pdu_id)
+                         rx_pdu_id, g_xcp_channel.config_ptr->xcp_rx_pdu_id)
     (void)rx_pdu_id;
 
 #if (XCP_ETH_SEGMENTED_RX == STD_ON)
@@ -112,13 +112,13 @@ static Std_ReturnType Xcp_EthSend(const uint8 *data, uint8 length)
     pdu_info.sdu_data_ptr = frame;
     pdu_info.sdu_length   = used;
     pdu_info.meta_data_ptr = NULL_PTR;
-    return SoAd_IfTransmit(g_xcp_manager.config_ptr->xcp_tx_pdu_id, &pdu_info);
+    return SoAd_IfTransmit(g_xcp_channel.config_ptr->xcp_tx_pdu_id, &pdu_info);
 }
 
 boolean Xcp_SoAdConnectionClosed(void)
 {
-    if ((g_xcp_manager.runtime_ptr == NULL_PTR)
-        || (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED))
+    if ((g_xcp_channel.runtime_ptr == NULL_PTR)
+        || (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED))
     {
         return FALSE;
     }

@@ -15,7 +15,7 @@ void Xcp_FrIfRxIndication(PduIdType rx_pdu_id, const PduInfoType *pdu_info_ptr)
 {
     XCP_TL_CHECK_INIT(XCP_SID_RX_INDICATION)
     XCP_TL_CHECK_RX_PARAMS(XCP_SID_RX_INDICATION, pdu_info_ptr,
-                         rx_pdu_id, g_xcp_manager.config_ptr->xcp_rx_pdu_id)
+                         rx_pdu_id, g_xcp_channel.config_ptr->xcp_rx_pdu_id)
     (void)rx_pdu_id;
 
 #if (XCP_FR_CONCATENATED_FRAMES == STD_ON)
@@ -106,7 +106,7 @@ uint16 Xcp_FrPackMessage(const uint8 *msg, uint8 msg_len, uint8 *frame, uint16 f
 
 Std_ReturnType Xcp_FrConfigureLPdu(void)
 {
-    const Xcp_ConfigType *cfg = g_xcp_manager.config_ptr;
+    const Xcp_ConfigType *cfg = g_xcp_channel.config_ptr;
 
     if (cfg == NULL_PTR)
     {
@@ -132,7 +132,7 @@ static Std_ReturnType Xcp_FrSend(const uint8 *data, uint8 length)
     pdu_info.sdu_data_ptr = frame;
     pdu_info.sdu_length   = used;
     pdu_info.meta_data_ptr = NULL_PTR;
-    return FrIf_Transmit(g_xcp_manager.config_ptr->xcp_tx_pdu_id, &pdu_info);
+    return FrIf_Transmit(g_xcp_channel.config_ptr->xcp_tx_pdu_id, &pdu_info);
 }
 
 Std_ReturnType Xcp_Tl_SendCto(const uint8 *data, uint8 length)

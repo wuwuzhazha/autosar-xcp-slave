@@ -72,6 +72,7 @@ def measure():
         text = read(path)
         key = rel(path)
         files[key] = {
+            "g_xcp_channel": count_ident(text, "g_xcp_channel"),
             "g_xcp_manager": count_ident(text, "g_xcp_manager"),
             "xcp_preprocessor": len(RE_PRE.findall(text)),
             "tx": {name: count_ident(text, name) for name in TX_SYMBOLS},
@@ -102,6 +103,7 @@ def pack(files, forbidden):
             includes.append(f"{key} -> {inc}")
     return {
         "version": 1,
+        "g_xcp_channel": by("g_xcp_channel"),
         "g_xcp_manager": by("g_xcp_manager"),
         "xcp_preprocessor": by("xcp_preprocessor"),
         "c_includes": includes,
@@ -111,7 +113,11 @@ def pack(files, forbidden):
 
 
 def load_baseline():
-    return json.loads(BASELINE.read_text(encoding="utf-8"))
+    base = json.loads(BASELINE.read_text(encoding="utf-8"))
+    # 迁移：旧基线用 g_xcp_manager 命名通道对象
+    if "g_xcp_channel" not in base and "g_xcp_manager" in base:
+        base["g_xcp_channel"] = base.pop("g_xcp_manager")
+    return base
 
 
 def file_rises(current, baseline):
@@ -154,8 +160,11 @@ def check(snapshot):
     base = load_baseline()
     errors = []
     loose = []
-    for name in ("g_xcp_manager", "xcp_preprocessor"):
+    for name in ("g_xcp_channel", "xcp_preprocessor"):
         check_metric(name, snapshot[name], base[name], errors, loose)
+    # 旧全局名不得复活
+    if snapshot["g_xcp_manager"]["total"] > 0:
+        errors.append("  g_xcp_manager 重新出现，应使用 g_xcp_channel")
     for name in TX_SYMBOLS:
         check_metric(f"tx.{name}", snapshot["tx_symbols"][name], base["tx_symbols"][name], errors, loose)
 
@@ -227,6 +236,7 @@ def check_gen():
 
 def report(snapshot):
     rows = [
+        ("g_xcp_channel", snapshot["g_xcp_channel"]["total"]),
         ("g_xcp_manager", snapshot["g_xcp_manager"]["total"]),
         ("xcp_preprocessor", snapshot["xcp_preprocessor"]["total"]),
         ("c_includes", len(snapshot["c_includes"])),

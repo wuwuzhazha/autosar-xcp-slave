@@ -99,7 +99,7 @@ static void Xcp_ApplyRestoredDaqConfig(void)
                 continue;
             }
 
-            daq_list = &g_xcp_manager.storage_ptr->daq_list[i];
+            daq_list = &g_xcp_channel.storage_ptr->daq_list[i];
 
             daq_list->event_channel = resume_cfg->event_channel;
             daq_list->odt_count = (resume_cfg->odt_count <= daq_list->odt_max_count)
@@ -139,7 +139,7 @@ static void Xcp_ApplyRestoredDaqConfig(void)
         }
     }
 
-    g_xcp_manager.runtime_ptr->daq_count = g_xcp_resume_data.daq_count;
+    g_xcp_channel.runtime_ptr->daq_count = g_xcp_resume_data.daq_count;
 }
 #endif
 
@@ -184,8 +184,8 @@ Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id)
     Xcp_DaqResumeConfigType *resume_cfg;
     const Xcp_DaqListType *daq_list;
 
-    if ((g_xcp_manager.runtime_ptr == NULL) ||
-        (g_xcp_manager.runtime_ptr->state != XCP_INIT))
+    if ((g_xcp_channel.runtime_ptr == NULL) ||
+        (g_xcp_channel.runtime_ptr->state != XCP_INIT))
     {
         return E_NOT_OK;
     }
@@ -194,17 +194,17 @@ Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id)
     g_xcp_resume_data.version = XCP_RESUME_DATA_VERSION;
     g_xcp_resume_data.session_cfg_id = session_cfg_id;
 #if (XCP_DAQ_ENABLED == STD_ON)
-    g_xcp_resume_data.daq_count = g_xcp_manager.runtime_ptr->daq_count;
+    g_xcp_resume_data.daq_count = g_xcp_channel.runtime_ptr->daq_count;
     g_xcp_resume_data.resume_active = TRUE;
 
-    for (i = 0U; i < g_xcp_manager.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
     {
         if (i >= XCP_MAX_DAQ)
         {
             break;
         }
 
-        daq_list = &g_xcp_manager.storage_ptr->daq_list[i];
+        daq_list = &g_xcp_channel.storage_ptr->daq_list[i];
         resume_cfg = &g_xcp_resume_data.daq_config[i];
 
         resume_cfg->event_channel = daq_list->event_channel;
@@ -247,7 +247,7 @@ Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id)
         g_xcp_resume_runtime.store_pending = TRUE;
         g_xcp_resume_runtime.state = XCP_RESUME_STATE_PENDING;
         /* SESSION_STATUS.STORE_DAQ_REQ 持续到 NvM 写完成回调 */
-        g_xcp_manager.runtime_ptr->session_status |= XCP_SS_STORE_DAQ_REQ;
+        g_xcp_channel.runtime_ptr->session_status |= XCP_SS_STORE_DAQ_REQ;
         return E_OK;
     }
 
@@ -358,9 +358,9 @@ void Xcp_NvMWriteRamBlockToNvmCallback(uint16 block_id, uint8 result)
     }
 
     g_xcp_resume_runtime.store_pending = FALSE;
-    if (g_xcp_manager.runtime_ptr != NULL_PTR)
+    if (g_xcp_channel.runtime_ptr != NULL_PTR)
     {
-        g_xcp_manager.runtime_ptr->session_status &= (uint8) ~XCP_SS_STORE_DAQ_REQ;
+        g_xcp_channel.runtime_ptr->session_status &= (uint8) ~XCP_SS_STORE_DAQ_REQ;
     }
 
     if (result == 0U)

@@ -35,15 +35,15 @@ static inline void Xcp_LeWrite32(uint8 *p, uint32 v)
 
 #if (XCP_DEV_ERROR_DETECT == STD_ON)
 #define XCP_TL_CHECK_INIT(sid)                                                        \
-    if ((g_xcp_manager.runtime_ptr == NULL_PTR) ||                                   \
-        (g_xcp_manager.runtime_ptr->state == XCP_UNINIT))                            \
+    if ((g_xcp_channel.runtime_ptr == NULL_PTR) ||                                   \
+        (g_xcp_channel.runtime_ptr->state == XCP_UNINIT))                            \
     {                                                                              \
         XCP_DET_REPORT_ERROR((sid), XCP_E_UNINIT);                                   \
         return;                                                                    \
     }
 #define XCP_TL_CHECK_INIT_R(sid)                                                      \
-    if ((g_xcp_manager.runtime_ptr == NULL_PTR) ||                                   \
-        (g_xcp_manager.runtime_ptr->state == XCP_UNINIT))                            \
+    if ((g_xcp_channel.runtime_ptr == NULL_PTR) ||                                   \
+        (g_xcp_channel.runtime_ptr->state == XCP_UNINIT))                            \
     {                                                                              \
         XCP_DET_REPORT_ERROR((sid), XCP_E_UNINIT);                                   \
         return E_NOT_OK;                                                             \
@@ -68,8 +68,8 @@ static inline void Xcp_LeWrite32(uint8 *p, uint32 v)
         return E_NOT_OK;                                                             \
     }
 #else
-#define XCP_TL_CHECK_INIT(sid)   if (g_xcp_manager.runtime_ptr == NULL_PTR) { return; }
-#define XCP_TL_CHECK_INIT_R(sid) if (g_xcp_manager.runtime_ptr == NULL_PTR) { return E_NOT_OK; }
+#define XCP_TL_CHECK_INIT(sid)   if (g_xcp_channel.runtime_ptr == NULL_PTR) { return; }
+#define XCP_TL_CHECK_INIT_R(sid) if (g_xcp_channel.runtime_ptr == NULL_PTR) { return E_NOT_OK; }
 #define XCP_TL_CHECK_RX_PARAMS(sid, pdu_ptr, rx_id, exp_id) \
     if ((pdu_ptr) == NULL_PTR) { return; }
 #define XCP_TL_CHECK_TT_PARAMS(sid, pdu_ptr) \
@@ -207,9 +207,9 @@ typedef struct
     const Xcp_ConfigType  *config_ptr;
     Xcp_StorageType       *storage_ptr;
     Xcp_RuntimeType       *runtime_ptr;
-} Xcp_ManagerType;
+} Xcp_Channel;
 
-extern Xcp_ManagerType g_xcp_manager;
+extern Xcp_Channel g_xcp_channel;
 
 /* 构造两字节 ERR 帧并返回 2。fr 即调用方收到的 res 缓冲（== cto_buffer）。 */
 static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)

@@ -17,7 +17,7 @@ extern const Xcp_ConfigType xcp_config;
 
 Xcp_StorageType g_xcp_storage;
 Xcp_RuntimeType g_xcp_runtime;
-Xcp_ManagerType g_xcp_manager;
+Xcp_Channel g_xcp_channel;
 
 void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length)
 {
@@ -32,33 +32,33 @@ void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length)
 
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
 
-    if (g_xcp_manager.runtime_ptr->cmd_queue_count >= XCP_CMD_QUEUE_SIZE)
+    if (g_xcp_channel.runtime_ptr->cmd_queue_count >= XCP_CMD_QUEUE_SIZE)
     {
-        g_xcp_manager.runtime_ptr->busy_pending = TRUE;
+        g_xcp_channel.runtime_ptr->busy_pending = TRUE;
         return;
     }
 
-    (void)memcpy(g_xcp_manager.runtime_ptr->cmd_queue[g_xcp_manager.runtime_ptr->cmd_queue_tail],
+    (void)memcpy(g_xcp_channel.runtime_ptr->cmd_queue[g_xcp_channel.runtime_ptr->cmd_queue_tail],
                  cmd_data, cmd_length);
-    g_xcp_manager.runtime_ptr->cmd_queue_len[g_xcp_manager.runtime_ptr->cmd_queue_tail] = cmd_length;
+    g_xcp_channel.runtime_ptr->cmd_queue_len[g_xcp_channel.runtime_ptr->cmd_queue_tail] = cmd_length;
 
-    g_xcp_manager.runtime_ptr->cmd_queue_tail =
-        (g_xcp_manager.runtime_ptr->cmd_queue_tail + 1U) % XCP_CMD_QUEUE_SIZE;
-    g_xcp_manager.runtime_ptr->cmd_queue_count++;
-    g_xcp_manager.runtime_ptr->cmd_pending = TRUE;
+    g_xcp_channel.runtime_ptr->cmd_queue_tail =
+        (g_xcp_channel.runtime_ptr->cmd_queue_tail + 1U) % XCP_CMD_QUEUE_SIZE;
+    g_xcp_channel.runtime_ptr->cmd_queue_count++;
+    g_xcp_channel.runtime_ptr->cmd_pending = TRUE;
 
 #else
 
-    if (g_xcp_manager.runtime_ptr->cmd_pending == TRUE)
+    if (g_xcp_channel.runtime_ptr->cmd_pending == TRUE)
     {
 
-        g_xcp_manager.runtime_ptr->busy_pending = TRUE;
+        g_xcp_channel.runtime_ptr->busy_pending = TRUE;
         return;
     }
 
-    (void)memcpy(g_xcp_manager.runtime_ptr->cmd_queue_buffer, cmd_data, cmd_length);
-    g_xcp_manager.runtime_ptr->cmd_queue_length = cmd_length;
-    g_xcp_manager.runtime_ptr->cmd_pending      = TRUE;
+    (void)memcpy(g_xcp_channel.runtime_ptr->cmd_queue_buffer, cmd_data, cmd_length);
+    g_xcp_channel.runtime_ptr->cmd_queue_length = cmd_length;
+    g_xcp_channel.runtime_ptr->cmd_pending      = TRUE;
 #endif
 }
 
@@ -67,48 +67,48 @@ void Xcp_ProcessCommandQueue(void)
     uint8 *cmd_data;
     uint8  cmd_length;
 
-    if (g_xcp_manager.runtime_ptr->busy_pending == TRUE)
+    if (g_xcp_channel.runtime_ptr->busy_pending == TRUE)
     {
-        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE))
+        if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE))
         {
             Xcp_SendErrorResponse(XCP_ERR_CMD_BUSY);
 
-            g_xcp_manager.runtime_ptr->busy_pending = FALSE;
+            g_xcp_channel.runtime_ptr->busy_pending = FALSE;
         }
 
         return;
     }
 
-    if (g_xcp_manager.runtime_ptr->cmd_pending == TRUE)
+    if (g_xcp_channel.runtime_ptr->cmd_pending == TRUE)
     {
-        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE))
+        if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE))
         {
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-            if (g_xcp_manager.runtime_ptr->cmd_queue_count > 0U)
+            if (g_xcp_channel.runtime_ptr->cmd_queue_count > 0U)
             {
-                cmd_data   = g_xcp_manager.runtime_ptr->cmd_queue[g_xcp_manager.runtime_ptr->cmd_queue_head];
-                cmd_length = g_xcp_manager.runtime_ptr->cmd_queue_len[g_xcp_manager.runtime_ptr->cmd_queue_head];
+                cmd_data   = g_xcp_channel.runtime_ptr->cmd_queue[g_xcp_channel.runtime_ptr->cmd_queue_head];
+                cmd_length = g_xcp_channel.runtime_ptr->cmd_queue_len[g_xcp_channel.runtime_ptr->cmd_queue_head];
 
                 Xcp_ProcessCommand(cmd_data, cmd_length);
 
-                g_xcp_manager.runtime_ptr->cmd_queue_head =
-                    (g_xcp_manager.runtime_ptr->cmd_queue_head + 1U) % XCP_CMD_QUEUE_SIZE;
-                g_xcp_manager.runtime_ptr->cmd_queue_count--;
+                g_xcp_channel.runtime_ptr->cmd_queue_head =
+                    (g_xcp_channel.runtime_ptr->cmd_queue_head + 1U) % XCP_CMD_QUEUE_SIZE;
+                g_xcp_channel.runtime_ptr->cmd_queue_count--;
 
-                if (g_xcp_manager.runtime_ptr->cmd_queue_count == 0U)
+                if (g_xcp_channel.runtime_ptr->cmd_queue_count == 0U)
                 {
-                    g_xcp_manager.runtime_ptr->cmd_pending = FALSE;
+                    g_xcp_channel.runtime_ptr->cmd_pending = FALSE;
                 }
             }
 #else
-            cmd_data   = g_xcp_manager.runtime_ptr->cmd_queue_buffer;
-            cmd_length = g_xcp_manager.runtime_ptr->cmd_queue_length;
+            cmd_data   = g_xcp_channel.runtime_ptr->cmd_queue_buffer;
+            cmd_length = g_xcp_channel.runtime_ptr->cmd_queue_length;
 
             Xcp_ProcessCommand(cmd_data, cmd_length);
 
-            g_xcp_manager.runtime_ptr->cmd_pending = FALSE;
+            g_xcp_channel.runtime_ptr->cmd_pending = FALSE;
 #endif
         }
     }
@@ -121,23 +121,23 @@ void Xcp_Init(const Xcp_ConfigType *Xcp_ConfigPtr)
 
     (void)memset(&g_xcp_runtime, 0, sizeof(Xcp_RuntimeType));
 
-    (void)memset(&g_xcp_manager, 0, sizeof(Xcp_ManagerType));
+    (void)memset(&g_xcp_channel, 0, sizeof(Xcp_Channel));
 
-    g_xcp_manager.config_ptr = (Xcp_ConfigPtr != NULL_PTR) ? Xcp_ConfigPtr : &xcp_config;
-    g_xcp_manager.storage_ptr = &g_xcp_storage;
-    g_xcp_manager.runtime_ptr = &g_xcp_runtime;
+    g_xcp_channel.config_ptr = (Xcp_ConfigPtr != NULL_PTR) ? Xcp_ConfigPtr : &xcp_config;
+    g_xcp_channel.storage_ptr = &g_xcp_storage;
+    g_xcp_channel.runtime_ptr = &g_xcp_runtime;
 
-    g_xcp_manager.runtime_ptr->state = XCP_INIT;
+    g_xcp_channel.runtime_ptr->state = XCP_INIT;
 
-    g_xcp_manager.runtime_ptr->tx_mode  = XCP_TX_ON;
-    g_xcp_manager.runtime_ptr->tx.state = XCP_TX_IDLE;
+    g_xcp_channel.runtime_ptr->tx_mode  = XCP_TX_ON;
+    g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
 
 #if (XCP_ON_CAN_ENABLED == STD_ON) && (XCP_DEV_ERROR_DETECT == STD_ON)
 
-    if (g_xcp_manager.config_ptr->xcp_rx_pdu_id == g_xcp_manager.config_ptr->xcp_tx_pdu_id)
+    if (g_xcp_channel.config_ptr->xcp_rx_pdu_id == g_xcp_channel.config_ptr->xcp_tx_pdu_id)
     {
         XCP_DET_REPORT_ERROR(XCP_SID_INIT, XCP_E_INV_CONFIG);
-        g_xcp_manager.runtime_ptr->state = XCP_UNINIT;
+        g_xcp_channel.runtime_ptr->state = XCP_UNINIT;
         return;
     }
 #endif
@@ -175,7 +175,7 @@ void Xcp_SetTransmissionMode(NetworkHandleType channel, Xcp_TransmissionModeType
 
     (void)channel;
 
-    g_xcp_manager.runtime_ptr->tx_mode = mode;
+    g_xcp_channel.runtime_ptr->tx_mode = mode;
 
     if (mode == XCP_TX_ON)
     {
@@ -207,7 +207,7 @@ void Xcp_GetVersionInfo(Std_VersionInfoType *versioninfo)
 
 void Xcp_HandleTxConfirmation(Std_ReturnType result)
 {
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
     if (runtime->tx.state == XCP_TX_DTO)
     {
@@ -271,15 +271,15 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
 
 Std_ReturnType Xcp_HandleTriggerTransmit(PduInfoType *pdu_info_ptr)
 {
-    if (pdu_info_ptr->sdu_length < g_xcp_manager.storage_ptr->cto_length)
+    if (pdu_info_ptr->sdu_length < g_xcp_channel.storage_ptr->cto_length)
     {
         return E_NOT_OK;
     }
 
     (void)memcpy(pdu_info_ptr->sdu_data_ptr,
-                 g_xcp_manager.storage_ptr->cto_buffer,
-                 g_xcp_manager.storage_ptr->cto_length);
-    pdu_info_ptr->sdu_length = g_xcp_manager.storage_ptr->cto_length;
+                 g_xcp_channel.storage_ptr->cto_buffer,
+                 g_xcp_channel.storage_ptr->cto_length);
+    pdu_info_ptr->sdu_length = g_xcp_channel.storage_ptr->cto_length;
     return E_OK;
 }
 
@@ -305,13 +305,13 @@ void Xcp_HandleRxIndication(const PduInfoType *pdu_info_ptr)
 
 void Xcp_MainFunction(void)
 {
-    if ((g_xcp_manager.runtime_ptr == NULL) || (g_xcp_manager.runtime_ptr->state == XCP_UNINIT))
+    if ((g_xcp_channel.runtime_ptr == NULL) || (g_xcp_channel.runtime_ptr->state == XCP_UNINIT))
     {
         return;
     }
 
 #if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP)
-    g_xcp_manager.runtime_ptr->timestamp++;
+    g_xcp_channel.runtime_ptr->timestamp++;
 #endif
 
     Xcp_ProcessCommandQueue();
@@ -329,7 +329,7 @@ void Xcp_MainFunction(void)
 
     Xcp_ReportDtoOverload();
 
-    if (g_xcp_manager.runtime_ptr->connection_state == XCP_CONNECTED)
+    if (g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED)
     {
         uint16                      i;
         const Xcp_EventChannelType *event_cfg;
@@ -337,7 +337,7 @@ void Xcp_MainFunction(void)
 
         for (i = 0U; i < XCP_MAX_EVENT_CHANNEL; i++)
         {
-            event_cfg = &g_xcp_manager.config_ptr->xcp_event_channel[i];
+            event_cfg = &g_xcp_channel.config_ptr->xcp_event_channel[i];
 
             if (event_cfg->time_cycle == 0U)
             {
@@ -381,13 +381,13 @@ void Xcp_MainFunction(void)
                 break;
             }
 
-            g_xcp_manager.runtime_ptr->event_channel_counter[i] += XCP_MAIN_FUNCTION_PERIOD_MS;
+            g_xcp_channel.runtime_ptr->event_channel_counter[i] += XCP_MAIN_FUNCTION_PERIOD_MS;
 
-            if (g_xcp_manager.runtime_ptr->event_channel_counter[i] >= cycle_ms)
+            if (g_xcp_channel.runtime_ptr->event_channel_counter[i] >= cycle_ms)
             {
                 Xcp_Event(event_cfg->event_channel_number);
 
-                g_xcp_manager.runtime_ptr->event_channel_counter[i] -= cycle_ms;
+                g_xcp_channel.runtime_ptr->event_channel_counter[i] -= cycle_ms;
             }
         }
     }
@@ -396,12 +396,12 @@ void Xcp_MainFunction(void)
 
 void Xcp_Event(uint16 event_channel)
 {
-    if ((g_xcp_manager.runtime_ptr == NULL) || (g_xcp_manager.runtime_ptr->state != XCP_INIT))
+    if ((g_xcp_channel.runtime_ptr == NULL) || (g_xcp_channel.runtime_ptr->state != XCP_INIT))
     {
         return;
     }
 
-    if (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED)
+    if (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
     {
         return;
     }
@@ -417,21 +417,21 @@ void Xcp_Event(uint16 event_channel)
 
 void Xcp_SendPositiveResponse(uint8 length)
 {
-    g_xcp_manager.storage_ptr->cto_length = length;
-    (void)Xcp_SendResponse(g_xcp_manager.storage_ptr->cto_buffer, length);
+    g_xcp_channel.storage_ptr->cto_length = length;
+    (void)Xcp_SendResponse(g_xcp_channel.storage_ptr->cto_buffer, length);
 }
 
 void Xcp_SendErrorResponse(uint8 error_code)
 {
-    g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_ERR;
-    g_xcp_manager.storage_ptr->cto_buffer[1] = error_code;
-    g_xcp_manager.storage_ptr->cto_length    = 2U;
-    (void)Xcp_SendResponse(g_xcp_manager.storage_ptr->cto_buffer, 2U);
+    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_ERR;
+    g_xcp_channel.storage_ptr->cto_buffer[1] = error_code;
+    g_xcp_channel.storage_ptr->cto_length    = 2U;
+    (void)Xcp_SendResponse(g_xcp_channel.storage_ptr->cto_buffer, 2U);
 }
 
 Std_ReturnType Xcp_SendResponse(const uint8 *res_data, uint8 res_length)
 {
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
     Std_ReturnType   ret_val;
 
     if (runtime->tx_mode != XCP_TX_ON)
@@ -467,7 +467,7 @@ Std_ReturnType Xcp_SendResponse(const uint8 *res_data, uint8 res_length)
 
 void Xcp_SendPendingCto(void)
 {
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
     if ((runtime->tx.parked == FALSE) || (runtime->tx_mode != XCP_TX_ON))
     {
@@ -498,7 +498,7 @@ void Xcp_SendPendingCto(void)
 
 void Xcp_SessionOpen(void)
 {
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
     runtime->connection_state = XCP_CONNECTED;
     runtime->session_status = 0U;
@@ -514,7 +514,7 @@ void Xcp_SessionOpen(void)
 
 void Xcp_SessionClose(void)
 {
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
 #if (XCP_DAQ_ENABLED == STD_ON)
     Xcp_FreeDaqLists();
@@ -535,12 +535,12 @@ uint32 Xcp_GetTimestamp(void)
 
     if (GetElapsedValue(XCP_OS_COUNTER, &os_last_tick, &os_elapsed) == E_OK)
     {
-        g_xcp_manager.runtime_ptr->os_timestamp_acc += os_elapsed;
+        g_xcp_channel.runtime_ptr->os_timestamp_acc += os_elapsed;
     }
 
-    return g_xcp_manager.runtime_ptr->os_timestamp_acc;
+    return g_xcp_channel.runtime_ptr->os_timestamp_acc;
 #else
-    return g_xcp_manager.runtime_ptr->timestamp;
+    return g_xcp_channel.runtime_ptr->timestamp;
 #endif
 #else
     return 0U;
@@ -553,19 +553,19 @@ Std_ReturnType Xcp_SendEventPacket(uint8 event_code, const uint8 *event_info, ui
     uint8          ev_length;
     Std_ReturnType ret_val = E_NOT_OK;
 
-    if ((g_xcp_manager.runtime_ptr == NULL) ||
-        (g_xcp_manager.runtime_ptr->state != XCP_INIT))
+    if ((g_xcp_channel.runtime_ptr == NULL) ||
+        (g_xcp_channel.runtime_ptr->state != XCP_INIT))
     {
         return E_NOT_OK;
     }
 
-    if ((g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED)
+    if ((g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
         && (event_code != XCP_EV_RESUME_MODE))
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_manager.runtime_ptr->tx_mode != XCP_TX_ON)
+    if (g_xcp_channel.runtime_ptr->tx_mode != XCP_TX_ON)
     {
         return E_NOT_OK;
     }
@@ -593,18 +593,18 @@ Std_ReturnType Xcp_SendServiceRequest(uint8 service_code, const uint8 *service_d
     uint8          serv_length;
     Std_ReturnType ret_val = E_NOT_OK;
 
-    if ((g_xcp_manager.runtime_ptr == NULL) ||
-        (g_xcp_manager.runtime_ptr->state != XCP_INIT))
+    if ((g_xcp_channel.runtime_ptr == NULL) ||
+        (g_xcp_channel.runtime_ptr->state != XCP_INIT))
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED)
+    if (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_manager.runtime_ptr->tx_mode != XCP_TX_ON)
+    if (g_xcp_channel.runtime_ptr->tx_mode != XCP_TX_ON)
     {
         return E_NOT_OK;
     }

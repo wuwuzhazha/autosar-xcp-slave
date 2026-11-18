@@ -24,9 +24,9 @@ void Xcp_RebuildActiveDaqList(void)
     uint16 i;
     Xcp_ActiveDaqCount = 0;
 
-    for (i = 0U; i < g_xcp_manager.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
     {
-        if (g_xcp_manager.storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
+        if (g_xcp_channel.storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
         {
             Xcp_ActiveDaqIndices[Xcp_ActiveDaqCount] = i;
             Xcp_ActiveDaqCount++;
@@ -40,13 +40,13 @@ void Xcp_ResetEventChannelCounters(void)
 
     for (i = 0U; i < XCP_MAX_EVENT_CHANNEL; i++)
     {
-        g_xcp_manager.runtime_ptr->event_channel_counter[i] = 0U;
+        g_xcp_channel.runtime_ptr->event_channel_counter[i] = 0U;
     }
 
 #if (XCP_PRESCALER_SUPPORTED == STD_ON)
-    for (i = 0U; i < g_xcp_manager.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
     {
-        g_xcp_manager.storage_ptr->daq_list[i].prescaler_counter = 0U;
+        g_xcp_channel.storage_ptr->daq_list[i].prescaler_counter = 0U;
     }
 #endif
 }
@@ -60,7 +60,7 @@ void Xcp_ProcessDaq(uint16 event_channel)
     for (i = 0U; i < Xcp_ActiveDaqCount; i++)
     {
         daqIdx = Xcp_ActiveDaqIndices[i];
-        Xcp_DaqListType *daq = &g_xcp_manager.storage_ptr->daq_list[daqIdx];
+        Xcp_DaqListType *daq = &g_xcp_channel.storage_ptr->daq_list[daqIdx];
 
         if ((daq->event_channel == event_channel) && (daq->state == XCP_DAQ_STATE_RUNNING)
             && (daq->direction == XCP_DAQ_LIST_TYPE_DAQ))
@@ -98,17 +98,17 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
     uint8             local_dto_buffer[XCP_MAX_DTO];
     uint8             local_buffer_length;
 
-    if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
+    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
     {
         return;
     }
 
-    if (odt_no >= g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt_count)
+    if (odt_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt_count)
     {
         return;
     }
 
-    odt = &g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt[odt_no];
+    odt = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no];
 
     (void) memset(&local_dto_buffer[0], 0x00, XCP_MAX_DTO);
 
@@ -148,7 +148,7 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
 
 #if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP)
 
-    if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&g_xcp_manager.storage_ptr->daq_list[daq_list_no]))
+    if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&g_xcp_channel.storage_ptr->daq_list[daq_list_no]))
     {
         uint32 ts = Xcp_GetTimestamp();
 #if (XCP_TIMESTAMP_TYPE == XCP_FOUR_BYTE)
@@ -224,8 +224,8 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
 
 void Xcp_DtoSendOrQueue(const uint8 *dto_data, uint8 dto_length)
 {
-    Xcp_StorageType *storage = g_xcp_manager.storage_ptr;
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_StorageType *storage = g_xcp_channel.storage_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
     XCP_DTO_ENTER_CRITICAL();
 
@@ -272,8 +272,8 @@ void Xcp_DtoSendOrQueue(const uint8 *dto_data, uint8 dto_length)
 
 void Xcp_DtoSendNext(void)
 {
-    Xcp_StorageType *storage = g_xcp_manager.storage_ptr;
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_StorageType *storage = g_xcp_channel.storage_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
     runtime->tx.dto_latch = FALSE;
 
@@ -312,8 +312,8 @@ void Xcp_DtoSendNext(void)
 void Xcp_ReportDtoOverload(void)
 {
     uint16           i;
-    Xcp_StorageType *storage = g_xcp_manager.storage_ptr;
-    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+    Xcp_StorageType *storage = g_xcp_channel.storage_ptr;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
     XCP_DTO_ENTER_CRITICAL();
 
@@ -383,7 +383,7 @@ void Xcp_ReportDtoOverload(void)
 
     for (i = 0U; i < XCP_MAX_DAQ; i++)
     {
-        if (g_xcp_manager.storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
+        if (g_xcp_channel.storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
         {
             break;
         }

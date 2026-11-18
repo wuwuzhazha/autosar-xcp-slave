@@ -17,7 +17,7 @@ void Xcp_ProcessStim(uint16 event_channel)
     for (i = 0U; i < Xcp_ActiveDaqCount; i++)
     {
         daqIdx = Xcp_ActiveDaqIndices[i];
-        daq = &g_xcp_manager.storage_ptr->daq_list[daqIdx];
+        daq = &g_xcp_channel.storage_ptr->daq_list[daqIdx];
 
         if ((daq->event_channel == event_channel) && (daq->state == XCP_DAQ_STATE_RUNNING)
             && (daq->direction == XCP_DAQ_LIST_TYPE_STIM))
@@ -92,31 +92,31 @@ Std_ReturnType Xcp_ReceiveStimDto(const uint8 *dto_data, uint8 dto_length)
     daq_list_no = (uint16) dto_data[2] | ((uint16) dto_data[3] << 8U);
     data_idx = 4U;
 #endif
-    if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
+    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_manager.storage_ptr->daq_list[daq_list_no].direction != XCP_DAQ_LIST_TYPE_STIM)
+    if (g_xcp_channel.storage_ptr->daq_list[daq_list_no].direction != XCP_DAQ_LIST_TYPE_STIM)
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_manager.storage_ptr->daq_list[daq_list_no].state != XCP_DAQ_STATE_RUNNING)
+    if (g_xcp_channel.storage_ptr->daq_list[daq_list_no].state != XCP_DAQ_STATE_RUNNING)
     {
         return E_NOT_OK;
     }
 
-    if (odt_no >= g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt_count)
+    if (odt_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt_count)
     {
         return E_NOT_OK;
     }
 
-    odt = &g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt[odt_no];
+    odt = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no];
 
 #if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP)
 
-    if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&g_xcp_manager.storage_ptr->daq_list[daq_list_no]))
+    if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&g_xcp_channel.storage_ptr->daq_list[daq_list_no]))
     {
 #if (XCP_TIMESTAMP_TYPE == XCP_FOUR_BYTE)
         data_idx += 4U;
@@ -197,8 +197,8 @@ void Xcp_InitStimTimeout(void)
 
     for (i = 0U; i < XCP_MAX_DAQ; i++)
     {
-        g_xcp_manager.runtime_ptr->stim_last_received[i] = 0U;
-        g_xcp_manager.runtime_ptr->stim_timeout_flag[i] = FALSE;
+        g_xcp_channel.runtime_ptr->stim_last_received[i] = 0U;
+        g_xcp_channel.runtime_ptr->stim_timeout_flag[i] = FALSE;
     }
 }
 
@@ -209,9 +209,9 @@ void Xcp_ResetStimTimeout(uint16 daq_list_no)
         return;
     }
 
-    g_xcp_manager.runtime_ptr->stim_last_received[daq_list_no] = g_xcp_manager.runtime_ptr->timestamp;
+    g_xcp_channel.runtime_ptr->stim_last_received[daq_list_no] = g_xcp_channel.runtime_ptr->timestamp;
 
-    g_xcp_manager.runtime_ptr->stim_timeout_flag[daq_list_no] = FALSE;
+    g_xcp_channel.runtime_ptr->stim_timeout_flag[daq_list_no] = FALSE;
 }
 
 void Xcp_CheckStimTimeout(void)
@@ -222,13 +222,13 @@ void Xcp_CheckStimTimeout(void)
     uint32           timeout_ticks;
     Xcp_DaqListType *daq;
 
-    if ((g_xcp_manager.runtime_ptr == NULL) || (g_xcp_manager.runtime_ptr->state != XCP_INIT)
-        || (g_xcp_manager.runtime_ptr->connection_state != XCP_CONNECTED))
+    if ((g_xcp_channel.runtime_ptr == NULL) || (g_xcp_channel.runtime_ptr->state != XCP_INIT)
+        || (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED))
     {
         return;
     }
 
-    current_timestamp = g_xcp_manager.runtime_ptr->timestamp;
+    current_timestamp = g_xcp_channel.runtime_ptr->timestamp;
 
     timeout_ticks = XCP_STIM_TIMEOUT_MS / XCP_MAIN_FUNCTION_PERIOD_MS;
 
@@ -237,26 +237,26 @@ void Xcp_CheckStimTimeout(void)
         timeout_ticks = 1U;
     }
 
-    for (i = 0U; i < g_xcp_manager.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
     {
-        daq = &g_xcp_manager.storage_ptr->daq_list[i];
+        daq = &g_xcp_channel.storage_ptr->daq_list[i];
 
         if ((daq->state == XCP_DAQ_STATE_RUNNING) && (daq->direction == XCP_DAQ_LIST_TYPE_STIM))
         {
-            if (current_timestamp >= g_xcp_manager.runtime_ptr->stim_last_received[i])
+            if (current_timestamp >= g_xcp_channel.runtime_ptr->stim_last_received[i])
             {
-                elapsed_time = current_timestamp - g_xcp_manager.runtime_ptr->stim_last_received[i];
+                elapsed_time = current_timestamp - g_xcp_channel.runtime_ptr->stim_last_received[i];
             }
             else
             {
                 elapsed_time
-                    = (0xFFFFFFFFU - g_xcp_manager.runtime_ptr->stim_last_received[i]) + current_timestamp + 1U;
+                    = (0xFFFFFFFFU - g_xcp_channel.runtime_ptr->stim_last_received[i]) + current_timestamp + 1U;
             }
 
-            if ((elapsed_time >= timeout_ticks) && (g_xcp_manager.runtime_ptr->stim_timeout_flag[i] == FALSE))
+            if ((elapsed_time >= timeout_ticks) && (g_xcp_channel.runtime_ptr->stim_timeout_flag[i] == FALSE))
             {
 
-                g_xcp_manager.runtime_ptr->stim_timeout_flag[i] = TRUE;
+                g_xcp_channel.runtime_ptr->stim_timeout_flag[i] = TRUE;
                 {
                     uint8 event_info[2];
                     event_info[0] = (uint8) (i & 0xFFU);

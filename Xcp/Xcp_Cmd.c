@@ -92,7 +92,7 @@ static sint16 Xcp_DispatchUserCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_R
 
 void Xcp_ProcessCommand(const uint8 *cmd_data, uint8 cmd_length)
 {
-    Xcp_ManagerType *man = &g_xcp_manager;
+    Xcp_Channel *man = &g_xcp_channel;
     uint8 i;
     const Xcp_CmdEntryType *entry;
 

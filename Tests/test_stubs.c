@@ -307,18 +307,18 @@ Std_ReturnType Xcp_CopyCalPage_Callout(uint8 src_segment, uint8 src_page, uint8 
 Std_ReturnType Xcp_UserCommand_Callout(const uint8 *cmd_data, uint8 cmd_length)
 {
     uint8 i;
-    g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
     for (i = 1U; (i < cmd_length) && (i < XCP_MAX_CTO); i++)
     {
-        g_xcp_manager.storage_ptr->cto_buffer[i] = cmd_data[i];
+        g_xcp_channel.storage_ptr->cto_buffer[i] = cmd_data[i];
     }
 #if (XCP_MAX_CTO < 255U)
-    g_xcp_manager.storage_ptr->cto_length =
+    g_xcp_channel.storage_ptr->cto_length =
         (uint8)((cmd_length > XCP_MAX_CTO) ? XCP_MAX_CTO : cmd_length);
 #else
-    g_xcp_manager.storage_ptr->cto_length = cmd_length;
+    g_xcp_channel.storage_ptr->cto_length = cmd_length;
 #endif
-    Xcp_SendPositiveResponse(g_xcp_manager.storage_ptr->cto_length);
+    Xcp_SendPositiveResponse(g_xcp_channel.storage_ptr->cto_length);
     return E_OK;
 }
 

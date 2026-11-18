@@ -46,19 +46,19 @@ int main(void)
     printf("================ XCP predef DAQ test ================\n");
     Xcp_Init(NULL_PTR);
     CHECK("P1 daq_count == XCP_MIN_DAQ at init",
-          g_xcp_manager.runtime_ptr->daq_count == XCP_MIN_DAQ);
+          g_xcp_channel.runtime_ptr->daq_count == XCP_MIN_DAQ);
     CHECK("P2 list0 loaded: CONFIGURED, event0, dir DAQ, 1 ODT x 2 entries",
-          (g_xcp_manager.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_CONFIGURED)
-          && (g_xcp_manager.storage_ptr->daq_list[0].event_channel == 0U)
-          && (g_xcp_manager.storage_ptr->daq_list[0].odt_count == 1U)
-          && (g_xcp_manager.storage_ptr->daq_list[0].odt[0].odt_entry_count == 2U));
+          (g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_CONFIGURED)
+          && (g_xcp_channel.storage_ptr->daq_list[0].event_channel == 0U)
+          && (g_xcp_channel.storage_ptr->daq_list[0].odt_count == 1U)
+          && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry_count == 2U));
     CHECK("P3 list0 entries from config (addr 0x20000000, size4; +4, size2)",
-          (g_xcp_manager.storage_ptr->daq_list[0].odt[0].odt_entry[0].address == 0x20000000UL)
-          && (g_xcp_manager.storage_ptr->daq_list[0].odt[0].odt_entry[0].size == 4U)
-          && (g_xcp_manager.storage_ptr->daq_list[0].odt[0].odt_entry[1].address == 0x20000004UL)
-          && (g_xcp_manager.storage_ptr->daq_list[0].odt[0].odt_entry[1].size == 2U));
+          (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[0].address == 0x20000000UL)
+          && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[0].size == 4U)
+          && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[1].address == 0x20000004UL)
+          && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[1].size == 2U));
     CHECK("P4 list1 write_protected flag from config",
-          g_xcp_manager.config_ptr->xcp_static_daq_list[1].write_protected == 1U);
+          g_xcp_channel.config_ptr->xcp_static_daq_list[1].write_protected == 1U);
     l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);   
     CHECK("P5 CONNECT -> RES", (l == 8U) && (res[0] == XCP_PID_RES));
     l = xcp_cmd((const uint8 *)"\xD8\x00\x00\x00", 4U, res);
@@ -113,16 +113,16 @@ int main(void)
     l = xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);       
     CHECK("P21 ALLOC_DAQ 1 -> RES (3rd list dynamic)",
           (l == 1U) && (res[0] == XCP_PID_RES)
-          && (g_xcp_manager.runtime_ptr->daq_count == (XCP_MIN_DAQ + 1U)));
+          && (g_xcp_channel.runtime_ptr->daq_count == (XCP_MIN_DAQ + 1U)));
     l = xcp_cmd((const uint8 *)"\xE3\x00\x00\x00", 4U, res);
     CHECK("P22 CLEAR_DAQ_LIST list0 -> RES + reload config",
           (l == 1U) && (res[0] == XCP_PID_RES)
-          && (g_xcp_manager.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_CONFIGURED)
-          && (g_xcp_manager.storage_ptr->daq_list[0].event_channel == 0U)
-          && (g_xcp_manager.storage_ptr->daq_list[0].odt_count == 1U));
+          && (g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_CONFIGURED)
+          && (g_xcp_channel.storage_ptr->daq_list[0].event_channel == 0U)
+          && (g_xcp_channel.storage_ptr->daq_list[0].odt_count == 1U));
     l = xcp_cmd((const uint8 *)"\xE3\x00\x02\x00", 4U, res);       
     CHECK("P23 CLEAR_DAQ_LIST dynamic list2 -> FREE",
-          (l == 1U) && (g_xcp_manager.storage_ptr->daq_list[2].state == XCP_DAQ_STATE_FREE));
+          (l == 1U) && (g_xcp_channel.storage_ptr->daq_list[2].state == XCP_DAQ_STATE_FREE));
     {
         uint32 lo = (uint32)(uintptr_t)&test_ram_var32;
         uint8 w[8] = {0xE1, 0xFF, 4, 0, (uint8)lo, (uint8)(lo >> 8), (uint8)(lo >> 16), (uint8)(lo >> 24)};
@@ -149,12 +149,12 @@ int main(void)
     l = xcp_cmd((const uint8 *)"\xD6", 1U, res);
     CHECK("P27 FREE_DAQ -> RES, daq_count still XCP_MIN_DAQ",
           (l == 1U) && (res[0] == XCP_PID_RES)
-          && (g_xcp_manager.runtime_ptr->daq_count == XCP_MIN_DAQ));
+          && (g_xcp_channel.runtime_ptr->daq_count == XCP_MIN_DAQ));
     CHECK("P28 list0 after FREE_DAQ: CONFIGURED ev0 (config reload)",
-          (g_xcp_manager.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_CONFIGURED)
-          && (g_xcp_manager.storage_ptr->daq_list[0].event_channel == 0U));
+          (g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_CONFIGURED)
+          && (g_xcp_channel.storage_ptr->daq_list[0].event_channel == 0U));
     CHECK("P29 dynamic list freed",
-          g_xcp_manager.storage_ptr->daq_list[2].state == XCP_DAQ_STATE_FREE);
+          g_xcp_channel.storage_ptr->daq_list[2].state == XCP_DAQ_STATE_FREE);
     CHECK("P30 SchM enter/exit paired, >0",
           (test_schm_enter_count == test_schm_exit_count)
           && (test_schm_enter_count > 0U));
