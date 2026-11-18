@@ -675,7 +675,8 @@ sint16 Xcp_CmdStartStopDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd
 
     ch->storage_ptr->cto_buffer[1] = (uint8) (first_pid & 0xFFU);
 #else
-    ch->storage_ptr->cto_buffer[1] = 0U;
+    /* RELATIVE_*: first_pid = list 编号(ODT0 在该 list 内的相对 PID 隐含=0) */
+    ch->storage_ptr->cto_buffer[1] = (uint8) (daq_list_no & 0xFFU);
 #endif
 
     return (sint16)(2U);
