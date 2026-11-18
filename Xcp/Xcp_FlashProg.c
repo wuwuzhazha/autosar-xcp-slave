@@ -85,8 +85,8 @@ sint16 Xcp_CmdProgramStart(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     ch->storage_ptr->cto_buffer[6] = 0x00U;
 #endif
     ch->storage_ptr->cto_buffer[3] = XCP_MAX_CTO;
-    ch->storage_ptr->cto_buffer[4] = 0x00U;
-    ch->storage_ptr->cto_buffer[5] = 0x00U;
+    ch->storage_ptr->cto_buffer[4] = XCP_MAX_BS;
+    ch->storage_ptr->cto_buffer[5] = XCP_MIN_ST;
 
     return (sint16)(7U);
 }
