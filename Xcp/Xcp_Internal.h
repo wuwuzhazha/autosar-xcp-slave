@@ -215,6 +215,64 @@ static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)
     return 2;
 }
 
+#if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
+extern Xcp_SegmentType Xcp_SegmentRuntime[XCP_MAX_SEGMENT];
+#endif
+
+/* 地址扩展：ext 高 4 位选地址空间。
+   0 = 默认（addr 原样）；s = CalPage 段 s-1，按激活的 XCP 页翻译。
+   CALPAGE 未启用或 ext==0 时不翻译。 */
+static inline uint32 Xcp_MemTranslate(Xcp_Channel *ch, uint8 ext, uint32 addr)
+{
+#if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
+    uint8 seg = (uint8)(ext >> 4U);
+
+    if (seg == 0U)
+    {
+        return addr;
+    }
+    seg = (uint8)(seg - 1U);
+    if (seg >= XCP_MAX_SEGMENT)
+    {
+        return addr;
+    }
+    {
+        const Xcp_SegmentConfigType *cfg = &ch->config_ptr->xcp_segment_config[seg];
+        uint32 page_len = (cfg->num_pages != 0U) ? (cfg->length / cfg->num_pages) : 0U;
+
+        return cfg->start_address
+             + ((uint32)Xcp_SegmentRuntime[seg].active_page_xcp * page_len)
+             + addr;
+    }
+#else
+    (void)ch; (void)ext;
+    return addr;
+#endif
+}
+
+/* 内存端口：翻译 + 访问检查 + 取物理指针。NULL = 拒绝。 */
+static inline uint8 *Xcp_MemPtrRead(Xcp_Channel *ch, uint8 ext, uint32 addr, uint32 size)
+{
+    uint32 phys = Xcp_MemTranslate(ch, ext, addr);
+
+    if (XCP_CHECK_READ_ACCESS_EX(ext, phys, size) != 0U)
+    {
+        return NULL_PTR;
+    }
+    return (uint8 *) phys;
+}
+
+static inline uint8 *Xcp_MemPtrWrite(Xcp_Channel *ch, uint8 ext, uint32 addr, uint32 size)
+{
+    uint32 phys = Xcp_MemTranslate(ch, ext, addr);
+
+    if (XCP_CHECK_WRITE_ACCESS_EX(ext, phys, size) != 0U)
+    {
+        return NULL_PTR;
+    }
+    return (uint8 *) phys;
+}
+
 #define XCP_GUARD_NONE                (0U)
 #define XCP_GUARD_ALLOW_DISCONNECTED  (1U)
 
@@ -260,10 +318,6 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result);
 Std_ReturnType Xcp_HandleTriggerTransmit(PduInfoType *pdu_info_ptr);
 
 void Xcp_HandleRxIndication(const PduInfoType *pdu_info_ptr);
-
-#if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
-extern Xcp_SegmentType Xcp_SegmentRuntime[XCP_MAX_SEGMENT];
-#endif
 
 #if (XCP_ON_FLEXRAY_ENABLED == STD_ON)
 

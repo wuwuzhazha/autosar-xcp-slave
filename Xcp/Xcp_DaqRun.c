@@ -140,11 +140,11 @@ void Xcp_TransmitDto(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no)
             break;
         }
 
-        src_ptr = (uint8 *) entry->address;
+        src_ptr = (uint8 *) Xcp_MemTranslate(ch, entry->address_extension, entry->address);
 
         if (is_bit != FALSE)
         {
-            uint32 byte_addr = entry->address + ((uint32) entry->bit_offset >> 3U);
+            uint32 byte_addr = (uint32)(uintptr_t)src_ptr + ((uint32) entry->bit_offset >> 3U);
 
             local_dto_buffer[buffer_idx] = 0x00U;
             if (XCP_CHECK_READ_ACCESS_EX(entry->address_extension, byte_addr, 1U) == 0U)
@@ -153,7 +153,7 @@ void Xcp_TransmitDto(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no)
                     (uint8) ((src_ptr[entry->bit_offset >> 3U] >> (entry->bit_offset & 0x07U)) & 0x01U);
             }
         }
-        else if (XCP_CHECK_READ_ACCESS_EX(entry->address_extension, entry->address, entry->size) != 0U)
+        else if (XCP_CHECK_READ_ACCESS_EX(entry->address_extension, (uint32)(uintptr_t)src_ptr, entry->size) != 0U)
         {
             (void) memset(&local_dto_buffer[buffer_idx], 0x00, entry->size);
         }

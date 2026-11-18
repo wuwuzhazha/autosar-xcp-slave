@@ -108,14 +108,14 @@ Std_ReturnType Xcp_ReceiveStimDto(Xcp_Channel *ch, const uint8 *dto_data, uint8 
             break;
         }
 
-        dst_ptr = (uint8 *) entry->address;
+        dst_ptr = (uint8 *) Xcp_MemTranslate(ch, entry->address_extension, entry->address);
 
         if (is_bit != FALSE)
         {
 
             uint8  byte_idx  = (uint8) (entry->bit_offset >> 3U);
             uint8  mask      = (uint8) (1U << (entry->bit_offset & 0x07U));
-            uint32 byte_addr = entry->address + byte_idx;
+            uint32 byte_addr = (uint32)(uintptr_t)dst_ptr + byte_idx;
 
             if (XCP_CHECK_WRITE_ACCESS_EX(entry->address_extension, byte_addr, 1U) == 0U)
             {
@@ -129,7 +129,7 @@ Std_ReturnType Xcp_ReceiveStimDto(Xcp_Channel *ch, const uint8 *dto_data, uint8 
                 }
             }
         }
-        else if (XCP_CHECK_WRITE_ACCESS_EX(entry->address_extension, entry->address, entry->size) == 0U)
+        else if (XCP_CHECK_WRITE_ACCESS_EX(entry->address_extension, (uint32)(uintptr_t)dst_ptr, entry->size) == 0U)
         {
             (void) memcpy(dst_ptr, &dto_data[data_idx], entry->size);
         }

@@ -247,14 +247,14 @@ sint16 Xcp_CmdUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, X
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_READ_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements) != 0U)
+    src_ptr = Xcp_MemPtrRead(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements);
+
+    if (src_ptr == NULL_PTR)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
-
-    src_ptr = (uint8 *) ch->runtime_ptr->mta;
 
     (void) memcpy(&ch->storage_ptr->cto_buffer[1U], src_ptr, num_elements);
 
@@ -276,21 +276,19 @@ sint16 Xcp_CmdShortUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
     address_extension = cmd_data[3];
     address = Xcp_LeRead32(&cmd_data[4U]);
 
-    (void) address_extension;
-
     if (num_elements > (XCP_MAX_CTO - 1U))
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_READ_ACCESS_EX(address_extension, address, num_elements) != 0U)
+    src_ptr = Xcp_MemPtrRead(ch, address_extension, address, num_elements);
+
+    if (src_ptr == NULL_PTR)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
-
-    src_ptr = (uint8 *) address;
 
     (void) memcpy(&ch->storage_ptr->cto_buffer[1U], src_ptr, num_elements);
 
@@ -312,7 +310,9 @@ sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements) != 0U)
+    dst_ptr = Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements);
+
+    if (dst_ptr == NULL_PTR)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -323,8 +323,6 @@ sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
-
-    dst_ptr = (uint8 *) ch->runtime_ptr->mta;
 
     (void) memcpy(dst_ptr, &cmd_data[2U], num_elements);
 
@@ -371,14 +369,14 @@ sint16 Xcp_CmdShortDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
     address_extension = cmd_data[3];
     address = Xcp_LeRead32(&cmd_data[4U]);
 
-    (void) address_extension;
-
     if ((8U + num_elements) > cmd_length)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS_EX(address_extension, address, num_elements) != 0U)
+    dst_ptr = Xcp_MemPtrWrite(ch, address_extension, address, num_elements);
+
+    if (dst_ptr == NULL_PTR)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -389,8 +387,6 @@ sint16 Xcp_CmdShortDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
-
-    dst_ptr = (uint8 *) address;
 
     (void) memcpy(dst_ptr, &cmd_data[8U], num_elements);
 
@@ -413,7 +409,9 @@ sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
 
     num_elements = cmd_length - 1U;
 
-    if (XCP_CHECK_WRITE_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements) != 0U)
+    dst_ptr = Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements);
+
+    if (dst_ptr == NULL_PTR)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -424,8 +422,6 @@ sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
-
-    dst_ptr = (uint8 *) ch->runtime_ptr->mta;
 
     (void) memcpy(dst_ptr, &cmd_data[1U], num_elements);
 
@@ -510,12 +506,16 @@ sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
         return Xcp_ResErr(res, XCP_ERR_CMD_SYNTAX);
     }
 
-    if (XCP_CHECK_READ_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U) != 0U)
+    target_ptr = (uint32 *) Xcp_MemPtrRead(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U);
+
+    if (target_ptr == NULL_PTR)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS_EX(ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U) != 0U)
+    target_ptr = (uint32 *) Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U);
+
+    if (target_ptr == NULL_PTR)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -526,8 +526,6 @@ sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
-
-    target_ptr = (uint32 *) ch->runtime_ptr->mta;
     old_value = *target_ptr;
 
     new_value = (old_value & ~(((uint32) 0xFFFFU) << shift_value)) | (((uint32) and_mask) << shift_value);
