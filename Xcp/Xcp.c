@@ -496,7 +496,8 @@ void Xcp_SessionOpen(void)
     Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
     runtime->connection_state = XCP_CONNECTED;
-    runtime->session_status = 0U;
+    /* 跨会话保留 STORE_CAL/CLEAR_DAQ 位供主站读取确认,其余清 */
+    runtime->session_status &= (uint8)(XCP_SS_STORE_CAL_REQ | XCP_SS_CLEAR_DAQ_REQ);
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     Xcp_InitProtection(&g_xcp_channel);

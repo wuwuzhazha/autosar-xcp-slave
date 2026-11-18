@@ -295,15 +295,18 @@ Std_ReturnType Xcp_ClearStoredDaqConfig(Xcp_Channel *ch)
     g_xcp_resume_runtime.state = XCP_RESUME_STATE_IDLE;
 
 #if (XCP_NVM_AVAILABLE == STD_ON)
-    if (NvM_InvalidateNvBlock(XCP_NVM_BLOCK_ID_RESUME) == E_OK)
+    if (NvM_InvalidateNvBlock(XCP_NVM_BLOCK_ID_RESUME) != E_OK)
     {
-        return E_OK;
+        return E_NOT_OK;
+    }
+#endif
+
+    if (ch->runtime_ptr != NULL_PTR)
+    {
+        ch->runtime_ptr->session_status |= XCP_SS_CLEAR_DAQ_REQ;
     }
 
-    return E_NOT_OK;
-#else
     return E_OK;
-#endif
 }
 
 boolean Xcp_IsDaqListResume(Xcp_Channel *ch, uint16 daq_list_no)
