@@ -8,20 +8,17 @@
 
 #if (XCP_DAQ_ENABLED == STD_ON)
 
-uint16 Xcp_ActiveDaqIndices[XCP_MAX_DAQ];
-uint16 Xcp_ActiveDaqCount = 0;
-
 void Xcp_RebuildActiveDaqList(Xcp_Channel *ch)
 {
     uint16 i;
-    Xcp_ActiveDaqCount = 0;
+    ch->storage_ptr->active_daq_count = 0U;
 
     for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
     {
         if (ch->storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
         {
-            Xcp_ActiveDaqIndices[Xcp_ActiveDaqCount] = i;
-            Xcp_ActiveDaqCount++;
+            ch->storage_ptr->active_daq_idx[ch->storage_ptr->active_daq_count] = i;
+            ch->storage_ptr->active_daq_count++;
         }
     }
 }
@@ -49,9 +46,9 @@ void Xcp_ProcessDaq(Xcp_Channel *ch, uint16 event_channel)
     uint16 daqIdx;
     uint8  odtIdx;
 
-    for (i = 0U; i < Xcp_ActiveDaqCount; i++)
+    for (i = 0U; i < ch->storage_ptr->active_daq_count; i++)
     {
-        daqIdx = Xcp_ActiveDaqIndices[i];
+        daqIdx = ch->storage_ptr->active_daq_idx[i];
         Xcp_DaqListType *daq = &ch->storage_ptr->daq_list[daqIdx];
 
         if ((daq->event_channel == event_channel) && (daq->state == XCP_DAQ_STATE_RUNNING)

@@ -103,6 +103,9 @@ typedef struct
     uint8  dto_queue_head;
     uint8  dto_queue_tail;
 
+    uint16 active_daq_idx[XCP_MAX_DAQ];
+    uint16 active_daq_count;
+
 #if (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
     uint32 dropped_dto_counter;
 #endif
