@@ -52,8 +52,6 @@ void Xcp_ProcessDaq(Xcp_Channel *ch, uint16 event_channel);
 
 void Xcp_ReportDtoOverload(Xcp_Channel *ch);
 
-void Xcp_ProcessStim(Xcp_Channel *ch, uint16 event_channel);
-
 Std_ReturnType Xcp_ReceiveStimDto(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length);
 
 void Xcp_TransmitDto(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no);

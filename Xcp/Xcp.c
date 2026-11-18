@@ -408,8 +408,6 @@ void Xcp_Event(uint16 event_channel)
 
 #if (XCP_DAQ_ENABLED == STD_ON)
     Xcp_ProcessDaq(&g_xcp_channel, event_channel);
-
-    Xcp_ProcessStim(&g_xcp_channel, event_channel);
 #else
     (void)event_channel;
 #endif

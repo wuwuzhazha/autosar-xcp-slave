@@ -8,40 +8,6 @@
 
 #if (XCP_DAQ_ENABLED == STD_ON)
 
-void Xcp_ProcessStim(Xcp_Channel *ch, uint16 event_channel)
-{
-    uint16           i;
-    uint16           daqIdx;
-    Xcp_DaqListType *daq;
-
-    for (i = 0U; i < Xcp_ActiveDaqCount; i++)
-    {
-        daqIdx = Xcp_ActiveDaqIndices[i];
-        daq = &ch->storage_ptr->daq_list[daqIdx];
-
-        if ((daq->event_channel == event_channel) && (daq->state == XCP_DAQ_STATE_RUNNING)
-            && (daq->direction == XCP_DAQ_LIST_TYPE_STIM))
-        {
-#if (XCP_PRESCALER_SUPPORTED == STD_ON)
-            uint8 prescaler = daq->prescaler;
-
-            if (prescaler > 1U)
-            {
-                daq->prescaler_counter++;
-
-                if (daq->prescaler_counter < (uint32) prescaler)
-                {
-                    continue;
-                }
-
-                daq->prescaler_counter = 0U;
-            }
-#endif
-
-        }
-    }
-}
-
 Std_ReturnType Xcp_ReceiveStimDto(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length)
 {
     uint16            daq_list_no;

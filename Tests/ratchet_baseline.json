@@ -1,9 +1,9 @@
 {
   "version": 1,
   "g_xcp_channel": {
-    "total": 169,
+    "total": 168,
     "files": {
-      "Xcp/Xcp.c": 98,
+      "Xcp/Xcp.c": 97,
       "Xcp/XcpOnCan.c": 2,
       "Xcp/XcpOnCdd.c": 2,
       "Xcp/XcpOnEth.c": 4,
@@ -24,7 +24,7 @@
     "files": {}
   },
   "xcp_preprocessor": {
-    "total": 166,
+    "total": 165,
     "files": {
       "Xcp/Xcp.c": 27,
       "Xcp/Xcp.h": 3,
@@ -40,7 +40,7 @@
       "Xcp/Xcp_DaqCfg.c": 29,
       "Xcp/Xcp_DaqInt.h": 17,
       "Xcp/Xcp_DaqRun.c": 5,
-      "Xcp/Xcp_DaqStim.c": 4,
+      "Xcp/Xcp_DaqStim.c": 3,
       "Xcp/Xcp_FlashProg.c": 11,
       "Xcp/Xcp_FlashProg.h": 1,
       "Xcp/Xcp_Internal.h": 13,
