@@ -251,10 +251,6 @@ typedef enum
     XCP_TX_ON  = 0x01U
 } Xcp_TransmissionModeType;
 
-#define XCP_TX_KIND_NONE (0x00U)
-#define XCP_TX_KIND_CTO  (0x01U)
-#define XCP_TX_KIND_DTO  (0x02U)
-
 typedef enum
 {
     XCP_DAQ_STATE_FREE = 0x00U,

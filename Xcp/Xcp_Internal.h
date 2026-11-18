@@ -103,6 +103,23 @@ typedef struct
 #endif
 } Xcp_StorageType;
 
+typedef enum
+{
+    XCP_TX_IDLE = 0,
+    XCP_TX_CTO  = 1,
+    XCP_TX_DTO  = 2
+} Xcp_TxStateType;
+
+typedef struct
+{
+    volatile Xcp_TxStateType state;
+    volatile boolean         parked;
+    volatile uint8           parked_len;
+    uint8                    parked_data[XCP_MAX_CTO];
+    volatile boolean         dto_latch;
+    uint8                    last_error;
+} Xcp_TxPipe;
+
 typedef struct
 {
 
@@ -126,15 +143,10 @@ typedef struct
     uint32 event_channel_counter[XCP_MAX_EVENT_CHANNEL];
 #endif
 
-    boolean cto_busy;
-    uint8   cto_retry_count;
-    uint8   cto_last_error;
-    volatile boolean dto_busy;
-
-    volatile uint8 tx_last_kind;
-    volatile boolean cto_pending;
-    uint8          cto_pending_data[XCP_MAX_CTO];
-    volatile uint8 cto_pending_len;
+    /* 一条 Tx PDU 上的发送管道。state 是总线令牌（同时只有一帧）。
+       parked 是等令牌的那一帧 CTO。dto_latch 不是令牌：DTO 确认后若改发
+       停放的 CTO，闩保持，看门狗继续计，直到排空、失败确认或超时。 */
+    Xcp_TxPipe tx;
 
     uint32 timestamp;
     uint32 os_timestamp_acc;

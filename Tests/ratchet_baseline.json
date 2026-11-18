@@ -1,9 +1,9 @@
 {
   "version": 1,
   "g_xcp_manager": {
-    "total": 616,
+    "total": 613,
     "files": {
-      "Xcp/Xcp.c": 85,
+      "Xcp/Xcp.c": 82,
       "Xcp/XcpOnCan.c": 2,
       "Xcp/XcpOnCdd.c": 2,
       "Xcp/XcpOnEth.c": 5,
@@ -55,36 +55,20 @@
   ],
   "tx_symbols": {
     "tx_last_kind": {
-      "total": 24,
-      "files": {
-        "Xcp/Xcp.c": 11,
-        "Xcp/Xcp_Daq.c": 12,
-        "Xcp/Xcp_Internal.h": 1
-      }
+      "total": 0,
+      "files": {}
     },
     "cto_busy": {
-      "total": 10,
-      "files": {
-        "Xcp/Xcp.c": 9,
-        "Xcp/Xcp_Internal.h": 1
-      }
+      "total": 0,
+      "files": {}
     },
     "dto_busy": {
-      "total": 11,
-      "files": {
-        "Xcp/Xcp.c": 1,
-        "Xcp/Xcp_Daq.c": 9,
-        "Xcp/Xcp_Internal.h": 1
-      }
+      "total": 0,
+      "files": {}
     },
     "cto_pending": {
-      "total": 14,
-      "files": {
-        "Xcp/Xcp.c": 11,
-        "Xcp/Xcp_Daq.c": 1,
-        "Xcp/Xcp_Internal.h": 1,
-        "Xcp/Xcp_Std.c": 1
-      }
+      "total": 0,
+      "files": {}
     }
   },
   "forbidden_includes": []

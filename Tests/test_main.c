@@ -196,8 +196,8 @@ static void xcp_drain_tx(void)
 /* 模拟一帧 DTO 在飞（共享PDU单在飞：须同时置归属） */
 static void test_sim_dto_inflight(void)
 {
-    g_xcp_manager.runtime_ptr->dto_busy     = TRUE;
-    g_xcp_manager.runtime_ptr->tx_last_kind = XCP_TX_KIND_DTO;
+    g_xcp_manager.runtime_ptr->tx.dto_latch = TRUE;
+    g_xcp_manager.runtime_ptr->tx.state = XCP_TX_DTO;
 }
 
 static void xcp_settle(void)
@@ -207,10 +207,10 @@ static void xcp_settle(void)
     {
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();
-        if ((g_xcp_manager.runtime_ptr->cto_busy == FALSE)
-            && (g_xcp_manager.runtime_ptr->dto_busy == FALSE)
-            && (g_xcp_manager.runtime_ptr->cto_pending == FALSE)
-            && (g_xcp_manager.runtime_ptr->tx_last_kind == XCP_TX_KIND_NONE)
+        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_manager.runtime_ptr->tx.dto_latch == FALSE)
+            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE)
+            && (g_xcp_manager.runtime_ptr->tx.state == XCP_TX_IDLE)
             && (g_xcp_manager.runtime_ptr->cmd_pending == FALSE))
         {
             break;
@@ -234,9 +234,9 @@ static void xcp_quiesce(void)
         while (test_tx_pop(f, &fl) > 0U)
         {
         }
-        if ((g_xcp_manager.runtime_ptr->cto_busy == FALSE)
-            && (g_xcp_manager.runtime_ptr->dto_busy == FALSE)
-            && (g_xcp_manager.runtime_ptr->cto_pending == FALSE)
+        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_manager.runtime_ptr->tx.dto_latch == FALSE)
+            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE)
             && (g_xcp_manager.storage_ptr->dto_queue_count == 0U))
         {
             break;
@@ -267,7 +267,7 @@ static boolean xcp_cmd_has_err(const uint8 *c, uint32 len, uint8 err)
         {
             Xcp_Tl_TxConfirmation(0U, E_OK);
             Xcp_MainFunction();
-            if ((g_xcp_manager.runtime_ptr->cto_busy == FALSE)
+            if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
                 && (g_xcp_manager.runtime_ptr->cmd_pending == FALSE))
             {
                 break;
@@ -311,8 +311,8 @@ static uint32 xcp_cmd_reply(const uint8 *c, uint32 len, uint8 *res)
     {
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();
-        if ((g_xcp_manager.runtime_ptr->cto_busy == FALSE)
-            && (g_xcp_manager.runtime_ptr->cto_pending == FALSE)
+        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE)
             && (g_xcp_manager.runtime_ptr->cmd_pending == FALSE)
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
             && (g_xcp_manager.runtime_ptr->cmd_queue_count == 0U)
@@ -1478,7 +1478,7 @@ int main(void)
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();         /* 处理唯一命令 → 发送失败 */
         CHECK("J5 TX fail -> no frame, busy cleared",
-              (test_tx_pop(res, &l) == 0U) && (g_xcp_manager.runtime_ptr->cto_busy == FALSE));
+              (test_tx_pop(res, &l) == 0U) && (g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO));
     }
     test_tx_fail_next = FALSE;
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
@@ -1487,7 +1487,7 @@ int main(void)
     test_tx_fail_next = TRUE;
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
     CHECK("J5 TX fail -> no frame, busy cleared",
-          (l == 0U) && (g_xcp_manager.runtime_ptr->cto_busy == FALSE));
+          (l == 0U) && (g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO));
     /* 恢复：J5 的命令仍在队列 → 先消费重叠命令的 ERR_CMD_BUSY，再泵出 J5 的 RES */
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
     CHECK("J6a overlapped -> ERR_CMD_BUSY", (l == 2U) && (res[0] == XCP_PID_ERR));
@@ -1560,8 +1560,8 @@ int main(void)
         CHECK("K1a DTO queue count capped at XCP_MAX_ODT",
               g_xcp_manager.storage_ptr->dto_queue_count == XCP_MAX_ODT);
 
-        g_xcp_manager.runtime_ptr->dto_busy     = FALSE; /* 释放通道,周期排空 */
-        g_xcp_manager.runtime_ptr->tx_last_kind = XCP_TX_KIND_NONE;
+        g_xcp_manager.runtime_ptr->tx.dto_latch = FALSE; /* 释放通道,周期排空 */
+        g_xcp_manager.runtime_ptr->tx.state = XCP_TX_IDLE;
         {
             uint8  ev[64]; uint32 el;
             boolean found = FALSE;
@@ -1744,7 +1744,7 @@ int main(void)
 
         /* Event gera DTO sem confirmacao -> dto_busy=TRUE */
         Xcp_Event(0U);
-        CHECK("K6a DTO in-flight sets dto_busy", g_xcp_manager.runtime_ptr->dto_busy == TRUE);
+        CHECK("K6a DTO in-flight sets dto_busy", g_xcp_manager.runtime_ptr->tx.dto_latch == TRUE);
 
         /* 新语义：DTO 在飞期间到达的 RES 暂存延迟槽（cto_pending），不占 cto_busy */
         {
@@ -1753,19 +1753,19 @@ int main(void)
             Xcp_MainFunction(); /* dispatch -> cto_pending=TRUE, 直发被在飞DTO抑制 */
         }
         CHECK("K6b RES deferred while DTO busy -> pending",
-              g_xcp_manager.runtime_ptr->cto_pending == TRUE
-              && g_xcp_manager.runtime_ptr->dto_busy == TRUE);
+              g_xcp_manager.runtime_ptr->tx.parked == TRUE
+              && g_xcp_manager.runtime_ptr->tx.dto_latch == TRUE);
 
         /* DTO 确认消费归属 -> 立即补发延迟 CTO */
         Xcp_Tl_TxConfirmation(0U, E_OK);
         CHECK("K6c DTO conf -> pending CTO sent (cto_busy)",
-              g_xcp_manager.runtime_ptr->cto_pending == FALSE
-              && g_xcp_manager.runtime_ptr->cto_busy == TRUE);
+              g_xcp_manager.runtime_ptr->tx.parked == FALSE
+              && g_xcp_manager.runtime_ptr->tx.state == XCP_TX_CTO);
 
         /* 2a confirmacao limpa CTO */
         Xcp_Tl_TxConfirmation(0U, E_OK);
         CHECK("K6d second conf clears cto_busy",
-              g_xcp_manager.runtime_ptr->cto_busy == FALSE);
+              g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO);
 
         /* Retry: CTO 确认失败 -> 无重传源，记录错误并释放通道 */
         {
@@ -1776,8 +1776,8 @@ int main(void)
         }
         Xcp_Tl_TxConfirmation(0U, E_NOT_OK);
         CHECK("K6e CTO conf fail -> busy cleared + error",
-              g_xcp_manager.runtime_ptr->cto_busy == FALSE
-              && g_xcp_manager.runtime_ptr->cto_last_error == 1U);
+              g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO
+              && g_xcp_manager.runtime_ptr->tx.last_error == 1U);
 
         cmd[0] = 0xDE; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
@@ -1820,7 +1820,7 @@ int main(void)
             }
         }
         CHECK("K8a dto_busy cleared after watchdog timeout",
-              g_xcp_manager.runtime_ptr->dto_busy == FALSE);
+              g_xcp_manager.runtime_ptr->tx.dto_latch == FALSE);
         /* busy volta a ligar quando ha DTO na fila — confirma drenagem pos-watchdog */
         {
             uint32 wi;
@@ -2976,8 +2976,8 @@ int main(void)
                 Xcp_Event(0U);                                            /* list0 DTO 入队 */
                 CHECK("K26f1 DTO queued behind in-flight frame",
                       g_xcp_manager.storage_ptr->dto_queue_count > 0U);
-                g_xcp_manager.runtime_ptr->dto_busy     = FALSE;          /* 释放在飞帧 */
-                g_xcp_manager.runtime_ptr->tx_last_kind = XCP_TX_KIND_NONE;
+                g_xcp_manager.runtime_ptr->tx.dto_latch = FALSE;          /* 释放在飞帧 */
+                g_xcp_manager.runtime_ptr->tx.state = XCP_TX_IDLE;
                 (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);            /* FREE_DAQ: 队列必须清空 */
                 CHECK("K26f2 FREE_DAQ clears queued DTOs",
                       g_xcp_manager.storage_ptr->dto_queue_count == 0U);

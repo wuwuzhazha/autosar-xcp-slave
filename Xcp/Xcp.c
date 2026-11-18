@@ -68,8 +68,8 @@ void Xcp_ProcessCommandQueue(void)
 
     if (g_xcp_manager.runtime_ptr->busy_pending == TRUE)
     {
-        if ((g_xcp_manager.runtime_ptr->cto_busy == FALSE)
-            && (g_xcp_manager.runtime_ptr->cto_pending == FALSE))
+        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE))
         {
             Xcp_SendErrorResponse(XCP_ERR_CMD_BUSY);
 
@@ -81,8 +81,8 @@ void Xcp_ProcessCommandQueue(void)
 
     if (g_xcp_manager.runtime_ptr->cmd_pending == TRUE)
     {
-        if ((g_xcp_manager.runtime_ptr->cto_busy == FALSE)
-            && (g_xcp_manager.runtime_ptr->cto_pending == FALSE))
+        if ((g_xcp_manager.runtime_ptr->tx.state != XCP_TX_CTO)
+            && (g_xcp_manager.runtime_ptr->tx.parked == FALSE))
         {
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
             if (g_xcp_manager.runtime_ptr->cmd_queue_count > 0U)
@@ -128,11 +128,8 @@ void Xcp_Init(const Xcp_ConfigType *Xcp_ConfigPtr)
 
     g_xcp_manager.runtime_ptr->state = XCP_INIT;
 
-    g_xcp_manager.runtime_ptr->tx_mode          = XCP_TX_ON;
-    g_xcp_manager.runtime_ptr->cto_busy         = FALSE;
-    g_xcp_manager.runtime_ptr->cto_retry_count  = 0U;
-    g_xcp_manager.runtime_ptr->tx_last_kind     = XCP_TX_KIND_NONE;
-    g_xcp_manager.runtime_ptr->cto_pending      = FALSE;
+    g_xcp_manager.runtime_ptr->tx_mode  = XCP_TX_ON;
+    g_xcp_manager.runtime_ptr->tx.state = XCP_TX_IDLE;
 
 #if (XCP_ON_CAN_ENABLED == STD_ON) && (XCP_DEV_ERROR_DETECT == STD_ON)
 
@@ -211,14 +208,14 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
 {
     Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
 
-    if (runtime->tx_last_kind == XCP_TX_KIND_DTO)
+    if (runtime->tx.state == XCP_TX_DTO)
     {
-        runtime->tx_last_kind = XCP_TX_KIND_NONE;
+        runtime->tx.state = XCP_TX_IDLE;
 
         if (result == E_OK)
         {
 
-            if (runtime->cto_pending != FALSE)
+            if (runtime->tx.parked != FALSE)
             {
                 Xcp_SendPendingCto();
             }
@@ -231,9 +228,9 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         }
         else
         {
-            runtime->dto_busy = FALSE;
+            runtime->tx.dto_latch = FALSE;
 
-            if (runtime->cto_pending != FALSE)
+            if (runtime->tx.parked != FALSE)
             {
                 Xcp_SendPendingCto();
             }
@@ -242,24 +239,20 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         return;
     }
 
-    if (runtime->tx_last_kind == XCP_TX_KIND_CTO)
+    if (runtime->tx.state == XCP_TX_CTO)
     {
-        runtime->tx_last_kind = XCP_TX_KIND_NONE;
+        runtime->tx.state = XCP_TX_IDLE;
 
         if (result == E_OK)
         {
-            runtime->cto_busy        = FALSE;
-            runtime->cto_retry_count = 0U;
-            runtime->cto_last_error  = 0U;
+            runtime->tx.last_error = 0U;
         }
         else
         {
-
-            runtime->cto_last_error = 1U;
-            runtime->cto_busy       = FALSE;
+            runtime->tx.last_error = 1U;
         }
 
-        if (runtime->cto_pending != FALSE)
+        if (runtime->tx.parked != FALSE)
         {
             Xcp_SendPendingCto();
         }
@@ -445,30 +438,28 @@ Std_ReturnType Xcp_SendResponse(const uint8 *res_data, uint8 res_length)
         return E_NOT_OK;
     }
 
-    if (runtime->tx_last_kind == XCP_TX_KIND_NONE)
+    if (runtime->tx.state == XCP_TX_IDLE)
     {
-        runtime->cto_busy      = TRUE;
-        runtime->tx_last_kind  = XCP_TX_KIND_CTO;
+        runtime->tx.state = XCP_TX_CTO;
         ret_val = Xcp_Tl_SendCto(res_data, res_length);
 
         if (ret_val != E_OK)
         {
-            runtime->cto_busy     = FALSE;
-            runtime->tx_last_kind = XCP_TX_KIND_NONE;
+            runtime->tx.state = XCP_TX_IDLE;
         }
 
         return ret_val;
     }
 
-    if (runtime->cto_pending != FALSE)
+    if (runtime->tx.parked != FALSE)
     {
         return E_NOT_OK;
     }
 
     XCP_DTO_ENTER_CRITICAL();
-    (void)memcpy(runtime->cto_pending_data, res_data, res_length);
-    runtime->cto_pending_len = res_length;
-    runtime->cto_pending     = TRUE;
+    (void)memcpy(runtime->tx.parked_data, res_data, res_length);
+    runtime->tx.parked_len = res_length;
+    runtime->tx.parked     = TRUE;
     XCP_DTO_EXIT_CRITICAL();
     return E_OK;
 }
@@ -477,31 +468,29 @@ void Xcp_SendPendingCto(void)
 {
     Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
 
-    if ((runtime->cto_pending == FALSE) || (runtime->tx_mode != XCP_TX_ON))
+    if ((runtime->tx.parked == FALSE) || (runtime->tx_mode != XCP_TX_ON))
     {
         return;
     }
 
-    if (runtime->tx_last_kind == XCP_TX_KIND_NONE)
+    if (runtime->tx.state == XCP_TX_IDLE)
     {
 
         uint8 pend_copy[XCP_MAX_CTO];
-        uint8 pend_len = runtime->cto_pending_len;
+        uint8 pend_len = runtime->tx.parked_len;
 
-        (void)memcpy(pend_copy, runtime->cto_pending_data, pend_len);
-        runtime->cto_pending = FALSE;
+        (void)memcpy(pend_copy, runtime->tx.parked_data, pend_len);
+        runtime->tx.parked = FALSE;
 
-        runtime->cto_busy     = TRUE;
-        runtime->tx_last_kind = XCP_TX_KIND_CTO;
+        runtime->tx.state = XCP_TX_CTO;
 
         if (Xcp_Tl_SendCto(pend_copy, pend_len) != E_OK)
         {
-            runtime->cto_busy     = FALSE;
-            runtime->tx_last_kind = XCP_TX_KIND_NONE;
+            runtime->tx.state = XCP_TX_IDLE;
 
-            (void)memcpy(runtime->cto_pending_data, pend_copy, pend_len);
-            runtime->cto_pending_len = pend_len;
-            runtime->cto_pending     = TRUE;
+            (void)memcpy(runtime->tx.parked_data, pend_copy, pend_len);
+            runtime->tx.parked_len = pend_len;
+            runtime->tx.parked     = TRUE;
         }
     }
 }

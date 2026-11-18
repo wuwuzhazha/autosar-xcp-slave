@@ -1195,11 +1195,11 @@ void Xcp_DtoSendOrQueue(const uint8 *dto_data, uint8 dto_length)
         return;
     }
 
-    if (runtime->tx_last_kind == XCP_TX_KIND_NONE)
+    if (runtime->tx.state == XCP_TX_IDLE)
     {
 
-        runtime->dto_busy     = TRUE;
-        runtime->tx_last_kind = XCP_TX_KIND_DTO;
+        runtime->tx.dto_latch = TRUE;
+        runtime->tx.state     = XCP_TX_DTO;
 
         if (Xcp_Tl_SendDto(dto_data, dto_length) == E_OK)
         {
@@ -1207,8 +1207,8 @@ void Xcp_DtoSendOrQueue(const uint8 *dto_data, uint8 dto_length)
             return;
         }
 
-        runtime->dto_busy     = FALSE;
-        runtime->tx_last_kind = XCP_TX_KIND_NONE;
+        runtime->tx.dto_latch = FALSE;
+        runtime->tx.state     = XCP_TX_IDLE;
     }
 
     if (storage->dto_queue_count < (uint8) XCP_MAX_ODT)
@@ -1235,14 +1235,14 @@ void Xcp_DtoSendNext(void)
     Xcp_StorageType *storage = g_xcp_manager.storage_ptr;
     Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
 
-    runtime->dto_busy = FALSE;
+    runtime->tx.dto_latch = FALSE;
 
     if (runtime->tx_mode == XCP_TX_OFF)
     {
         return;
     }
 
-    if (runtime->tx_last_kind != XCP_TX_KIND_NONE)
+    if (runtime->tx.state != XCP_TX_IDLE)
     {
         return;
     }
@@ -1256,13 +1256,13 @@ void Xcp_DtoSendNext(void)
         storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_MAX_ODT;
         storage->dto_queue_count--;
 
-        runtime->dto_busy     = TRUE;
-        runtime->tx_last_kind = XCP_TX_KIND_DTO;
+        runtime->tx.dto_latch = TRUE;
+        runtime->tx.state     = XCP_TX_DTO;
 
         if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) != E_OK)
         {
-            runtime->dto_busy     = FALSE;
-            runtime->tx_last_kind = XCP_TX_KIND_NONE;
+            runtime->tx.dto_latch = FALSE;
+            runtime->tx.state     = XCP_TX_IDLE;
             storage->dto_queue_tail = tail;
             storage->dto_queue_count++;
         }
@@ -1277,7 +1277,7 @@ void Xcp_ReportDtoOverload(void)
 
     XCP_DTO_ENTER_CRITICAL();
 
-    if (runtime->dto_busy != FALSE)
+    if (runtime->tx.dto_latch != FALSE)
     {
         if (dto_busy_watchdog_cnt < XCP_DTO_BUSY_TIMEOUT_CYCLES)
         {
@@ -1286,12 +1286,12 @@ void Xcp_ReportDtoOverload(void)
         else
         {
 
-            if (runtime->tx_last_kind == XCP_TX_KIND_DTO)
+            if (runtime->tx.state == XCP_TX_DTO)
             {
-                runtime->tx_last_kind = XCP_TX_KIND_NONE;
+                runtime->tx.state = XCP_TX_IDLE;
             }
 
-            runtime->dto_busy = FALSE;
+            runtime->tx.dto_latch = FALSE;
             dto_busy_watchdog_cnt = 0U;
         }
     }
@@ -1301,13 +1301,13 @@ void Xcp_ReportDtoOverload(void)
     }
 
     if ((runtime->tx_mode == XCP_TX_ON) &&
-        (runtime->cto_pending != FALSE) && (runtime->tx_last_kind == XCP_TX_KIND_NONE))
+        (runtime->tx.parked != FALSE) && (runtime->tx.state == XCP_TX_IDLE))
     {
         Xcp_SendPendingCto();
     }
 
     if ((runtime->tx_mode == XCP_TX_ON) &&
-        (runtime->tx_last_kind == XCP_TX_KIND_NONE) && (storage->dto_queue_count > 0U))
+        (runtime->tx.state == XCP_TX_IDLE) && (storage->dto_queue_count > 0U))
     {
         uint8 tail = storage->dto_queue_tail;
         uint8 dto_copy[XCP_MAX_DTO];
@@ -1316,13 +1316,13 @@ void Xcp_ReportDtoOverload(void)
         storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_MAX_ODT;
         storage->dto_queue_count--;
 
-        runtime->dto_busy     = TRUE;
-        runtime->tx_last_kind = XCP_TX_KIND_DTO;
+        runtime->tx.dto_latch = TRUE;
+        runtime->tx.state     = XCP_TX_DTO;
 
         if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) != E_OK)
         {
-            runtime->dto_busy     = FALSE;
-            runtime->tx_last_kind = XCP_TX_KIND_NONE;
+            runtime->tx.dto_latch = FALSE;
+            runtime->tx.state     = XCP_TX_IDLE;
             storage->dto_queue_tail = tail;
             storage->dto_queue_count++;
         }

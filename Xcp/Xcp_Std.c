@@ -114,8 +114,8 @@ void Xcp_CmdDisconnect(const uint8 *cmd_data, uint8 cmd_length)
     Xcp_FreeDaqLists();
 #endif
 
-    g_xcp_manager.runtime_ptr->cto_pending     = FALSE;
-    g_xcp_manager.runtime_ptr->cto_pending_len = 0U;
+    g_xcp_manager.runtime_ptr->tx.parked     = FALSE;
+    g_xcp_manager.runtime_ptr->tx.parked_len = 0U;
 
     g_xcp_manager.runtime_ptr->connection_state = XCP_DISCONNECTED;
 
