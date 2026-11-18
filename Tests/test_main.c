@@ -712,11 +712,11 @@ int main(void)
           (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
     l = xcp_cmd((const uint8 *)"\xE7\x00\x00\x00", 4U, res);
-    CHECK("D7 GET_PAGE_INFO seg0 page0 (reference): XCP read-only",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x0F, 0x00 }, 3U));
+    CHECK("D7 GET_PAGE_INFO seg0 page0 (reference): XCP read-only ECU r/w",
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x0C, 0x03 }, 3U));
     l = xcp_cmd((const uint8 *)"\xE7\x00\x01\x01", 4U, res);
-    CHECK("D7a GET_PAGE_INFO seg1 page1 (working): all access, INIT_SEGMENT=1",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x3F, 0x01 }, 3U));
+    CHECK("D7a GET_PAGE_INFO seg1 page1 (working): all access",
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x3C, 0x03 }, 3U));
     cmd[0] = 0xE6; cmd[1] = 0; cmd[2] = 0;
     l = xcp_cmd(cmd, 3U, res);
     CHECK("D8 SET_SEGMENT_MODE -> RES", (l == 1U) && (res[0] == XCP_PID_RES));

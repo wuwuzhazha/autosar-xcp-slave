@@ -262,21 +262,20 @@ sint16 Xcp_CmdGetPageInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
     {
-        uint8 properties = (uint8) (XCP_PAGE_PROP_ECU_ACCESS_WITHOUT_XCP
-                                    | XCP_PAGE_PROP_ECU_ACCESS_WITH_XCP
-                                    | XCP_PAGE_PROP_XCP_READ_ACCESS_WITHOUT_ECU
-                                    | XCP_PAGE_PROP_XCP_READ_ACCESS_WITH_ECU);
+        uint8 xcp_props = (uint8) (XCP_PAGE_PROP_XCP_READ_ACCESS_WITHOUT_ECU
+                                 | XCP_PAGE_PROP_XCP_READ_ACCESS_WITH_ECU);
+        uint8 ecu_props = (uint8) (XCP_PAGE_PROP_ECU_ACCESS_WITHOUT_XCP
+                                 | XCP_PAGE_PROP_ECU_ACCESS_WITH_XCP);
 
         if (page_number != 0U)
         {
-            properties |= (uint8) (XCP_PAGE_PROP_XCP_WRITE_ACCESS_WITHOUT_ECU
-                                   | XCP_PAGE_PROP_XCP_WRITE_ACCESS_WITH_ECU);
+            xcp_props |= (uint8) (XCP_PAGE_PROP_XCP_WRITE_ACCESS_WITHOUT_ECU
+                                 | XCP_PAGE_PROP_XCP_WRITE_ACCESS_WITH_ECU);
         }
 
-        ch->storage_ptr->cto_buffer[1] = properties;
+        ch->storage_ptr->cto_buffer[1] = xcp_props;
+        ch->storage_ptr->cto_buffer[2] = ecu_props;
     }
-
-    ch->storage_ptr->cto_buffer[2] = segment_number;
 
     return (sint16)(3U);
 }
