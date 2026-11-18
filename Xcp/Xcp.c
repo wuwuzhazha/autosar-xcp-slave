@@ -518,6 +518,19 @@ void Xcp_SessionClose(void)
     runtime->tx.parked     = FALSE;
     runtime->tx.parked_len = 0U;
     runtime->connection_state = XCP_DISCONNECTED;
+
+    runtime->mta            = 0U;
+    runtime->mta_extension  = 0U;
+    runtime->seed_requested = FALSE;
+    runtime->seed_length    = 0U;
+    runtime->seed_total     = 0U;
+
+#if (XCP_FLASH_PROGRAMMING_ENABLED == STD_ON)
+    runtime->pgm_started   = FALSE;
+    runtime->pgm_processor = 0U;
+    runtime->pgm_address   = 0U;
+    runtime->pgm_size      = 0U;
+#endif
 }
 
 uint32 Xcp_GetTimestamp(void)
