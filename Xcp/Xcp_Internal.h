@@ -192,8 +192,6 @@ typedef struct
 
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
 
-    uint8   block_sequence_counter;
-    uint8   expected_block_sequence;
     boolean block_transfer_active;
     uint32  block_transfer_remaining;
     uint8   block_transfer_type;

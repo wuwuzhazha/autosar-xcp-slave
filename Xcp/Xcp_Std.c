@@ -625,8 +625,6 @@ void Xcp_InitBlockTransfer(Xcp_Channel *ch)
         return;
     }
 
-    ch->runtime_ptr->block_sequence_counter = 0U;
-    ch->runtime_ptr->expected_block_sequence = 0U;
     ch->runtime_ptr->block_transfer_active = FALSE;
     ch->runtime_ptr->block_transfer_remaining = 0U;
     ch->runtime_ptr->block_transfer_type = XCP_BLOCK_TYPE_NONE;
@@ -646,8 +644,6 @@ Std_ReturnType Xcp_StartBlockTransfer(Xcp_Channel *ch, uint8 block_type, uint32 
 
     ch->runtime_ptr->block_transfer_active = TRUE;
     ch->runtime_ptr->block_transfer_type = block_type;
-    ch->runtime_ptr->block_sequence_counter = 0U;
-    ch->runtime_ptr->expected_block_sequence = 1U;
 
     if (total_size > first_packet_size)
     {
@@ -679,9 +675,6 @@ Std_ReturnType Xcp_ValidateBlockSequence(Xcp_Channel *ch, uint8 block_type, uint
         Xcp_InitBlockTransfer(&g_xcp_channel);
         return E_NOT_OK;
     }
-
-    ch->runtime_ptr->block_sequence_counter++;
-    ch->runtime_ptr->expected_block_sequence++;
 
     if (ch->runtime_ptr->block_transfer_remaining >= data_size)
     {
