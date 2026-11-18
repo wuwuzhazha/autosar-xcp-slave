@@ -29,9 +29,6 @@
 #define XCP_TIMESTAMP_UNIT_10MS  (7U)
 #define XCP_TIMESTAMP_UNIT_100MS (8U)
 #define XCP_TIMESTAMP_UNIT_1S    (9U)
-#define XCP_TIMESTAMP_UNIT_1PS   (10U)
-#define XCP_TIMESTAMP_UNIT_10PS  (11U)
-#define XCP_TIMESTAMP_UNIT_100PS (12U)
 
 #define XCP_ABSOLUTE              (0U)
 #define XCP_RELATIVE_BYTE         (1U)
@@ -75,6 +72,7 @@
 #define XCP_BLOCK_TRANSFER_ENABLED STD_ON
 #define XCP_INTERLEAVED_MODE_ENABLED STD_OFF
 #define XCP_CMD_QUEUE_SIZE (4U)
+#define XCP_DTO_QUEUE_DEPTH (4U)
 #define XCP_TX_RETRY_MAX (3U)
 #define XCP_STIM_TIMEOUT_ENABLED STD_ON
 #define XCP_STIM_TIMEOUT_MS (100U)
@@ -144,6 +142,10 @@
 #endif
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON) && (XCP_BLOCK_TRANSFER_ENABLED == STD_OFF)
 #error "XcpInterleavedModeEnabled requires XcpBlockTransferEnabled"
+#endif
+#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE) \
+    && ((XCP_MAX_DAQ * XCP_MAX_ODT) > 255U)
+#error "ABSOLUTE abs_pid 是 u8, XCP_MAX_DAQ*XCP_MAX_ODT 必须 <= 255"
 #endif
 
 #endif /* XCP_CFG_H */
