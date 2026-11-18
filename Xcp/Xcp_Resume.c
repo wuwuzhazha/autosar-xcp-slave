@@ -1,5 +1,6 @@
 #include "Xcp_Resume.h"
 #include "Xcp_Internal.h"
+#include "Xcp_DaqInt.h"
 #include "Xcp.h"
 #include <string.h>
 #include <stddef.h>
@@ -93,7 +94,7 @@ static void Xcp_ApplyRestoredDaqConfig(Xcp_Channel *ch)
         if (resume_cfg->resume_enabled == TRUE)
         {
 
-            if ((resume_cfg->event_channel >= XCP_MAX_EVENT_CHANNEL) ||
+            if ((Xcp_EventChannelIdx(ch, resume_cfg->event_channel) >= XCP_MAX_EVENT_CHANNEL) ||
                 (resume_cfg->odt_count > XCP_MAX_ODT))
             {
                 continue;
