@@ -349,9 +349,6 @@ void Xcp_MainFunction(void)
             case XCP_TIMESTAMP_UNIT_1NS:
             case XCP_TIMESTAMP_UNIT_10NS:
             case XCP_TIMESTAMP_UNIT_100NS:
-            case XCP_TIMESTAMP_UNIT_1PS:
-            case XCP_TIMESTAMP_UNIT_10PS:
-            case XCP_TIMESTAMP_UNIT_100PS:
 
                 cycle_ms = 1U;
                 break;
