@@ -15,7 +15,7 @@
 #include "Xcp_Resume.h"
 #include "Xcp_Std.h"
 
-sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdConnect(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8 mode;
 
@@ -39,12 +39,12 @@ sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
         {
             uint16 ri;
 
-            for (ri = 0U; ri < g_xcp_channel.runtime_ptr->daq_count; ri++)
+            for (ri = 0U; ri < ch->runtime_ptr->daq_count; ri++)
             {
-                if (g_xcp_channel.storage_ptr->daq_list[ri].resume_pending)
+                if (ch->storage_ptr->daq_list[ri].resume_pending)
                 {
-                    g_xcp_channel.storage_ptr->daq_list[ri].state = XCP_DAQ_STATE_RUNNING;
-                    g_xcp_channel.storage_ptr->daq_list[ri].resume_pending = FALSE;
+                    ch->storage_ptr->daq_list[ri].state = XCP_DAQ_STATE_RUNNING;
+                    ch->storage_ptr->daq_list[ri].resume_pending = FALSE;
                     resume_kept = TRUE;
                 }
             }
@@ -65,58 +65,58 @@ sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
     Xcp_ResetEventChannelCounters();
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
-    g_xcp_channel.storage_ptr->cto_buffer[1] = 0x00U;
+    ch->storage_ptr->cto_buffer[1] = 0x00U;
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
-    g_xcp_channel.storage_ptr->cto_buffer[1] |= XCP_RESOURCE_CAL_PAG;
+    ch->storage_ptr->cto_buffer[1] |= XCP_RESOURCE_CAL_PAG;
 #endif
 #if (XCP_DAQ_ENABLED == STD_ON)
-    g_xcp_channel.storage_ptr->cto_buffer[1] |= (XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM);
+    ch->storage_ptr->cto_buffer[1] |= (XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM);
 #endif
 #if (XCP_FLASH_PROGRAMMING_ENABLED == STD_ON)
-    g_xcp_channel.storage_ptr->cto_buffer[1] |= XCP_RESOURCE_PGM;
+    ch->storage_ptr->cto_buffer[1] |= XCP_RESOURCE_PGM;
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[2] = XCP_COMM_BASIC_OPTIONAL;
+    ch->storage_ptr->cto_buffer[2] = XCP_COMM_BASIC_OPTIONAL;
 
-    g_xcp_channel.storage_ptr->cto_buffer[3] = XCP_MAX_CTO;
+    ch->storage_ptr->cto_buffer[3] = XCP_MAX_CTO;
 
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (XCP_MAX_DTO & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((XCP_MAX_DTO >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[4] = (uint8) (XCP_MAX_DTO & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8) ((XCP_MAX_DTO >> 8U) & 0xFFU);
 
-    g_xcp_channel.storage_ptr->cto_buffer[6] = 0x01U;
-    g_xcp_channel.storage_ptr->cto_buffer[7] = 0x01U;
+    ch->storage_ptr->cto_buffer[6] = 0x01U;
+    ch->storage_ptr->cto_buffer[7] = 0x01U;
 
     return (sint16)(8U);
 }
 
-sint16 Xcp_CmdDisconnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdDisconnect(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
 
     Xcp_SessionClose();
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdGetStatus(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetStatus(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
 
-    uint8  session_status = g_xcp_channel.runtime_ptr->session_status;
+    uint8  session_status = ch->runtime_ptr->session_status;
     uint16 session_cfg_id = 0U;
 
 #if (XCP_DAQ_ENABLED == STD_ON)
     {
         uint16 i;
 
-        for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
+        for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
         {
-            if (g_xcp_channel.storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
+            if (ch->storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
             {
                 session_status |= XCP_SS_DAQ_RUNNING;
                 break;
@@ -135,17 +135,17 @@ sint16 Xcp_CmdGetStatus(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *r
     }
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = session_status;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = g_xcp_channel.runtime_ptr->protection_status;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (session_cfg_id & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((session_cfg_id >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = session_status;
+    ch->storage_ptr->cto_buffer[2] = ch->runtime_ptr->protection_status;
+    ch->storage_ptr->cto_buffer[3] = 0x00U;
+    ch->storage_ptr->cto_buffer[4] = (uint8) (session_cfg_id & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8) ((session_cfg_id >> 8U) & 0xFFU);
 
     return (sint16)(6U);
 }
 
-sint16 Xcp_CmdSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
@@ -153,35 +153,35 @@ sint16 Xcp_CmdSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
     return Xcp_ResErr(res, XCP_ERR_CMD_SYNCH);
 }
 
-sint16 Xcp_CmdGetCommModeInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetCommModeInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = 0x00U;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = 0x00U;
 
-    g_xcp_channel.storage_ptr->cto_buffer[2] = 0x00U;
+    ch->storage_ptr->cto_buffer[2] = 0x00U;
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-    g_xcp_channel.storage_ptr->cto_buffer[2] |= XCP_COMM_OPT_INTERLEAVED_MODE;
+    ch->storage_ptr->cto_buffer[2] |= XCP_COMM_OPT_INTERLEAVED_MODE;
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = XCP_MAX_BS;
-    g_xcp_channel.storage_ptr->cto_buffer[5] = XCP_MIN_ST;
+    ch->storage_ptr->cto_buffer[3] = 0x00U;
+    ch->storage_ptr->cto_buffer[4] = XCP_MAX_BS;
+    ch->storage_ptr->cto_buffer[5] = XCP_MIN_ST;
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-    g_xcp_channel.storage_ptr->cto_buffer[6] = XCP_CMD_QUEUE_SIZE;
+    ch->storage_ptr->cto_buffer[6] = XCP_CMD_QUEUE_SIZE;
 #else
-    g_xcp_channel.storage_ptr->cto_buffer[6] = 0x00U;
+    ch->storage_ptr->cto_buffer[6] = 0x00U;
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8) (((XCP_SW_MAJOR_VERSION & 0x0FU) << 4U)
+    ch->storage_ptr->cto_buffer[7] = (uint8) (((XCP_SW_MAJOR_VERSION & 0x0FU) << 4U)
                                                         | (XCP_SW_MINOR_VERSION & 0x0FU));
 
     return (sint16)(8U);
 }
 
-sint16 Xcp_CmdGetId(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetId(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_length;
 
@@ -199,38 +199,38 @@ sint16 Xcp_CmdGetId(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 
     }
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = 0x00U;
+    ch->storage_ptr->cto_buffer[2] = 0x00U;
+    ch->storage_ptr->cto_buffer[3] = 0x00U;
 
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (id_len & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((id_len >> 8U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8) ((id_len >> 16U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8) ((id_len >> 24U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[4] = (uint8) (id_len & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8) ((id_len >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[6] = (uint8) ((id_len >> 16U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[7] = (uint8) ((id_len >> 24U) & 0xFFU);
 
     if (id_len > 0U)
     {
-        g_xcp_channel.runtime_ptr->mta = (uint32) id_ptr;
-        g_xcp_channel.runtime_ptr->mta_extension = 0U;
+        ch->runtime_ptr->mta = (uint32) id_ptr;
+        ch->runtime_ptr->mta_extension = 0U;
     }
 
     return (sint16)(8U);
 }
 
-sint16 Xcp_CmdSetMta(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdSetMta(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_length;
 
-    g_xcp_channel.runtime_ptr->mta_extension = cmd_data[3];
+    ch->runtime_ptr->mta_extension = cmd_data[3];
 
-    g_xcp_channel.runtime_ptr->mta = Xcp_LeRead32(&cmd_data[4U]);
+    ch->runtime_ptr->mta = Xcp_LeRead32(&cmd_data[4U]);
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdUpload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  num_elements = 0;
     uint8 *src_ptr = NULL;
@@ -244,23 +244,23 @@ sint16 Xcp_CmdUpload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_READ_ACCESS(g_xcp_channel.runtime_ptr->mta, num_elements) != 0U)
+    if (XCP_CHECK_READ_ACCESS(ch->runtime_ptr->mta, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
-    src_ptr = (uint8 *) g_xcp_channel.runtime_ptr->mta;
+    src_ptr = (uint8 *) ch->runtime_ptr->mta;
 
-    (void) memcpy(&g_xcp_channel.storage_ptr->cto_buffer[1U], src_ptr, num_elements);
+    (void) memcpy(&ch->storage_ptr->cto_buffer[1U], src_ptr, num_elements);
 
-    g_xcp_channel.runtime_ptr->mta += num_elements;
+    ch->runtime_ptr->mta += num_elements;
 
     return (sint16)(1U + num_elements);
 }
 
-sint16 Xcp_CmdShortUpload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdShortUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  num_elements;
     uint8  address_extension;
@@ -285,19 +285,19 @@ sint16 Xcp_CmdShortUpload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame 
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
     src_ptr = (uint8 *) address;
 
-    (void) memcpy(&g_xcp_channel.storage_ptr->cto_buffer[1U], src_ptr, num_elements);
+    (void) memcpy(&ch->storage_ptr->cto_buffer[1U], src_ptr, num_elements);
 
-    g_xcp_channel.runtime_ptr->mta = address + num_elements;
-    g_xcp_channel.runtime_ptr->mta_extension = address_extension;
+    ch->runtime_ptr->mta = address + num_elements;
+    ch->runtime_ptr->mta_extension = address_extension;
 
     return (sint16)(1U + num_elements);
 }
 
-sint16 Xcp_CmdDownload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  num_elements;
     uint8 *dst_ptr;
@@ -309,7 +309,7 @@ sint16 Xcp_CmdDownload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *re
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS(g_xcp_channel.runtime_ptr->mta, num_elements) != 0U)
+    if (XCP_CHECK_WRITE_ACCESS(ch->runtime_ptr->mta, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -321,29 +321,29 @@ sint16 Xcp_CmdDownload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *re
     }
 #endif
 
-    dst_ptr = (uint8 *) g_xcp_channel.runtime_ptr->mta;
+    dst_ptr = (uint8 *) ch->runtime_ptr->mta;
 
     (void) memcpy(dst_ptr, &cmd_data[2U], num_elements);
 
-    g_xcp_channel.runtime_ptr->mta += num_elements;
+    ch->runtime_ptr->mta += num_elements;
 
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
 
-    g_xcp_channel.runtime_ptr->block_transfer_active = TRUE;
-    g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
-    g_xcp_channel.runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
+    ch->runtime_ptr->block_transfer_active = TRUE;
+    ch->runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
+    ch->runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdDownloadNext(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
 
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-    if ((g_xcp_channel.runtime_ptr->block_transfer_active == FALSE)
-        || (g_xcp_channel.runtime_ptr->block_transfer_type != XCP_BLOCK_TYPE_DOWNLOAD))
+    if ((ch->runtime_ptr->block_transfer_active == FALSE)
+        || (ch->runtime_ptr->block_transfer_type != XCP_BLOCK_TYPE_DOWNLOAD))
     {
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
@@ -354,10 +354,10 @@ sint16 Xcp_CmdDownloadNext(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame
     }
 #endif
 
-    return Xcp_CmdDownload(cmd_data, cmd_length, res);
+    return Xcp_CmdDownload(ch, cmd_data, cmd_length, res);
 }
 
-sint16 Xcp_CmdShortDownload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdShortDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  num_elements;
     uint8  address_extension;
@@ -391,14 +391,14 @@ sint16 Xcp_CmdShortDownload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
 
     (void) memcpy(dst_ptr, &cmd_data[8U], num_elements);
 
-    g_xcp_channel.runtime_ptr->mta = address + num_elements;
-    g_xcp_channel.runtime_ptr->mta_extension = address_extension;
+    ch->runtime_ptr->mta = address + num_elements;
+    ch->runtime_ptr->mta_extension = address_extension;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdDownloadMax(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  num_elements;
     uint8 *dst_ptr;
@@ -410,7 +410,7 @@ sint16 Xcp_CmdDownloadMax(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame 
 
     num_elements = cmd_length - 1U;
 
-    if (XCP_CHECK_WRITE_ACCESS(g_xcp_channel.runtime_ptr->mta, num_elements) != 0U)
+    if (XCP_CHECK_WRITE_ACCESS(ch->runtime_ptr->mta, num_elements) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -422,17 +422,17 @@ sint16 Xcp_CmdDownloadMax(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame 
     }
 #endif
 
-    dst_ptr = (uint8 *) g_xcp_channel.runtime_ptr->mta;
+    dst_ptr = (uint8 *) ch->runtime_ptr->mta;
 
     (void) memcpy(dst_ptr, &cmd_data[1U], num_elements);
 
-    g_xcp_channel.runtime_ptr->mta += num_elements;
+    ch->runtime_ptr->mta += num_elements;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdBuildChecksum(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdBuildChecksum(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint32 block_size;
     uint32 checksum = 0U;
@@ -442,33 +442,33 @@ sint16 Xcp_CmdBuildChecksum(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
 
     block_size = Xcp_LeRead32(&cmd_data[4U]);
 
-    if (Xcp_BuildChecksum_Callout(g_xcp_channel.runtime_ptr->mta, block_size, &checksum, &checksum_len) == E_OK)
+    if (Xcp_BuildChecksum_Callout(ch->runtime_ptr->mta, block_size, &checksum, &checksum_len) == E_OK)
     {
-        g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+        ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
         if (checksum_len == 4U)
         {
-            g_xcp_channel.storage_ptr->cto_buffer[1] = 0x03U;
-            g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (checksum & 0xFFU);
-            g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((checksum >> 8U) & 0xFFU);
-            g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8) ((checksum >> 16U) & 0xFFU);
-            g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8) ((checksum >> 24U) & 0xFFU);
+            ch->storage_ptr->cto_buffer[1] = 0x03U;
+            ch->storage_ptr->cto_buffer[4] = (uint8) (checksum & 0xFFU);
+            ch->storage_ptr->cto_buffer[5] = (uint8) ((checksum >> 8U) & 0xFFU);
+            ch->storage_ptr->cto_buffer[6] = (uint8) ((checksum >> 16U) & 0xFFU);
+            ch->storage_ptr->cto_buffer[7] = (uint8) ((checksum >> 24U) & 0xFFU);
         }
         else if (checksum_len == 2U)
         {
-            g_xcp_channel.storage_ptr->cto_buffer[1] = 0x02U;
-            g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (checksum & 0xFFU);
-            g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((checksum >> 8U) & 0xFFU);
-            g_xcp_channel.storage_ptr->cto_buffer[6] = 0x00U;
-            g_xcp_channel.storage_ptr->cto_buffer[7] = 0x00U;
+            ch->storage_ptr->cto_buffer[1] = 0x02U;
+            ch->storage_ptr->cto_buffer[4] = (uint8) (checksum & 0xFFU);
+            ch->storage_ptr->cto_buffer[5] = (uint8) ((checksum >> 8U) & 0xFFU);
+            ch->storage_ptr->cto_buffer[6] = 0x00U;
+            ch->storage_ptr->cto_buffer[7] = 0x00U;
         }
         else if (checksum_len == 1U)
         {
-            g_xcp_channel.storage_ptr->cto_buffer[1] = 0x01U;
-            g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (checksum & 0xFFU);
-            g_xcp_channel.storage_ptr->cto_buffer[5] = 0x00U;
-            g_xcp_channel.storage_ptr->cto_buffer[6] = 0x00U;
-            g_xcp_channel.storage_ptr->cto_buffer[7] = 0x00U;
+            ch->storage_ptr->cto_buffer[1] = 0x01U;
+            ch->storage_ptr->cto_buffer[4] = (uint8) (checksum & 0xFFU);
+            ch->storage_ptr->cto_buffer[5] = 0x00U;
+            ch->storage_ptr->cto_buffer[6] = 0x00U;
+            ch->storage_ptr->cto_buffer[7] = 0x00U;
         }
         else
         {
@@ -476,8 +476,8 @@ sint16 Xcp_CmdBuildChecksum(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
             return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
         }
 
-        g_xcp_channel.storage_ptr->cto_buffer[2] = 0x00U;
-        g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
+        ch->storage_ptr->cto_buffer[2] = 0x00U;
+        ch->storage_ptr->cto_buffer[3] = 0x00U;
 
         return (sint16)(8U);
     }
@@ -487,7 +487,7 @@ sint16 Xcp_CmdBuildChecksum(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
     }
 }
 
-sint16 Xcp_CmdModifyBits(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8   shift_value;
     uint16  and_mask;
@@ -507,12 +507,12 @@ sint16 Xcp_CmdModifyBits(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *
         return Xcp_ResErr(res, XCP_ERR_CMD_SYNTAX);
     }
 
-    if (XCP_CHECK_READ_ACCESS(g_xcp_channel.runtime_ptr->mta, 4U) != 0U)
+    if (XCP_CHECK_READ_ACCESS(ch->runtime_ptr->mta, 4U) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
 
-    if (XCP_CHECK_WRITE_ACCESS(g_xcp_channel.runtime_ptr->mta, 4U) != 0U)
+    if (XCP_CHECK_WRITE_ACCESS(ch->runtime_ptr->mta, 4U) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
     }
@@ -524,7 +524,7 @@ sint16 Xcp_CmdModifyBits(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *
     }
 #endif
 
-    target_ptr = (uint32 *) g_xcp_channel.runtime_ptr->mta;
+    target_ptr = (uint32 *) ch->runtime_ptr->mta;
     old_value = *target_ptr;
 
     new_value = (old_value & ~(((uint32) 0xFFFFU) << shift_value)) | (((uint32) and_mask) << shift_value);
@@ -532,11 +532,11 @@ sint16 Xcp_CmdModifyBits(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *
 
     *target_ptr = new_value;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdSetRequest(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdSetRequest(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8 mode;
 
@@ -575,14 +575,14 @@ sint16 Xcp_CmdSetRequest(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *
 
     if ((mode & XCP_SET_REQ_STORE_CAL_REQ) != 0U)
     {
-        g_xcp_channel.runtime_ptr->session_status |= XCP_SS_STORE_CAL_REQ;
+        ch->runtime_ptr->session_status |= XCP_SS_STORE_CAL_REQ;
     }
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdTransportLayerCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdTransportLayerCmd(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     if (cmd_length < 2U)
     {
@@ -593,14 +593,14 @@ sint16 Xcp_CmdTransportLayerCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_Res
     {
 #if (XCP_ON_CAN_ENABLED == STD_ON)
     case 0xFFU:
-        g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-        g_xcp_channel.storage_ptr->cto_buffer[1] = 0x00U;
-        g_xcp_channel.storage_ptr->cto_buffer[2] = 0x00U;
-        g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
-        g_xcp_channel.storage_ptr->cto_buffer[4] = 0x00U;
-        g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8)'X';
-        g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8)'C';
-        g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8)'P';
+        ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+        ch->storage_ptr->cto_buffer[1] = 0x00U;
+        ch->storage_ptr->cto_buffer[2] = 0x00U;
+        ch->storage_ptr->cto_buffer[3] = 0x00U;
+        ch->storage_ptr->cto_buffer[4] = 0x00U;
+        ch->storage_ptr->cto_buffer[5] = (uint8)'X';
+        ch->storage_ptr->cto_buffer[6] = (uint8)'C';
+        ch->storage_ptr->cto_buffer[7] = (uint8)'P';
         return (sint16)(8U);
         break;
 #endif

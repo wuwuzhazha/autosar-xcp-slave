@@ -14,39 +14,39 @@ void Xcp_InitDaqLists(void);
 
 void Xcp_ResetEventChannelCounters(void);
 
-sint16 Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetDaqProcessorInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetDaqResolutionInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetDaqResolutionInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetDaqEventInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdFreeDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdFreeDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdAllocDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdAllocDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdAllocOdt(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdAllocOdtEntry(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdSetDaqPtr(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdSetDaqPtr(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdWriteDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdSetDaqListMode(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdStartStopDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetDaqListMode(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetDaqListInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdClearDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdReadDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdReadDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetDaqClock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetDaqClock(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
 void Xcp_ProcessDaq(uint16 event_channel);
 

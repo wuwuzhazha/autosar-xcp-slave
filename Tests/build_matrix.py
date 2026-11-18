@@ -103,6 +103,9 @@ def build(vid, sets, workdir):
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, errors="replace")
         if r.returncode != 0:
             return vid, sets, (r.stderr or r.stdout).strip()
+    r = subprocess.run([str(exe)], cwd=ROOT, capture_output=True, text=True, errors="replace")
+    if r.returncode != 0:
+        return vid, sets, f"run rc={r.returncode}: " + (r.stderr or r.stdout).strip()
     return vid, sets, None
 
 def main():

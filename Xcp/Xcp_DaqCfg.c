@@ -98,7 +98,7 @@ static void Xcp_LoadStaticDaqLists(void)
 }
 #endif
 
-sint16 Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetDaqProcessorInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
 
     uint8 daq_properties = XCP_DAQ_PROP_BIT_STIM_SUPPORTED | XCP_DAQ_PROP_OVERLOAD_EVENT;
@@ -119,21 +119,21 @@ sint16 Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_R
     daq_properties |= XCP_DAQ_PROP_TIMESTAMP_SUPPORTED;
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = daq_properties;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = (uint8) (XCP_MAX_DAQ & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[3] = (uint8) ((XCP_MAX_DAQ >> 8U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (XCP_MAX_EVENT_CHANNEL & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((XCP_MAX_EVENT_CHANNEL >> 8U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8) XCP_MIN_DAQ;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = daq_properties;
+    ch->storage_ptr->cto_buffer[2] = (uint8) (XCP_MAX_DAQ & 0xFFU);
+    ch->storage_ptr->cto_buffer[3] = (uint8) ((XCP_MAX_DAQ >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[4] = (uint8) (XCP_MAX_EVENT_CHANNEL & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8) ((XCP_MAX_EVENT_CHANNEL >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[6] = (uint8) XCP_MIN_DAQ;
 
-    g_xcp_channel.storage_ptr->cto_buffer[7] =
+    ch->storage_ptr->cto_buffer[7] =
         (uint8) ((XCP_IDENTIFICATION_FIELD_TYPE & 0x03U) << XCP_DAQ_KEY_ID_FIELD_SHIFT);
 
     return (sint16)(8U);
 }
 
-sint16 Xcp_CmdGetDaqResolutionInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetDaqResolutionInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8 timestamp_mode;
 
@@ -146,19 +146,19 @@ sint16 Xcp_CmdGetDaqResolutionInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_
 #endif
     timestamp_mode |= (uint8) ((XCP_TIMESTAMP_UNIT & 0x0FU) << XCP_TS_MODE_UNIT_SHIFT);
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = 1U;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = XCP_ODT_ENTRY_SIZE_DAQ;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = 1U;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = XCP_ODT_ENTRY_SIZE_STIM;
-    g_xcp_channel.storage_ptr->cto_buffer[5] = timestamp_mode;
-    g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8) (XCP_TIMESTAMP_TICKS & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8) ((XCP_TIMESTAMP_TICKS >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = 1U;
+    ch->storage_ptr->cto_buffer[2] = XCP_ODT_ENTRY_SIZE_DAQ;
+    ch->storage_ptr->cto_buffer[3] = 1U;
+    ch->storage_ptr->cto_buffer[4] = XCP_ODT_ENTRY_SIZE_STIM;
+    ch->storage_ptr->cto_buffer[5] = timestamp_mode;
+    ch->storage_ptr->cto_buffer[6] = (uint8) (XCP_TIMESTAMP_TICKS & 0xFFU);
+    ch->storage_ptr->cto_buffer[7] = (uint8) ((XCP_TIMESTAMP_TICKS >> 8U) & 0xFFU);
 
     return (sint16)(8U);
 }
 
-sint16 Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetDaqEventInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16                      event_channel;
     const Xcp_EventChannelType *event_cfg;
@@ -173,18 +173,18 @@ sint16 Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFr
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    event_cfg = &g_xcp_channel.config_ptr->xcp_event_channel[event_channel];
+    event_cfg = &ch->config_ptr->xcp_event_channel[event_channel];
 
     event_properties = (uint8) (event_cfg->event_channel_type & XCP_EVENT_CHANNEL_TYPE_DAQ_STIM);
     event_properties |= (uint8) ((event_cfg->consistency & 0x03U) << XCP_EVENT_PROP_CONSISTENCY_SHIFT);
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = event_properties;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = (uint8) event_cfg->max_daq_list;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) event_cfg->time_cycle;
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) event_cfg->time_unit;
-    g_xcp_channel.storage_ptr->cto_buffer[6] = event_cfg->event_channel_priority;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = event_properties;
+    ch->storage_ptr->cto_buffer[2] = (uint8) event_cfg->max_daq_list;
+    ch->storage_ptr->cto_buffer[3] = 0x00U;
+    ch->storage_ptr->cto_buffer[4] = (uint8) event_cfg->time_cycle;
+    ch->storage_ptr->cto_buffer[5] = (uint8) event_cfg->time_unit;
+    ch->storage_ptr->cto_buffer[6] = event_cfg->event_channel_priority;
 
     return (sint16)(7U);
 }
@@ -220,7 +220,7 @@ void Xcp_FreeDaqLists(void)
     Xcp_RebuildActiveDaqList();
 }
 
-sint16 Xcp_CmdFreeDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdFreeDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
@@ -228,11 +228,11 @@ sint16 Xcp_CmdFreeDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
     return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #endif
     Xcp_FreeDaqLists();
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdAllocDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdAllocDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
 #if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
     (void) cmd_data;
@@ -249,21 +249,21 @@ sint16 Xcp_CmdAllocDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *re
         return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
     }
 
-    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
     {
-        if (g_xcp_channel.storage_ptr->daq_list[i].state == XCP_DAQ_STATE_RUNNING)
+        if (ch->storage_ptr->daq_list[i].state == XCP_DAQ_STATE_RUNNING)
         {
             return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
         }
     }
 
-    g_xcp_channel.runtime_ptr->daq_count = XCP_MIN_DAQ + daq_count;
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->runtime_ptr->daq_count = XCP_MIN_DAQ + daq_count;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 #endif
 }
 
-sint16 Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdAllocOdt(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16 daq_list_no;
     uint8  odt_count;
@@ -277,7 +277,7 @@ sint16 Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *re
     daq_list_no = Xcp_LeRead16(&cmd_data[2U]);
     odt_count = cmd_data[4];
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
@@ -294,19 +294,19 @@ sint16 Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *re
         return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
     }
 
-    if (g_xcp_channel.storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
+    if (ch->storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
     {
         return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
-    g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt_count = odt_count;
-    g_xcp_channel.storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_CONFIGURED;
+    ch->storage_ptr->daq_list[daq_list_no].odt_count = odt_count;
+    ch->storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_CONFIGURED;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdAllocOdtEntry(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16 daq_list_no;
     uint8  odt_no;
@@ -322,7 +322,7 @@ sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
     odt_no = cmd_data[4];
     odt_entry_count = cmd_data[5];
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
@@ -334,7 +334,7 @@ sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
     }
 #endif
 
-    if (odt_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt_count)
+    if (odt_no >= ch->storage_ptr->daq_list[daq_list_no].odt_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
@@ -346,13 +346,13 @@ sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
     }
 #endif
 
-    if (g_xcp_channel.storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
+    if (ch->storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
     {
         return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
     {
-        Xcp_OdtType *odt = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no];
+        Xcp_OdtType *odt = &ch->storage_ptr->daq_list[daq_list_no].odt[odt_no];
         uint8        e;
 
         for (e = 0U; e < odt_entry_count; e++)
@@ -364,13 +364,13 @@ sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
         }
         odt->odt_entry_count = odt_entry_count;
     }
-    g_xcp_channel.storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_CONFIGURED;
+    ch->storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_CONFIGURED;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdSetDaqPtr(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdSetDaqPtr(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16 daq_list_no;
     uint8  odt_no;
@@ -382,30 +382,30 @@ sint16 Xcp_CmdSetDaqPtr(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *r
     odt_no = cmd_data[4];
     odt_entry_no = cmd_data[5];
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (odt_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt_count)
+    if (odt_no >= ch->storage_ptr->daq_list[daq_list_no].odt_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (odt_entry_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry_count)
+    if (odt_entry_no >= ch->storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    g_xcp_channel.runtime_ptr->daq_list_ptr = daq_list_no;
-    g_xcp_channel.runtime_ptr->odt_ptr = odt_no;
-    g_xcp_channel.runtime_ptr->odt_entry_ptr = odt_entry_no;
+    ch->runtime_ptr->daq_list_ptr = daq_list_no;
+    ch->runtime_ptr->odt_ptr = odt_no;
+    ch->runtime_ptr->odt_entry_ptr = odt_entry_no;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdWriteDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8             bit_offset;
     uint8             size;
@@ -420,20 +420,20 @@ sint16 Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *re
     address_extension = cmd_data[3];
     address = Xcp_LeRead32(&cmd_data[4U]);
 
-    if ((g_xcp_channel.runtime_ptr->daq_list_ptr >= g_xcp_channel.runtime_ptr->daq_count)
-        || (g_xcp_channel.runtime_ptr->odt_ptr
-            >= g_xcp_channel.storage_ptr->daq_list[g_xcp_channel.runtime_ptr->daq_list_ptr].odt_count)
-        || (g_xcp_channel.runtime_ptr->odt_entry_ptr
-            >= g_xcp_channel.storage_ptr->daq_list[g_xcp_channel.runtime_ptr->daq_list_ptr]
-                   .odt[g_xcp_channel.runtime_ptr->odt_ptr]
+    if ((ch->runtime_ptr->daq_list_ptr >= ch->runtime_ptr->daq_count)
+        || (ch->runtime_ptr->odt_ptr
+            >= ch->storage_ptr->daq_list[ch->runtime_ptr->daq_list_ptr].odt_count)
+        || (ch->runtime_ptr->odt_entry_ptr
+            >= ch->storage_ptr->daq_list[ch->runtime_ptr->daq_list_ptr]
+                   .odt[ch->runtime_ptr->odt_ptr]
                    .odt_entry_count))
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
 #if (XCP_MIN_DAQ > 0U)
-    if ((g_xcp_channel.runtime_ptr->daq_list_ptr < XCP_MIN_DAQ)
-        && (g_xcp_channel.config_ptr->xcp_static_daq_list[g_xcp_channel.runtime_ptr->daq_list_ptr]
+    if ((ch->runtime_ptr->daq_list_ptr < XCP_MIN_DAQ)
+        && (ch->config_ptr->xcp_static_daq_list[ch->runtime_ptr->daq_list_ptr]
                 .write_protected != FALSE))
     {
         return Xcp_ResErr(res, XCP_ERR_WRITE_PROTECTED);
@@ -445,26 +445,26 @@ sint16 Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *re
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (g_xcp_channel.storage_ptr->daq_list[g_xcp_channel.runtime_ptr->daq_list_ptr].state
+    if (ch->storage_ptr->daq_list[ch->runtime_ptr->daq_list_ptr].state
         == (uint8) XCP_DAQ_STATE_RUNNING)
     {
         return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
-    entry = &g_xcp_channel.storage_ptr->daq_list[g_xcp_channel.runtime_ptr->daq_list_ptr]
-                 .odt[g_xcp_channel.runtime_ptr->odt_ptr]
-                 .odt_entry[g_xcp_channel.runtime_ptr->odt_entry_ptr];
+    entry = &ch->storage_ptr->daq_list[ch->runtime_ptr->daq_list_ptr]
+                 .odt[ch->runtime_ptr->odt_ptr]
+                 .odt_entry[ch->runtime_ptr->odt_entry_ptr];
     entry->address = address;
     entry->address_extension = address_extension;
     entry->size = size;
     entry->bit_offset = bit_offset;
-    g_xcp_channel.runtime_ptr->odt_entry_ptr++;
+    ch->runtime_ptr->odt_entry_ptr++;
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdSetDaqListMode(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  mode;
     uint16 daq_list_no;
@@ -480,7 +480,7 @@ sint16 Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
     prescaler = cmd_data[6];
     priority = cmd_data[7];
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
@@ -513,9 +513,9 @@ sint16 Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
     }
 
     {
-        Xcp_DaqListType *daq = &g_xcp_channel.storage_ptr->daq_list[daq_list_no];
+        Xcp_DaqListType *daq = &ch->storage_ptr->daq_list[daq_list_no];
         const uint8 evt_type
-            = g_xcp_channel.config_ptr->xcp_event_channel[event_channel].event_channel_type;
+            = ch->config_ptr->xcp_event_channel[event_channel].event_channel_type;
         const uint8 dir_bit = ((mode & XCP_DAQ_MODE_DIRECTION_STIM) != 0U)
                               ? XCP_EVENT_CHANNEL_TYPE_STIM : XCP_EVENT_CHANNEL_TYPE_DAQ;
 
@@ -550,11 +550,11 @@ sint16 Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
         }
     }
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetDaqListMode(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16           daq_list_no;
     Xcp_DaqListType *daq;
@@ -564,12 +564,12 @@ sint16 Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
 
     daq_list_no = Xcp_LeRead16(&cmd_data[2U]);
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    daq = &g_xcp_channel.storage_ptr->daq_list[daq_list_no];
+    daq = &ch->storage_ptr->daq_list[daq_list_no];
 
     if (daq->selected != FALSE)
     {
@@ -594,19 +594,19 @@ sint16 Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
     }
 #endif
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = current_mode;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8)(daq->event_channel & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8)((daq->event_channel >> 8U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[6] = daq->prescaler;
-    g_xcp_channel.storage_ptr->cto_buffer[7] = daq->priority;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = current_mode;
+    ch->storage_ptr->cto_buffer[2] = 0x00U;
+    ch->storage_ptr->cto_buffer[3] = 0x00U;
+    ch->storage_ptr->cto_buffer[4] = (uint8)(daq->event_channel & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8)((daq->event_channel >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[6] = daq->prescaler;
+    ch->storage_ptr->cto_buffer[7] = daq->priority;
 
     return (sint16)(8U);
 }
 
-sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdStartStopDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  mode;
     uint16 daq_list_no;
@@ -616,20 +616,20 @@ sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResF
     mode = cmd_data[1];
     daq_list_no = Xcp_LeRead16(&cmd_data[2U]);
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (mode == XCP_START_STOP_STOP)
     {
-        g_xcp_channel.storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_STOPPED;
+        ch->storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_STOPPED;
     }
     else if (mode == XCP_START_STOP_START)
     {
-        g_xcp_channel.storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_RUNNING;
+        ch->storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_RUNNING;
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
-        if (g_xcp_channel.storage_ptr->daq_list[daq_list_no].direction == XCP_DAQ_LIST_TYPE_STIM)
+        if (ch->storage_ptr->daq_list[daq_list_no].direction == XCP_DAQ_LIST_TYPE_STIM)
         {
             Xcp_ResetStimTimeout(daq_list_no);
         }
@@ -638,7 +638,7 @@ sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResF
     else if (mode == XCP_START_STOP_SELECT)
     {
 
-        g_xcp_channel.storage_ptr->daq_list[daq_list_no].selected = TRUE;
+        ch->storage_ptr->daq_list[daq_list_no].selected = TRUE;
     }
     else
     {
@@ -647,7 +647,7 @@ sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResF
 
     Xcp_RebuildActiveDaqList();
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
 #if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
     uint16 first_pid = 0U;
@@ -655,18 +655,18 @@ sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResF
 
     for (idx = 0U; idx < daq_list_no; idx++)
     {
-        first_pid += g_xcp_channel.storage_ptr->daq_list[idx].odt_count;
+        first_pid += ch->storage_ptr->daq_list[idx].odt_count;
     }
 
-    g_xcp_channel.storage_ptr->cto_buffer[1] = (uint8) (first_pid & 0xFFU);
+    ch->storage_ptr->cto_buffer[1] = (uint8) (first_pid & 0xFFU);
 #else
-    g_xcp_channel.storage_ptr->cto_buffer[1] = 0U;
+    ch->storage_ptr->cto_buffer[1] = 0U;
 #endif
 
     return (sint16)(2U);
 }
 
-sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  mode;
     uint16 i;
@@ -680,9 +680,9 @@ sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
-    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
     {
-        Xcp_DaqListType *daq = &g_xcp_channel.storage_ptr->daq_list[i];
+        Xcp_DaqListType *daq = &ch->storage_ptr->daq_list[i];
 
         if (mode == XCP_START_STOP_STOP)
         {
@@ -722,7 +722,7 @@ sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
 
     Xcp_RebuildActiveDaqList();
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
@@ -755,7 +755,7 @@ static uint8 Xcp_DaqListTypeProperties(uint16 daq_list_no)
     return properties;
 }
 
-sint16 Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetDaqListInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16           daq_list_no;
     Xcp_DaqListType *daq;
@@ -765,12 +765,12 @@ sint16 Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
 
     daq_list_no = Xcp_LeRead16(&cmd_data[2U]);
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    daq = &g_xcp_channel.storage_ptr->daq_list[daq_list_no];
+    daq = &ch->storage_ptr->daq_list[daq_list_no];
 
     properties = Xcp_DaqListTypeProperties(daq_list_no);
 #if (XCP_MIN_DAQ > 0U)
@@ -784,17 +784,17 @@ sint16 Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
         properties |= XCP_DAQ_LIST_PROP_EVENT_FIXED;
     }
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = properties;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = daq->odt_max_count;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = XCP_MAX_ODT_ENTRIES;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (daq->event_channel & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((daq->event_channel >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = properties;
+    ch->storage_ptr->cto_buffer[2] = daq->odt_max_count;
+    ch->storage_ptr->cto_buffer[3] = XCP_MAX_ODT_ENTRIES;
+    ch->storage_ptr->cto_buffer[4] = (uint8) (daq->event_channel & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8) ((daq->event_channel >> 8U) & 0xFFU);
 
     return (sint16)(6U);
 }
 
-sint16 Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdClearDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16           daq_list_no;
     Xcp_DaqListType *daq;
@@ -803,12 +803,12 @@ sint16 Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame
 
     daq_list_no = Xcp_LeRead16(&cmd_data[2U]);
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    daq = &g_xcp_channel.storage_ptr->daq_list[daq_list_no];
+    daq = &ch->storage_ptr->daq_list[daq_list_no];
 
     if (daq->state == (uint8) XCP_DAQ_STATE_RUNNING)
     {
@@ -836,50 +836,50 @@ sint16 Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame
     }
     Xcp_RebuildActiveDaqList();
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-sint16 Xcp_CmdReadDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdReadDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     Xcp_OdtEntryType *entry;
-    uint16            daq_list_no = g_xcp_channel.runtime_ptr->daq_list_ptr;
-    uint8             odt_no = g_xcp_channel.runtime_ptr->odt_ptr;
-    uint8             odt_entry_no = g_xcp_channel.runtime_ptr->odt_entry_ptr;
+    uint16            daq_list_no = ch->runtime_ptr->daq_list_ptr;
+    uint8             odt_no = ch->runtime_ptr->odt_ptr;
+    uint8             odt_entry_no = ch->runtime_ptr->odt_entry_ptr;
 
     (void) cmd_data;
     (void) cmd_length;
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (odt_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt_count)
+    if (odt_no >= ch->storage_ptr->daq_list[daq_list_no].odt_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (odt_entry_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry_count)
+    if (odt_entry_no >= ch->storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry_count)
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    entry = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry[odt_entry_no];
+    entry = &ch->storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry[odt_entry_no];
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = entry->bit_offset;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = entry->size;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = entry->address_extension;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (entry->address & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((entry->address >> 8U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8) ((entry->address >> 16U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8) ((entry->address >> 24U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = entry->bit_offset;
+    ch->storage_ptr->cto_buffer[2] = entry->size;
+    ch->storage_ptr->cto_buffer[3] = entry->address_extension;
+    ch->storage_ptr->cto_buffer[4] = (uint8) (entry->address & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8) ((entry->address >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[6] = (uint8) ((entry->address >> 16U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[7] = (uint8) ((entry->address >> 24U) & 0xFFU);
 
     return (sint16)(8U);
 }
 
-sint16 Xcp_CmdGetDaqClock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+sint16 Xcp_CmdGetDaqClock(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint32 timestamp;
 
@@ -888,14 +888,14 @@ sint16 Xcp_CmdGetDaqClock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame 
 
     timestamp = Xcp_GetTimestamp();
 
-    g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    g_xcp_channel.storage_ptr->cto_buffer[1] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[2] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[3] = 0x00U;
-    g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (timestamp & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((timestamp >> 8U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8) ((timestamp >> 16U) & 0xFFU);
-    g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8) ((timestamp >> 24U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    ch->storage_ptr->cto_buffer[1] = 0x00U;
+    ch->storage_ptr->cto_buffer[2] = 0x00U;
+    ch->storage_ptr->cto_buffer[3] = 0x00U;
+    ch->storage_ptr->cto_buffer[4] = (uint8) (timestamp & 0xFFU);
+    ch->storage_ptr->cto_buffer[5] = (uint8) ((timestamp >> 8U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[6] = (uint8) ((timestamp >> 16U) & 0xFFU);
+    ch->storage_ptr->cto_buffer[7] = (uint8) ((timestamp >> 24U) & 0xFFU);
 
     return (sint16)(8U);
 }

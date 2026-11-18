@@ -1,25 +1,29 @@
 {
   "version": 1,
-  "g_xcp_manager": {
-    "total": 607,
+  "g_xcp_channel": {
+    "total": 236,
     "files": {
       "Xcp/Xcp.c": 84,
       "Xcp/XcpOnCan.c": 2,
       "Xcp/XcpOnCdd.c": 2,
       "Xcp/XcpOnEth.c": 4,
       "Xcp/XcpOnFr.c": 3,
-      "Xcp/Xcp_CalPage.c": 36,
+      "Xcp/Xcp_CalPage.c": 6,
       "Xcp/Xcp_Cmd.c": 1,
-      "Xcp/Xcp_DaqCfg.c": 154,
+      "Xcp/Xcp_DaqCfg.c": 27,
       "Xcp/Xcp_DaqInt.h": 3,
       "Xcp/Xcp_DaqRun.c": 17,
       "Xcp/Xcp_DaqStim.c": 23,
-      "Xcp/Xcp_FlashProg.c": 91,
+      "Xcp/Xcp_FlashProg.c": 8,
       "Xcp/Xcp_Internal.h": 7,
       "Xcp/Xcp_Resume.c": 10,
-      "Xcp/Xcp_SeedKey.c": 33,
-      "Xcp/Xcp_Std.c": 137
+      "Xcp/Xcp_SeedKey.c": 9,
+      "Xcp/Xcp_Std.c": 30
     }
+  },
+  "g_xcp_manager": {
+    "total": 0,
+    "files": {}
   },
   "xcp_preprocessor": {
     "total": 168,

@@ -7,7 +7,8 @@
 #include "Xcp_CalPage.h"
 #include "Xcp_FlashProg.h"
 
-static sint16 Xcp_DispatchUserCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+static sint16 Xcp_DispatchUserCmd(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+
 
 static const Xcp_CmdEntryType XCP_CMD_TABLE[] = {
     { XCP_CMD_CONNECT,              2U, 0U,                    XCP_GUARD_ALLOW_DISCONNECTED, Xcp_CmdConnect },
@@ -78,8 +79,9 @@ static const Xcp_CmdEntryType XCP_CMD_TABLE[] = {
 
 #define XCP_CMD_TABLE_SIZE ((uint8)(sizeof(XCP_CMD_TABLE) / sizeof(XCP_CMD_TABLE[0])))
 
-static sint16 Xcp_DispatchUserCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+static sint16 Xcp_DispatchUserCmd(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
+    (void)ch;
     if (Xcp_UserCommand_Callout(cmd_data, cmd_length) != E_OK)
     {
         return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
@@ -125,7 +127,7 @@ void Xcp_ProcessCommand(const uint8 *cmd_data, uint8 cmd_length)
             }
 
             {
-                sint16 len = entry->fn(cmd_data, cmd_length, man->storage_ptr->cto_buffer);
+                sint16 len = entry->fn(man, cmd_data, cmd_length, man->storage_ptr->cto_buffer);
                 if (len > 0)
                 {
                     man->storage_ptr->cto_length = (uint8)len;

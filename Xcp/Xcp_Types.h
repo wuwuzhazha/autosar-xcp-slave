@@ -232,7 +232,10 @@ extern "C" {
 
 typedef uint8 Xcp_ResFrame;
 
-typedef sint16 (*Xcp_CmdFn)(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+struct Xcp_Channel;
+typedef struct Xcp_Channel Xcp_Channel;
+
+typedef sint16 (*Xcp_CmdFn)(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
 typedef enum
 {

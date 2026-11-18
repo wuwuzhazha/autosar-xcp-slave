@@ -11,21 +11,21 @@ extern "C" {
 
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
 
-sint16 Xcp_CmdSetCalPage(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdSetCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetCalPage(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetPagProcessorInfo(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetPagProcessorInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetSegmentInfo(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetSegmentInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetPageInfo(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetPageInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdSetSegmentMode(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdSetSegmentMode(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdGetSegmentMode(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdGetSegmentMode(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
-sint16 Xcp_CmdCopyCalPage(const uint8 *data, uint8 length, Xcp_ResFrame *res);
+sint16 Xcp_CmdCopyCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_ResFrame *res);
 
 const Xcp_SegmentConfigType * Xcp_GetSegmentConfig(uint8 segment_number);
 

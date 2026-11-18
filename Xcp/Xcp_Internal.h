@@ -199,12 +199,12 @@ typedef struct
 #endif
 } Xcp_RuntimeType;
 
-typedef struct
+struct Xcp_Channel
 {
     const Xcp_ConfigType  *config_ptr;
     Xcp_StorageType       *storage_ptr;
     Xcp_RuntimeType       *runtime_ptr;
-} Xcp_Channel;
+};
 
 extern Xcp_Channel g_xcp_channel;
 
