@@ -65,11 +65,14 @@ sint16 Xcp_CmdProgramStart(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     ch->storage_ptr->cto_buffer[1] = 0x00U;
 
+    ch->storage_ptr->cto_buffer[2] = 0x00U;
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    ch->storage_ptr->cto_buffer[2] |= XCP_COMM_OPT_MASTER_BLOCK_MODE;
+#endif
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-    ch->storage_ptr->cto_buffer[2] = XCP_COMM_OPT_INTERLEAVED_MODE;
+    ch->storage_ptr->cto_buffer[2] |= XCP_COMM_OPT_INTERLEAVED_MODE;
     ch->storage_ptr->cto_buffer[6] = XCP_CMD_QUEUE_SIZE;
 #else
-    ch->storage_ptr->cto_buffer[2] = 0x00U;
     ch->storage_ptr->cto_buffer[6] = 0x00U;
 #endif
     ch->storage_ptr->cto_buffer[3] = XCP_MAX_CTO;
