@@ -174,10 +174,6 @@ typedef struct
     boolean seed_requested;
 
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
-
-    uint8 active_segment;
-    uint8 active_page_ecu;
-    uint8 active_page_xcp;
 #endif
 
 #if (XCP_FLASH_PROGRAMMING_ENABLED == STD_ON)

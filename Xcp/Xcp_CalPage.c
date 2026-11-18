@@ -97,10 +97,6 @@ sint16 Xcp_CmdSetCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_R
         }
     }
 
-    ch->runtime_ptr->active_segment  = segment_number;
-    ch->runtime_ptr->active_page_ecu = Xcp_SegmentRuntime[segment_number].active_page_ecu;
-    ch->runtime_ptr->active_page_xcp = Xcp_SegmentRuntime[segment_number].active_page_xcp;
-
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
@@ -384,14 +380,7 @@ const Xcp_SegmentConfigType * Xcp_GetSegmentConfig(uint8 segment_number)
 
 void Xcp_InitCalPage(Xcp_Channel *ch)
 {
-    if (ch->runtime_ptr == NULL)
-    {
-        return;
-    }
-
-    ch->runtime_ptr->active_segment  = 0U;
-    ch->runtime_ptr->active_page_ecu = Xcp_SegmentRuntime[0].active_page_ecu;
-    ch->runtime_ptr->active_page_xcp = Xcp_SegmentRuntime[0].active_page_xcp;
+    (void)ch;
 }
 
 #endif
