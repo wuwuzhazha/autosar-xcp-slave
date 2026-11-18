@@ -1179,8 +1179,12 @@ int main(void)
           && ((g_xcp_channel.runtime_ptr->session_status & 0x01U) != 0U));
 
     l = xcp_cmd((const uint8 *)"\xF9\x02\x00\x00", 4U, res);
-    CHECK("H7 SET_REQUEST STORE_DAQ_REQ_NO_RESUME -> ERR_OUT_OF_RANGE",
-          (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+    CHECK("H7 SET_REQUEST STORE_DAQ_NO_RESUME -> RES, stored but resume_active=0",
+          (l == 1U) && (res[0] == XCP_PID_RES));
+    xcp_drain_tx();
+    Xcp_NvMWriteRamBlockToNvmCallback(XCP_NVM_BLOCK_ID_RESUME, 0U);
+    CHECK("H7a NvM store complete: data_valid but resume_active cleared",
+          (g_xcp_resume_runtime.data_valid == TRUE) && (g_xcp_resume_data.resume_active == FALSE));
 
     (void)xcp_cmd((const uint8 *)"\xDE\x02\x00\x00", 4U, res);
     (void)xcp_cmd((const uint8 *)"\xF9\x04\x00\x00", 4U, res);
@@ -1746,8 +1750,9 @@ int main(void)
         CHECK("K9d SET_REQUEST len2 -> ERR_CMD_SYNTAX",
               (l == 2U) && (res[1] == XCP_ERR_CMD_SYNTAX));
 
-        l = xcp_cmd((const uint8 *)"\xF9\xF0\x00\x00", 4U, res);
-        CHECK("K9e SET_REQUEST reserved bits -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
+        l = xcp_cmd((const uint8 *)"\xF9\xE0\x00\x00", 4U, res);
+        CHECK("K9e SET_REQUEST reserved bits only -> RES (no-op)",
+              (l == 1U) && (res[0] == XCP_PID_RES));
     }
 
     {

@@ -178,7 +178,7 @@ void Xcp_InitResumeMode(void)
 #endif
 }
 
-Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id)
+Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id, boolean resume)
 {
     uint16 i;
     Xcp_DaqResumeConfigType *resume_cfg;
@@ -195,7 +195,7 @@ Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id)
     g_xcp_resume_data.session_cfg_id = session_cfg_id;
 #if (XCP_DAQ_ENABLED == STD_ON)
     g_xcp_resume_data.daq_count = ch->runtime_ptr->daq_count;
-    g_xcp_resume_data.resume_active = TRUE;
+    g_xcp_resume_data.resume_active = resume;
 
     for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
     {
@@ -214,7 +214,7 @@ Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id)
         resume_cfg->prescaler = daq_list->prescaler;
         resume_cfg->priority = daq_list->priority;
 
-        resume_cfg->resume_enabled = (daq_list->resume != FALSE) ? TRUE : FALSE;
+        resume_cfg->resume_enabled = ((resume != FALSE) && (daq_list->resume != FALSE)) ? TRUE : FALSE;
 
         {
             uint8 o, e;

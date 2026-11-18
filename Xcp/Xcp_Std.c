@@ -544,12 +544,6 @@ sint16 Xcp_CmdSetRequest(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
     (void)cmd_length;
     mode = cmd_data[1];
 
-    if ((mode & XCP_SET_REQ_STORE_DAQ_NO_RESUME) != 0U)
-    {
-
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
-    }
-
     if ((mode & XCP_SET_REQ_CLEAR_DAQ_REQ) != 0U)
     {
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
@@ -562,17 +556,23 @@ sint16 Xcp_CmdSetRequest(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
 #endif
     }
 
-    if ((mode & XCP_SET_REQ_STORE_DAQ_RESUME) != 0U)
-    {
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
-        if (Xcp_StoreDaqConfig(&g_xcp_channel, Xcp_LeRead16(&cmd_data[2U])) != E_OK)
+    if ((mode & (XCP_SET_REQ_STORE_DAQ_NO_RESUME | XCP_SET_REQ_STORE_DAQ_RESUME)) != 0U)
+    {
+        boolean resume = ((mode & XCP_SET_REQ_STORE_DAQ_RESUME) != 0U)
+                      && ((mode & XCP_SET_REQ_STORE_DAQ_NO_RESUME) == 0U);
+
+        if (Xcp_StoreDaqConfig(&g_xcp_channel, Xcp_LeRead16(&cmd_data[2U]), resume) != E_OK)
         {
             return Xcp_ResErr(res, XCP_ERR_GENERIC);
         }
-#else
-        return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
-#endif
     }
+#else
+    if ((mode & (XCP_SET_REQ_STORE_DAQ_NO_RESUME | XCP_SET_REQ_STORE_DAQ_RESUME)) != 0U)
+    {
+        return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
+    }
+#endif
 
     if ((mode & XCP_SET_REQ_STORE_CAL_REQ) != 0U)
     {

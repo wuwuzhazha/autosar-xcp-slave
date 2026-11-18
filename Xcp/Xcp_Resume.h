@@ -71,7 +71,7 @@ extern Xcp_ResumeDataType g_xcp_resume_data;
 
 void Xcp_InitResumeMode(void);
 
-Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id);
+Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id, boolean resume);
 
 Std_ReturnType Xcp_RestoreDaqConfig(void);
 
