@@ -19,7 +19,7 @@ Xcp_ResumeDataType g_xcp_resume_data;
 
 static uint16 Xcp_CalculateResumeChecksum(const Xcp_ResumeDataType *data);
 static Std_ReturnType Xcp_ValidateResumeData(const Xcp_ResumeDataType *data);
-static void Xcp_ApplyRestoredDaqConfig(void);
+static void Xcp_ApplyRestoredDaqConfig(Xcp_Channel *ch);
 
 static uint16 Xcp_CalculateResumeChecksum(const Xcp_ResumeDataType *data)
 {
@@ -75,7 +75,7 @@ static Std_ReturnType Xcp_ValidateResumeData(const Xcp_ResumeDataType *data)
 }
 
 #if (XCP_DAQ_ENABLED == STD_ON)
-static void Xcp_ApplyRestoredDaqConfig(void)
+static void Xcp_ApplyRestoredDaqConfig(Xcp_Channel *ch)
 {
     uint16 i;
     const Xcp_DaqResumeConfigType *resume_cfg;
@@ -99,7 +99,7 @@ static void Xcp_ApplyRestoredDaqConfig(void)
                 continue;
             }
 
-            daq_list = &g_xcp_channel.storage_ptr->daq_list[i];
+            daq_list = &ch->storage_ptr->daq_list[i];
 
             daq_list->event_channel = resume_cfg->event_channel;
             daq_list->odt_count = (resume_cfg->odt_count <= daq_list->odt_max_count)
@@ -139,7 +139,7 @@ static void Xcp_ApplyRestoredDaqConfig(void)
         }
     }
 
-    g_xcp_channel.runtime_ptr->daq_count = g_xcp_resume_data.daq_count;
+    ch->runtime_ptr->daq_count = g_xcp_resume_data.daq_count;
 }
 #endif
 
@@ -178,14 +178,14 @@ void Xcp_InitResumeMode(void)
 #endif
 }
 
-Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id)
+Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id)
 {
     uint16 i;
     Xcp_DaqResumeConfigType *resume_cfg;
     const Xcp_DaqListType *daq_list;
 
-    if ((g_xcp_channel.runtime_ptr == NULL) ||
-        (g_xcp_channel.runtime_ptr->state != XCP_INIT))
+    if ((ch->runtime_ptr == NULL) ||
+        (ch->runtime_ptr->state != XCP_INIT))
     {
         return E_NOT_OK;
     }
@@ -194,17 +194,17 @@ Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id)
     g_xcp_resume_data.version = XCP_RESUME_DATA_VERSION;
     g_xcp_resume_data.session_cfg_id = session_cfg_id;
 #if (XCP_DAQ_ENABLED == STD_ON)
-    g_xcp_resume_data.daq_count = g_xcp_channel.runtime_ptr->daq_count;
+    g_xcp_resume_data.daq_count = ch->runtime_ptr->daq_count;
     g_xcp_resume_data.resume_active = TRUE;
 
-    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
     {
         if (i >= XCP_MAX_DAQ)
         {
             break;
         }
 
-        daq_list = &g_xcp_channel.storage_ptr->daq_list[i];
+        daq_list = &ch->storage_ptr->daq_list[i];
         resume_cfg = &g_xcp_resume_data.daq_config[i];
 
         resume_cfg->event_channel = daq_list->event_channel;
@@ -247,7 +247,7 @@ Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id)
         g_xcp_resume_runtime.store_pending = TRUE;
         g_xcp_resume_runtime.state = XCP_RESUME_STATE_PENDING;
 
-        g_xcp_channel.runtime_ptr->session_status |= XCP_SS_STORE_DAQ_REQ;
+        ch->runtime_ptr->session_status |= XCP_SS_STORE_DAQ_REQ;
         return E_OK;
     }
 
@@ -276,7 +276,7 @@ Std_ReturnType Xcp_RestoreDaqConfig(void)
     }
 
 #if (XCP_DAQ_ENABLED == STD_ON)
-    Xcp_ApplyRestoredDaqConfig();
+    Xcp_ApplyRestoredDaqConfig(&g_xcp_channel);
 #endif
 
     g_xcp_resume_runtime.data_valid = TRUE;
@@ -286,7 +286,7 @@ Std_ReturnType Xcp_RestoreDaqConfig(void)
     return E_OK;
 }
 
-Std_ReturnType Xcp_ClearStoredDaqConfig(void)
+Std_ReturnType Xcp_ClearStoredDaqConfig(Xcp_Channel *ch)
 {
     (void)memset(&g_xcp_resume_data, 0, sizeof(Xcp_ResumeDataType));
 
@@ -305,7 +305,7 @@ Std_ReturnType Xcp_ClearStoredDaqConfig(void)
 #endif
 }
 
-boolean Xcp_IsDaqListResume(uint16 daq_list_no)
+boolean Xcp_IsDaqListResume(Xcp_Channel *ch, uint16 daq_list_no)
 {
     return ((g_xcp_resume_runtime.data_valid != FALSE)
             && (g_xcp_resume_data.resume_active == TRUE)
@@ -314,7 +314,7 @@ boolean Xcp_IsDaqListResume(uint16 daq_list_no)
             && (g_xcp_resume_data.daq_config[daq_list_no].resume_enabled == TRUE)) ? TRUE : FALSE;
 }
 
-boolean Xcp_IsResumeModeActive(void)
+boolean Xcp_IsResumeModeActive(Xcp_Channel *ch)
 {
     return (g_xcp_resume_runtime.state == XCP_RESUME_STATE_ACTIVE);
 }

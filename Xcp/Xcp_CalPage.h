@@ -29,7 +29,7 @@ sint16 Xcp_CmdCopyCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_
 
 const Xcp_SegmentConfigType * Xcp_GetSegmentConfig(uint8 segment_number);
 
-void Xcp_InitCalPage(void);
+void Xcp_InitCalPage(Xcp_Channel *ch);
 
 #endif
 

@@ -44,17 +44,17 @@ sint16 Xcp_CmdTransportLayerCmd(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cm
 
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
 
-void Xcp_InitBlockTransfer(void);
+void Xcp_InitBlockTransfer(Xcp_Channel *ch);
 
-Std_ReturnType Xcp_StartBlockTransfer(uint8 block_type, uint32 total_size, uint32 first_packet_size);
+Std_ReturnType Xcp_StartBlockTransfer(Xcp_Channel *ch, uint8 block_type, uint32 total_size, uint32 first_packet_size);
 
-Std_ReturnType Xcp_ValidateBlockSequence(uint8 block_type, uint32 data_size);
+Std_ReturnType Xcp_ValidateBlockSequence(Xcp_Channel *ch, uint8 block_type, uint32 data_size);
 
 void Xcp_CancelBlockTransfer(void);
 
-boolean Xcp_IsBlockTransferActive(void);
+boolean Xcp_IsBlockTransferActive(Xcp_Channel *ch);
 
-uint32 Xcp_GetBlockTransferRemaining(void);
+uint32 Xcp_GetBlockTransferRemaining(Xcp_Channel *ch);
 #endif
 
 #ifdef __cplusplus

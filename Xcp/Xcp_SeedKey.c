@@ -124,40 +124,40 @@ sint16 Xcp_CmdUnlock(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, X
     }
 }
 
-boolean Xcp_IsResourceUnlocked(uint8 resource)
+boolean Xcp_IsResourceUnlocked(Xcp_Channel *ch, uint8 resource)
 {
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return FALSE;
     }
 
-    return ((g_xcp_channel.runtime_ptr->protection_status & resource) == 0U);
+    return ((ch->runtime_ptr->protection_status & resource) == 0U);
 #else
     (void)resource;
     return TRUE;
 #endif
 }
 
-void Xcp_InitProtection(void)
+void Xcp_InitProtection(Xcp_Channel *ch)
 {
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return;
     }
 
-    g_xcp_channel.runtime_ptr->protection_status = XCP_RESOURCE_CAL_PAG |
+    ch->runtime_ptr->protection_status = XCP_RESOURCE_CAL_PAG |
                                     XCP_RESOURCE_DAQ |
                                     XCP_RESOURCE_STIM |
                                     XCP_RESOURCE_PGM;
-    g_xcp_channel.runtime_ptr->seed_requested = FALSE;
-    g_xcp_channel.runtime_ptr->seed_resource = 0U;
-    g_xcp_channel.runtime_ptr->seed_length = 0U;
+    ch->runtime_ptr->seed_requested = FALSE;
+    ch->runtime_ptr->seed_resource = 0U;
+    ch->runtime_ptr->seed_length = 0U;
 #else
-    if (g_xcp_channel.runtime_ptr != NULL)
+    if (ch->runtime_ptr != NULL)
     {
-        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        ch->runtime_ptr->protection_status = 0U;
     }
 #endif
 }

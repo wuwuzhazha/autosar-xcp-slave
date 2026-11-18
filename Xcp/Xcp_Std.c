@@ -53,16 +53,16 @@ sint16 Xcp_CmdConnect(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
         if (resume_kept)
         {
 
-            Xcp_RebuildActiveDaqList();
+            Xcp_RebuildActiveDaqList(&g_xcp_channel);
         }
         else
         {
 
-            Xcp_FreeDaqLists();
+            Xcp_FreeDaqLists(&g_xcp_channel);
         }
     }
 
-    Xcp_ResetEventChannelCounters();
+    Xcp_ResetEventChannelCounters(&g_xcp_channel);
 #endif
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
@@ -128,7 +128,7 @@ sint16 Xcp_CmdGetStatus(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length
     }
 #endif
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
-    if (Xcp_IsResumeModeActive())
+    if (Xcp_IsResumeModeActive(&g_xcp_channel))
     {
         session_status |= XCP_SS_RESUME;
     }
@@ -318,7 +318,7 @@ sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
     }
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_CAL_PAG))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -351,7 +351,7 @@ sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
-    if (Xcp_ValidateBlockSequence(XCP_BLOCK_TYPE_DOWNLOAD, cmd_data[1]) != E_OK)
+    if (Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, cmd_data[1]) != E_OK)
     {
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
@@ -384,7 +384,7 @@ sint16 Xcp_CmdShortDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
     }
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_CAL_PAG))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -419,7 +419,7 @@ sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
     }
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_CAL_PAG))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -521,7 +521,7 @@ sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
     }
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_CAL_PAG))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -555,7 +555,7 @@ sint16 Xcp_CmdSetRequest(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
     if ((mode & XCP_SET_REQ_CLEAR_DAQ_REQ) != 0U)
     {
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
-        if (Xcp_ClearStoredDaqConfig() != E_OK)
+        if (Xcp_ClearStoredDaqConfig(&g_xcp_channel) != E_OK)
         {
             return Xcp_ResErr(res, XCP_ERR_GENERIC);
         }
@@ -567,7 +567,7 @@ sint16 Xcp_CmdSetRequest(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
     if ((mode & XCP_SET_REQ_STORE_DAQ_RESUME) != 0U)
     {
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
-        if (Xcp_StoreDaqConfig(Xcp_LeRead16(&cmd_data[2U])) != E_OK)
+        if (Xcp_StoreDaqConfig(&g_xcp_channel, Xcp_LeRead16(&cmd_data[2U])) != E_OK)
         {
             return Xcp_ResErr(res, XCP_ERR_GENERIC);
         }
@@ -615,84 +615,84 @@ sint16 Xcp_CmdTransportLayerCmd(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cm
 
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
 
-void Xcp_InitBlockTransfer(void)
+void Xcp_InitBlockTransfer(Xcp_Channel *ch)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return;
     }
 
-    g_xcp_channel.runtime_ptr->block_sequence_counter = 0U;
-    g_xcp_channel.runtime_ptr->expected_block_sequence = 0U;
-    g_xcp_channel.runtime_ptr->block_transfer_active = FALSE;
-    g_xcp_channel.runtime_ptr->block_transfer_remaining = 0U;
-    g_xcp_channel.runtime_ptr->block_transfer_type = XCP_BLOCK_TYPE_NONE;
+    ch->runtime_ptr->block_sequence_counter = 0U;
+    ch->runtime_ptr->expected_block_sequence = 0U;
+    ch->runtime_ptr->block_transfer_active = FALSE;
+    ch->runtime_ptr->block_transfer_remaining = 0U;
+    ch->runtime_ptr->block_transfer_type = XCP_BLOCK_TYPE_NONE;
 }
 
-Std_ReturnType Xcp_StartBlockTransfer(uint8 block_type, uint32 total_size, uint32 first_packet_size)
+Std_ReturnType Xcp_StartBlockTransfer(Xcp_Channel *ch, uint8 block_type, uint32 total_size, uint32 first_packet_size)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_channel.runtime_ptr->block_transfer_active == TRUE)
+    if (ch->runtime_ptr->block_transfer_active == TRUE)
     {
         return E_NOT_OK;
     }
 
-    g_xcp_channel.runtime_ptr->block_transfer_active = TRUE;
-    g_xcp_channel.runtime_ptr->block_transfer_type = block_type;
-    g_xcp_channel.runtime_ptr->block_sequence_counter = 0U;
-    g_xcp_channel.runtime_ptr->expected_block_sequence = 1U;
+    ch->runtime_ptr->block_transfer_active = TRUE;
+    ch->runtime_ptr->block_transfer_type = block_type;
+    ch->runtime_ptr->block_sequence_counter = 0U;
+    ch->runtime_ptr->expected_block_sequence = 1U;
 
     if (total_size > first_packet_size)
     {
-        g_xcp_channel.runtime_ptr->block_transfer_remaining = total_size - first_packet_size;
+        ch->runtime_ptr->block_transfer_remaining = total_size - first_packet_size;
     }
     else
     {
-        g_xcp_channel.runtime_ptr->block_transfer_remaining = 0U;
-        g_xcp_channel.runtime_ptr->block_transfer_active = FALSE;
+        ch->runtime_ptr->block_transfer_remaining = 0U;
+        ch->runtime_ptr->block_transfer_active = FALSE;
     }
 
     return E_OK;
 }
 
-Std_ReturnType Xcp_ValidateBlockSequence(uint8 block_type, uint32 data_size)
+Std_ReturnType Xcp_ValidateBlockSequence(Xcp_Channel *ch, uint8 block_type, uint32 data_size)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_channel.runtime_ptr->block_transfer_active == FALSE)
+    if (ch->runtime_ptr->block_transfer_active == FALSE)
     {
         return E_NOT_OK;
     }
 
-    if (g_xcp_channel.runtime_ptr->block_transfer_type != block_type)
+    if (ch->runtime_ptr->block_transfer_type != block_type)
     {
-        Xcp_InitBlockTransfer();
+        Xcp_InitBlockTransfer(&g_xcp_channel);
         return E_NOT_OK;
     }
 
-    g_xcp_channel.runtime_ptr->block_sequence_counter++;
-    g_xcp_channel.runtime_ptr->expected_block_sequence++;
+    ch->runtime_ptr->block_sequence_counter++;
+    ch->runtime_ptr->expected_block_sequence++;
 
-    if (g_xcp_channel.runtime_ptr->block_transfer_remaining >= data_size)
+    if (ch->runtime_ptr->block_transfer_remaining >= data_size)
     {
-        g_xcp_channel.runtime_ptr->block_transfer_remaining -= data_size;
+        ch->runtime_ptr->block_transfer_remaining -= data_size;
     }
     else
     {
-        g_xcp_channel.runtime_ptr->block_transfer_remaining = 0U;
+        ch->runtime_ptr->block_transfer_remaining = 0U;
     }
 
-    if (g_xcp_channel.runtime_ptr->block_transfer_remaining == 0U)
+    if (ch->runtime_ptr->block_transfer_remaining == 0U)
     {
-        g_xcp_channel.runtime_ptr->block_transfer_active = FALSE;
-        g_xcp_channel.runtime_ptr->block_transfer_type = XCP_BLOCK_TYPE_NONE;
+        ch->runtime_ptr->block_transfer_active = FALSE;
+        ch->runtime_ptr->block_transfer_type = XCP_BLOCK_TYPE_NONE;
     }
 
     return E_OK;
@@ -700,26 +700,26 @@ Std_ReturnType Xcp_ValidateBlockSequence(uint8 block_type, uint32 data_size)
 
 void Xcp_CancelBlockTransfer(void)
 {
-    Xcp_InitBlockTransfer();
+    Xcp_InitBlockTransfer(&g_xcp_channel);
 }
 
-boolean Xcp_IsBlockTransferActive(void)
+boolean Xcp_IsBlockTransferActive(Xcp_Channel *ch)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return FALSE;
     }
 
-    return g_xcp_channel.runtime_ptr->block_transfer_active;
+    return ch->runtime_ptr->block_transfer_active;
 }
 
-uint32 Xcp_GetBlockTransferRemaining(void)
+uint32 Xcp_GetBlockTransferRemaining(Xcp_Channel *ch)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return 0U;
     }
 
-    return g_xcp_channel.runtime_ptr->block_transfer_remaining;
+    return ch->runtime_ptr->block_transfer_remaining;
 }
 #endif

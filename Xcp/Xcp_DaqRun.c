@@ -19,14 +19,14 @@ static boolean dto_overload_pending = FALSE;
 static uint16  overload_ev_cooldown = 0U;
 static uint16  dto_busy_watchdog_cnt = 0U;
 
-void Xcp_RebuildActiveDaqList(void)
+void Xcp_RebuildActiveDaqList(Xcp_Channel *ch)
 {
     uint16 i;
     Xcp_ActiveDaqCount = 0;
 
-    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
     {
-        if (g_xcp_channel.storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
+        if (ch->storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
         {
             Xcp_ActiveDaqIndices[Xcp_ActiveDaqCount] = i;
             Xcp_ActiveDaqCount++;
@@ -34,24 +34,24 @@ void Xcp_RebuildActiveDaqList(void)
     }
 }
 
-void Xcp_ResetEventChannelCounters(void)
+void Xcp_ResetEventChannelCounters(Xcp_Channel *ch)
 {
     uint16 i;
 
     for (i = 0U; i < XCP_MAX_EVENT_CHANNEL; i++)
     {
-        g_xcp_channel.runtime_ptr->event_channel_counter[i] = 0U;
+        ch->runtime_ptr->event_channel_counter[i] = 0U;
     }
 
 #if (XCP_PRESCALER_SUPPORTED == STD_ON)
-    for (i = 0U; i < g_xcp_channel.runtime_ptr->daq_count; i++)
+    for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
     {
-        g_xcp_channel.storage_ptr->daq_list[i].prescaler_counter = 0U;
+        ch->storage_ptr->daq_list[i].prescaler_counter = 0U;
     }
 #endif
 }
 
-void Xcp_ProcessDaq(uint16 event_channel)
+void Xcp_ProcessDaq(Xcp_Channel *ch, uint16 event_channel)
 {
     uint16 i;
     uint16 daqIdx;
@@ -60,7 +60,7 @@ void Xcp_ProcessDaq(uint16 event_channel)
     for (i = 0U; i < Xcp_ActiveDaqCount; i++)
     {
         daqIdx = Xcp_ActiveDaqIndices[i];
-        Xcp_DaqListType *daq = &g_xcp_channel.storage_ptr->daq_list[daqIdx];
+        Xcp_DaqListType *daq = &ch->storage_ptr->daq_list[daqIdx];
 
         if ((daq->event_channel == event_channel) && (daq->state == XCP_DAQ_STATE_RUNNING)
             && (daq->direction == XCP_DAQ_LIST_TYPE_DAQ))
@@ -82,13 +82,13 @@ void Xcp_ProcessDaq(uint16 event_channel)
 #endif
             for (odtIdx = 0U; odtIdx < daq->odt_count; odtIdx++)
             {
-                Xcp_TransmitDto(daqIdx, odtIdx);
+                Xcp_TransmitDto(&g_xcp_channel, daqIdx, odtIdx);
             }
         }
     }
 }
 
-void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
+void Xcp_TransmitDto(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no)
 {
     Xcp_OdtType      *odt;
     Xcp_OdtEntryType *entry;
@@ -98,23 +98,23 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
     uint8             local_dto_buffer[XCP_MAX_DTO];
     uint8             local_buffer_length;
 
-    if (daq_list_no >= g_xcp_channel.runtime_ptr->daq_count)
+    if (daq_list_no >= ch->runtime_ptr->daq_count)
     {
         return;
     }
 
-    if (odt_no >= g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt_count)
+    if (odt_no >= ch->storage_ptr->daq_list[daq_list_no].odt_count)
     {
         return;
     }
 
-    odt = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no];
+    odt = &ch->storage_ptr->daq_list[daq_list_no].odt[odt_no];
 
     (void) memset(&local_dto_buffer[0], 0x00, XCP_MAX_DTO);
 
     buffer_idx = Xcp_PidFieldEncode(&g_xcp_channel, daq_list_no, odt_no, &local_dto_buffer[0]);
 
-    if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&g_xcp_channel.storage_ptr->daq_list[daq_list_no]))
+    if ((odt_no == 0U) && XCP_DAQ_HAS_TIMESTAMP(&ch->storage_ptr->daq_list[daq_list_no]))
     {
         buffer_idx += Xcp_WriteTimestamp(Xcp_GetTimestamp(), &local_dto_buffer[buffer_idx]);
     }
@@ -172,13 +172,13 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
         local_buffer_length = XCP_MAX_DTO;
     }
 
-    Xcp_DtoSendOrQueue(local_dto_buffer, local_buffer_length);
+    Xcp_DtoSendOrQueue(&g_xcp_channel, local_dto_buffer, local_buffer_length);
 }
 
-void Xcp_DtoSendOrQueue(const uint8 *dto_data, uint8 dto_length)
+void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length)
 {
-    Xcp_StorageType *storage = g_xcp_channel.storage_ptr;
-    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    Xcp_StorageType *storage = ch->storage_ptr;
+    Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
     XCP_DTO_ENTER_CRITICAL();
 
@@ -223,10 +223,10 @@ void Xcp_DtoSendOrQueue(const uint8 *dto_data, uint8 dto_length)
     XCP_DTO_EXIT_CRITICAL();
 }
 
-void Xcp_DtoSendNext(void)
+void Xcp_DtoSendNext(Xcp_Channel *ch)
 {
-    Xcp_StorageType *storage = g_xcp_channel.storage_ptr;
-    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    Xcp_StorageType *storage = ch->storage_ptr;
+    Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
     runtime->tx.dto_latch = FALSE;
 
@@ -262,11 +262,11 @@ void Xcp_DtoSendNext(void)
     }
 }
 
-void Xcp_ReportDtoOverload(void)
+void Xcp_ReportDtoOverload(Xcp_Channel *ch)
 {
     uint16           i;
-    Xcp_StorageType *storage = g_xcp_channel.storage_ptr;
-    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    Xcp_StorageType *storage = ch->storage_ptr;
+    Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
     XCP_DTO_ENTER_CRITICAL();
 
@@ -336,7 +336,7 @@ void Xcp_ReportDtoOverload(void)
 
     for (i = 0U; i < XCP_MAX_DAQ; i++)
     {
-        if (g_xcp_channel.storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
+        if (ch->storage_ptr->daq_list[i].state == (uint8) XCP_DAQ_STATE_RUNNING)
         {
             break;
         }

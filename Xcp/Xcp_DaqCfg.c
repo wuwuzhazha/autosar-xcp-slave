@@ -9,36 +9,36 @@
 #if (XCP_DAQ_ENABLED == STD_ON)
 
 #if (XCP_MIN_DAQ > 0U)
-static void Xcp_LoadStaticDaqLists(void);
+static void Xcp_LoadStaticDaqLists(Xcp_Channel *ch);
 #endif
 
-void Xcp_InitDaqLists(void)
+void Xcp_InitDaqLists(Xcp_Channel *ch)
 {
     uint16 daq_idx = 0;
     uint8  odt_idx = 0;
     uint16 odt_pool_idx = 0U;
     uint16 entry_pool_idx = 0U;
 
-    g_xcp_channel.runtime_ptr->daq_list = (Xcp_DaqListType *) &g_xcp_channel.storage_ptr->daq_list[0];
+    ch->runtime_ptr->daq_list = (Xcp_DaqListType *) &ch->storage_ptr->daq_list[0];
 #if (XCP_MIN_DAQ > 0U)
-    g_xcp_channel.runtime_ptr->daq_count = XCP_MIN_DAQ;
+    ch->runtime_ptr->daq_count = XCP_MIN_DAQ;
 #else
-    g_xcp_channel.runtime_ptr->daq_count = 0U;
+    ch->runtime_ptr->daq_count = 0U;
 #endif
     for (daq_idx = 0U; daq_idx < XCP_MAX_DAQ; daq_idx++)
     {
-        g_xcp_channel.storage_ptr->daq_list[daq_idx].odt
-            = (Xcp_OdtType *) &g_xcp_channel.storage_ptr->odt[odt_pool_idx];
-        g_xcp_channel.storage_ptr->daq_list[daq_idx].odt_count = 0U;
-        g_xcp_channel.storage_ptr->daq_list[daq_idx].odt_max_count = XCP_MAX_ODT;
-        g_xcp_channel.storage_ptr->daq_list[daq_idx].state = XCP_DAQ_STATE_FREE;
+        ch->storage_ptr->daq_list[daq_idx].odt
+            = (Xcp_OdtType *) &ch->storage_ptr->odt[odt_pool_idx];
+        ch->storage_ptr->daq_list[daq_idx].odt_count = 0U;
+        ch->storage_ptr->daq_list[daq_idx].odt_max_count = XCP_MAX_ODT;
+        ch->storage_ptr->daq_list[daq_idx].state = XCP_DAQ_STATE_FREE;
 
         for (odt_idx = 0U; odt_idx < XCP_MAX_ODT; odt_idx++)
         {
-            g_xcp_channel.storage_ptr->odt[odt_pool_idx + odt_idx].odt_entry
-                = (Xcp_OdtEntryType *) &g_xcp_channel.storage_ptr->odt_entry[entry_pool_idx];
-            g_xcp_channel.storage_ptr->odt[odt_pool_idx + odt_idx].odt_entry_count = 0U;
-            g_xcp_channel.storage_ptr->odt[odt_pool_idx + odt_idx].odt_entry_max_count = XCP_MAX_ODT_ENTRIES;
+            ch->storage_ptr->odt[odt_pool_idx + odt_idx].odt_entry
+                = (Xcp_OdtEntryType *) &ch->storage_ptr->odt_entry[entry_pool_idx];
+            ch->storage_ptr->odt[odt_pool_idx + odt_idx].odt_entry_count = 0U;
+            ch->storage_ptr->odt[odt_pool_idx + odt_idx].odt_entry_max_count = XCP_MAX_ODT_ENTRIES;
 
             entry_pool_idx += XCP_MAX_ODT_ENTRIES;
         }
@@ -47,15 +47,15 @@ void Xcp_InitDaqLists(void)
     }
 
 #if (XCP_MIN_DAQ > 0U)
-    Xcp_LoadStaticDaqLists();
+    Xcp_LoadStaticDaqLists(&g_xcp_channel);
 #endif
 }
 
 #if (XCP_MIN_DAQ > 0U)
-static void Xcp_LoadStaticDaqList(uint16 list_no)
+static void Xcp_LoadStaticDaqList(Xcp_Channel *ch, uint16 list_no)
 {
-    const Xcp_StaticDaqListType *cfg = &g_xcp_channel.config_ptr->xcp_static_daq_list[list_no];
-    Xcp_DaqListType *daq = &g_xcp_channel.storage_ptr->daq_list[list_no];
+    const Xcp_StaticDaqListType *cfg = &ch->config_ptr->xcp_static_daq_list[list_no];
+    Xcp_DaqListType *daq = &ch->storage_ptr->daq_list[list_no];
     uint8 o;
 
     daq->state         = XCP_DAQ_STATE_CONFIGURED;
@@ -87,13 +87,13 @@ static void Xcp_LoadStaticDaqList(uint16 list_no)
     }
 }
 
-static void Xcp_LoadStaticDaqLists(void)
+static void Xcp_LoadStaticDaqLists(Xcp_Channel *ch)
 {
     uint16 s;
 
     for (s = 0U; s < XCP_MIN_DAQ; s++)
     {
-        Xcp_LoadStaticDaqList(s);
+        Xcp_LoadStaticDaqList(&g_xcp_channel, s);
     }
 }
 #endif
@@ -189,35 +189,35 @@ sint16 Xcp_CmdGetDaqEventInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_
     return (sint16)(7U);
 }
 
-void Xcp_FreeDaqLists(void)
+void Xcp_FreeDaqLists(Xcp_Channel *ch)
 {
     uint16 i;
 
     for (i = XCP_MIN_DAQ; i < XCP_MAX_DAQ; i++)
     {
-        g_xcp_channel.storage_ptr->daq_list[i].odt_count = 0U;
-        g_xcp_channel.storage_ptr->daq_list[i].state = XCP_DAQ_STATE_FREE;
-        g_xcp_channel.storage_ptr->daq_list[i].event_channel = 0U;
-        g_xcp_channel.storage_ptr->daq_list[i].mode = 0U;
-        g_xcp_channel.storage_ptr->daq_list[i].direction = XCP_DAQ_LIST_TYPE_DAQ;
-        g_xcp_channel.storage_ptr->daq_list[i].selected = FALSE;
-        g_xcp_channel.storage_ptr->daq_list[i].resume = FALSE;
+        ch->storage_ptr->daq_list[i].odt_count = 0U;
+        ch->storage_ptr->daq_list[i].state = XCP_DAQ_STATE_FREE;
+        ch->storage_ptr->daq_list[i].event_channel = 0U;
+        ch->storage_ptr->daq_list[i].mode = 0U;
+        ch->storage_ptr->daq_list[i].direction = XCP_DAQ_LIST_TYPE_DAQ;
+        ch->storage_ptr->daq_list[i].selected = FALSE;
+        ch->storage_ptr->daq_list[i].resume = FALSE;
     }
 
 #if (XCP_MIN_DAQ > 0U)
-    Xcp_LoadStaticDaqLists();
+    Xcp_LoadStaticDaqLists(&g_xcp_channel);
 #endif
 
-    g_xcp_channel.runtime_ptr->daq_count = XCP_MIN_DAQ;
+    ch->runtime_ptr->daq_count = XCP_MIN_DAQ;
 
     XCP_DTO_ENTER_CRITICAL();
-    g_xcp_channel.storage_ptr->dto_queue_count = 0U;
-    g_xcp_channel.storage_ptr->dto_queue_head  = 0U;
-    g_xcp_channel.storage_ptr->dto_queue_tail  = 0U;
+    ch->storage_ptr->dto_queue_count = 0U;
+    ch->storage_ptr->dto_queue_head  = 0U;
+    ch->storage_ptr->dto_queue_tail  = 0U;
     XCP_DTO_EXIT_CRITICAL();
 
-    Xcp_ResetEventChannelCounters();
-    Xcp_RebuildActiveDaqList();
+    Xcp_ResetEventChannelCounters(&g_xcp_channel);
+    Xcp_RebuildActiveDaqList(&g_xcp_channel);
 }
 
 sint16 Xcp_CmdFreeDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
@@ -227,7 +227,7 @@ sint16 Xcp_CmdFreeDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 #if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
     return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #endif
-    Xcp_FreeDaqLists();
+    Xcp_FreeDaqLists(&g_xcp_channel);
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
@@ -588,7 +588,7 @@ sint16 Xcp_CmdGetDaqListMode(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
         current_mode |= XCP_DAQ_MODE_RUNNING;
     }
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
-    if ((daq->resume != FALSE) || (Xcp_IsDaqListResume(daq_list_no) != FALSE))
+    if ((daq->resume != FALSE) || (Xcp_IsDaqListResume(&g_xcp_channel, daq_list_no) != FALSE))
     {
         current_mode |= XCP_DAQ_MODE_RESUME;
     }
@@ -631,7 +631,7 @@ sint16 Xcp_CmdStartStopDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
         if (ch->storage_ptr->daq_list[daq_list_no].direction == XCP_DAQ_LIST_TYPE_STIM)
         {
-            Xcp_ResetStimTimeout(daq_list_no);
+            Xcp_ResetStimTimeout(&g_xcp_channel, daq_list_no);
         }
 #endif
     }
@@ -645,7 +645,7 @@ sint16 Xcp_CmdStartStopDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
-    Xcp_RebuildActiveDaqList();
+    Xcp_RebuildActiveDaqList(&g_xcp_channel);
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
@@ -700,7 +700,7 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
                 if (daq->direction == XCP_DAQ_LIST_TYPE_STIM)
                 {
-                    Xcp_ResetStimTimeout(i);
+                    Xcp_ResetStimTimeout(&g_xcp_channel, i);
                 }
 #endif
             }
@@ -720,20 +720,20 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
         }
     }
 
-    Xcp_RebuildActiveDaqList();
+    Xcp_RebuildActiveDaqList(&g_xcp_channel);
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
-static uint8 Xcp_DaqListTypeProperties(uint16 daq_list_no)
+static uint8 Xcp_DaqListTypeProperties(Xcp_Channel *ch, uint16 daq_list_no)
 {
     uint8 properties = (uint8) (XCP_DAQ_LIST_PROP_DAQ | XCP_DAQ_LIST_PROP_STIM);
 
 #if (XCP_MIN_DAQ > 0U)
     if (daq_list_no < XCP_MIN_DAQ)
     {
-        uint8 list_type = g_xcp_channel.config_ptr->xcp_static_daq_list[daq_list_no].direction;
+        uint8 list_type = ch->config_ptr->xcp_static_daq_list[daq_list_no].direction;
 
         if (list_type == XCP_DAQ_LIST_TYPE_DAQ)
         {
@@ -772,7 +772,7 @@ sint16 Xcp_CmdGetDaqListInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
 
     daq = &ch->storage_ptr->daq_list[daq_list_no];
 
-    properties = Xcp_DaqListTypeProperties(daq_list_no);
+    properties = Xcp_DaqListTypeProperties(&g_xcp_channel, daq_list_no);
 #if (XCP_MIN_DAQ > 0U)
     if (daq_list_no < XCP_MIN_DAQ)
     {
@@ -818,7 +818,7 @@ sint16 Xcp_CmdClearDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
 #if (XCP_MIN_DAQ > 0U)
     if (daq_list_no < XCP_MIN_DAQ)
     {
-        Xcp_LoadStaticDaqList(daq_list_no);
+        Xcp_LoadStaticDaqList(&g_xcp_channel, daq_list_no);
     }
     else
 #endif
@@ -834,7 +834,7 @@ sint16 Xcp_CmdClearDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
         daq->priority = 0U;
         daq->prescaler_counter = 0U;
     }
-    Xcp_RebuildActiveDaqList();
+    Xcp_RebuildActiveDaqList(&g_xcp_channel);
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);

@@ -143,18 +143,18 @@ void Xcp_Init(const Xcp_ConfigType *Xcp_ConfigPtr)
 #endif
 
 #if (XCP_DAQ_ENABLED == STD_ON)
-    Xcp_InitDaqLists();
+    Xcp_InitDaqLists(&g_xcp_channel);
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
-    Xcp_InitStimTimeout();
+    Xcp_InitStimTimeout(&g_xcp_channel);
 #endif
 #endif
 
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
-    Xcp_InitCalPage();
+    Xcp_InitCalPage(&g_xcp_channel);
 #endif
 
 #if (XCP_FLASH_PROGRAMMING_ENABLED == STD_ON)
-    Xcp_InitFlashProg();
+    Xcp_InitFlashProg(&g_xcp_channel);
 #endif
 
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
@@ -223,7 +223,7 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
             else
             {
 #if (XCP_DAQ_ENABLED == STD_ON)
-                Xcp_DtoSendNext();
+                Xcp_DtoSendNext(&g_xcp_channel);
 #endif
             }
         }
@@ -260,7 +260,7 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         else
         {
 #if (XCP_DAQ_ENABLED == STD_ON)
-            Xcp_DtoSendNext();
+            Xcp_DtoSendNext(&g_xcp_channel);
 #endif
         }
 
@@ -294,7 +294,7 @@ void Xcp_HandleRxIndication(const PduInfoType *pdu_info_ptr)
         && (pdu_info_ptr->sdu_data_ptr[0] < XCP_CMD_PROGRAM_VERIFY))
     {
 
-        (void)Xcp_ReceiveStimDto(pdu_info_ptr->sdu_data_ptr,
+        (void)Xcp_ReceiveStimDto(&g_xcp_channel, pdu_info_ptr->sdu_data_ptr,
                                (uint8)pdu_info_ptr->sdu_length);
         return;
     }
@@ -324,10 +324,10 @@ void Xcp_MainFunction(void)
 #if (XCP_DAQ_ENABLED == STD_ON)
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
 
-    Xcp_CheckStimTimeout();
+    Xcp_CheckStimTimeout(&g_xcp_channel);
 #endif
 
-    Xcp_ReportDtoOverload();
+    Xcp_ReportDtoOverload(&g_xcp_channel);
 
     if (g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED)
     {
@@ -407,9 +407,9 @@ void Xcp_Event(uint16 event_channel)
     }
 
 #if (XCP_DAQ_ENABLED == STD_ON)
-    Xcp_ProcessDaq(event_channel);
+    Xcp_ProcessDaq(&g_xcp_channel, event_channel);
 
-    Xcp_ProcessStim(event_channel);
+    Xcp_ProcessStim(&g_xcp_channel, event_channel);
 #else
     (void)event_channel;
 #endif
@@ -504,11 +504,11 @@ void Xcp_SessionOpen(void)
     runtime->session_status = 0U;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    Xcp_InitProtection();
+    Xcp_InitProtection(&g_xcp_channel);
 #endif
 
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-    Xcp_InitBlockTransfer();
+    Xcp_InitBlockTransfer(&g_xcp_channel);
 #endif
 }
 
@@ -517,7 +517,7 @@ void Xcp_SessionClose(void)
     Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
 
 #if (XCP_DAQ_ENABLED == STD_ON)
-    Xcp_FreeDaqLists();
+    Xcp_FreeDaqLists(&g_xcp_channel);
 #endif
 
     runtime->tx.parked     = FALSE;

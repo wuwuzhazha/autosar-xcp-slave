@@ -27,7 +27,7 @@ sint16 Xcp_CmdSetCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_R
     page_number    = data[3];
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_CAL_PAG))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -311,7 +311,7 @@ sint16 Xcp_CmdCopyCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_
     dst_page    = data[4];
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_CAL_PAG))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -354,16 +354,16 @@ const Xcp_SegmentConfigType * Xcp_GetSegmentConfig(uint8 segment_number)
     return &XCP_SEG_CFG[segment_number];
 }
 
-void Xcp_InitCalPage(void)
+void Xcp_InitCalPage(Xcp_Channel *ch)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return;
     }
 
-    g_xcp_channel.runtime_ptr->active_segment  = 0U;
-    g_xcp_channel.runtime_ptr->active_page_ecu = Xcp_SegmentRuntime[0].active_page_ecu;
-    g_xcp_channel.runtime_ptr->active_page_xcp = Xcp_SegmentRuntime[0].active_page_xcp;
+    ch->runtime_ptr->active_segment  = 0U;
+    ch->runtime_ptr->active_page_ecu = Xcp_SegmentRuntime[0].active_page_ecu;
+    ch->runtime_ptr->active_page_xcp = Xcp_SegmentRuntime[0].active_page_xcp;
 }
 
 #endif

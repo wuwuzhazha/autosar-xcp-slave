@@ -71,15 +71,15 @@ extern Xcp_ResumeDataType g_xcp_resume_data;
 
 void Xcp_InitResumeMode(void);
 
-Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id);
+Std_ReturnType Xcp_StoreDaqConfig(Xcp_Channel *ch, uint16 session_cfg_id);
 
 Std_ReturnType Xcp_RestoreDaqConfig(void);
 
-Std_ReturnType Xcp_ClearStoredDaqConfig(void);
+Std_ReturnType Xcp_ClearStoredDaqConfig(Xcp_Channel *ch);
 
-boolean Xcp_IsDaqListResume(uint16 daq_list_no);
+boolean Xcp_IsDaqListResume(Xcp_Channel *ch, uint16 daq_list_no);
 
-boolean Xcp_IsResumeModeActive(void);
+boolean Xcp_IsResumeModeActive(Xcp_Channel *ch);
 
 void Xcp_ResumeMainFunction(void);
 

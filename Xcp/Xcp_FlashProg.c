@@ -16,7 +16,7 @@ static uint32 Xcp_ProgramBufferIndex = 0U;
 
 static uint32 Xcp_ExpectedProgramSize = 0U;
 
-static boolean Xcp_CheckProgramRange(uint32 addr, uint32 len)
+static boolean Xcp_CheckProgramRange(Xcp_Channel *ch, uint32 addr, uint32 len)
 {
     for (uint8 i = 0U; i < XCP_MAX_FLASH_SECTOR; i++)
     {
@@ -38,7 +38,7 @@ sint16 Xcp_CmdProgramStart(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     (void) cmd_length;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -51,7 +51,7 @@ sint16 Xcp_CmdProgramStart(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
 
 #if (XCP_DAQ_ENABLED == STD_ON)
 
-    Xcp_FreeDaqLists();
+    Xcp_FreeDaqLists(&g_xcp_channel);
 #endif
 
     ch->runtime_ptr->pgm_started = TRUE;
@@ -89,7 +89,7 @@ sint16 Xcp_CmdProgramClear(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     (void) cmd_length;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -192,7 +192,7 @@ sint16 Xcp_CmdProgram(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
     Std_ReturnType result = E_NOT_OK;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -233,7 +233,7 @@ sint16 Xcp_CmdProgram(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (!Xcp_CheckProgramRange(ch->runtime_ptr->mta, data_size))
+    if (!Xcp_CheckProgramRange(&g_xcp_channel, ch->runtime_ptr->mta, data_size))
     {
         return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
@@ -360,7 +360,7 @@ sint16 Xcp_CmdProgramPrepare(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
     (void) cmd_length;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -396,7 +396,7 @@ sint16 Xcp_CmdProgramFormat(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
     (void) cmd_length;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -435,7 +435,7 @@ sint16 Xcp_CmdProgramNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
     Std_ReturnType result;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -454,7 +454,7 @@ sint16 Xcp_CmdProgramNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (!Xcp_CheckProgramRange(ch->runtime_ptr->mta, data_size))
+    if (!Xcp_CheckProgramRange(&g_xcp_channel, ch->runtime_ptr->mta, data_size))
     {
         return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
@@ -484,7 +484,7 @@ sint16 Xcp_CmdProgramMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
     Std_ReturnType result;
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -502,7 +502,7 @@ sint16 Xcp_CmdProgramMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-    if (!Xcp_CheckProgramRange(ch->runtime_ptr->mta, data_size))
+    if (!Xcp_CheckProgramRange(&g_xcp_channel, ch->runtime_ptr->mta, data_size))
     {
         return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
@@ -536,7 +536,7 @@ sint16 Xcp_CmdProgramVerify(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
                          | ((uint32) cmd_data[7] << 24U);
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
+    if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_PGM))
     {
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
@@ -562,17 +562,17 @@ sint16 Xcp_CmdProgramVerify(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
     return (sint16)(1U);
 }
 
-void Xcp_InitFlashProg(void)
+void Xcp_InitFlashProg(Xcp_Channel *ch)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return;
     }
 
-    g_xcp_channel.runtime_ptr->pgm_started = FALSE;
-    g_xcp_channel.runtime_ptr->pgm_processor = XCP_PGM_STATUS_IDLE;
-    g_xcp_channel.runtime_ptr->pgm_address = 0U;
-    g_xcp_channel.runtime_ptr->pgm_size = 0U;
+    ch->runtime_ptr->pgm_started = FALSE;
+    ch->runtime_ptr->pgm_processor = XCP_PGM_STATUS_IDLE;
+    ch->runtime_ptr->pgm_address = 0U;
+    ch->runtime_ptr->pgm_size = 0U;
 
     Xcp_ProgramBufferIndex = 0U;
     Xcp_ExpectedProgramSize = 0U;
@@ -590,14 +590,14 @@ const Xcp_FlashSectorType *Xcp_GetSectorConfig(uint8 sector_number)
     return &XCP_SECTORS[sector_number];
 }
 
-boolean Xcp_IsProgrammingActive(void)
+boolean Xcp_IsProgrammingActive(Xcp_Channel *ch)
 {
-    if (g_xcp_channel.runtime_ptr == NULL)
+    if (ch->runtime_ptr == NULL)
     {
         return FALSE;
     }
 
-    return g_xcp_channel.runtime_ptr->pgm_started;
+    return ch->runtime_ptr->pgm_started;
 }
 
 #endif

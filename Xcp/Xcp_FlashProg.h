@@ -47,11 +47,11 @@ sint16 Xcp_CmdProgramMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
 
 sint16 Xcp_CmdProgramVerify(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_InitFlashProg(void);
+void Xcp_InitFlashProg(Xcp_Channel *ch);
 
 const Xcp_FlashSectorType *Xcp_GetSectorConfig(uint8 sector_number);
 
-boolean Xcp_IsProgrammingActive(void);
+boolean Xcp_IsProgrammingActive(Xcp_Channel *ch);
 
 #endif
 

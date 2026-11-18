@@ -14,9 +14,9 @@ sint16 Xcp_CmdGetSeed(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 
 sint16 Xcp_CmdUnlock(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-boolean Xcp_IsResourceUnlocked(uint8 resource);
+boolean Xcp_IsResourceUnlocked(Xcp_Channel *ch, uint8 resource);
 
-void Xcp_InitProtection(void);
+void Xcp_InitProtection(Xcp_Channel *ch);
 
 #endif
 

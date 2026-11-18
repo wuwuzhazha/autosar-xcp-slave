@@ -1221,9 +1221,9 @@ int main(void)
           Xcp_GetTimestamp() == g_xcp_channel.runtime_ptr->timestamp);
 #endif
     CHECK("H11 IsProgrammingActive == FALSE (PGM reset后)",
-          Xcp_IsProgrammingActive() == FALSE);
+          Xcp_IsProgrammingActive(&g_xcp_channel) == FALSE);
     CHECK("H12 IsResumeModeActive == TRUE (恢复后激活)",
-          Xcp_IsResumeModeActive() == TRUE);
+          Xcp_IsResumeModeActive(&g_xcp_channel) == TRUE);
 
     printf("-- I. event packets\n");
     xcp_drain_tx();
@@ -1515,13 +1515,13 @@ int main(void)
         g_xcp_channel.runtime_ptr->block_transfer_active = TRUE;
         g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
         g_xcp_channel.runtime_ptr->block_transfer_remaining = 100U;
-        r = Xcp_StartBlockTransfer(XCP_BLOCK_TYPE_DOWNLOAD, 200U, 8U);
+        r = Xcp_StartBlockTransfer(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, 200U, 8U);
         CHECK("K3a StartBlockTransfer while active -> E_NOT_OK", r == E_NOT_OK);
         CHECK("K3b state preserved after rejected start",
               g_xcp_channel.runtime_ptr->block_transfer_active == TRUE
               && g_xcp_channel.runtime_ptr->block_transfer_remaining == 100U);
 
-        r = Xcp_ValidateBlockSequence(XCP_BLOCK_TYPE_UPLOAD, 4U);
+        r = Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_UPLOAD, 4U);
         CHECK("K3c type-mismatch Validate -> E_NOT_OK", r == E_NOT_OK);
         CHECK("K3d type-mismatch resets block state",
               g_xcp_channel.runtime_ptr->block_transfer_active == FALSE
@@ -1530,7 +1530,7 @@ int main(void)
         g_xcp_channel.runtime_ptr->block_transfer_active = TRUE;
         g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
         g_xcp_channel.runtime_ptr->block_transfer_remaining = 4U;
-        r = Xcp_ValidateBlockSequence(XCP_BLOCK_TYPE_DOWNLOAD, 10U);
+        r = Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, 10U);
         CHECK("K3e oversize data clamped, transfer completes",
               (r == E_OK) && (g_xcp_channel.runtime_ptr->block_transfer_active == FALSE));
     }
@@ -1541,11 +1541,11 @@ int main(void)
         uint8 dto_short[1] = {0x00};
         uint8 dto_baddaq[8] = {0x3F, 0x01, 0x02, 0x03, 0x04, 0, 0, 0};
 
-        r = Xcp_ReceiveStimDto(NULL, 4U);
+        r = Xcp_ReceiveStimDto(&g_xcp_channel, NULL, 4U);
         CHECK("K4a STIM NULL -> E_NOT_OK", r == E_NOT_OK);
-        r = Xcp_ReceiveStimDto(dto_short, 1U);
+        r = Xcp_ReceiveStimDto(&g_xcp_channel, dto_short, 1U);
         CHECK("K4b STIM len<2 -> E_NOT_OK", r == E_NOT_OK);
-        r = Xcp_ReceiveStimDto(dto_baddaq, 8U);
+        r = Xcp_ReceiveStimDto(&g_xcp_channel, dto_baddaq, 8U);
         CHECK("K4c STIM out-of-range daq list -> E_NOT_OK", r == E_NOT_OK);
 
         Xcp_Tl_RxIndication(0U, NULL);
@@ -2178,7 +2178,7 @@ int main(void)
         l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
         CHECK("K20d GET_STATUS fields",
               (l == 6U) && (res[0] == XCP_PID_RES)
-              && (res[1] == ((Xcp_IsResumeModeActive() != FALSE) ? 0x80U : 0x00U))
+              && (res[1] == ((Xcp_IsResumeModeActive(&g_xcp_channel) != FALSE) ? 0x80U : 0x00U))
               && (res[2] == g_xcp_channel.runtime_ptr->protection_status));
 
         {
@@ -2720,11 +2720,11 @@ int main(void)
             cmd[0] = 0xDE; cmd[1] = 1; cmd[2] = 1; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
             {
 #if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
-                Std_ReturnType r = Xcp_ReceiveStimDto((const uint8 *)"\x01\xAA\xBB\xCC\xDD", 5U);
+                Std_ReturnType r = Xcp_ReceiveStimDto(&g_xcp_channel, (const uint8 *)"\x01\xAA\xBB\xCC\xDD", 5U);
                 CHECK("K26e abs_odt=1 routed to list1 (prefix-sum decode)", r == E_OK);
 #else
 
-                Std_ReturnType r = Xcp_ReceiveStimDto((const uint8 *)"\x00\x01\xAA\xBB\xCC\xDD", 6U);
+                Std_ReturnType r = Xcp_ReceiveStimDto(&g_xcp_channel, (const uint8 *)"\x00\x01\xAA\xBB\xCC\xDD", 6U);
                 CHECK("K26e odt0/list1 routed (relative decode)", r == E_OK);
 #endif
             }

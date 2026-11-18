@@ -247,9 +247,9 @@ void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length);
 
 void Xcp_ProcessCommandQueue(void);
 
-void Xcp_DtoSendOrQueue(const uint8 *dto_data, uint8 dto_length);
+void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length);
 
-void Xcp_DtoSendNext(void);
+void Xcp_DtoSendNext(Xcp_Channel *ch);
 
 Std_ReturnType Xcp_Tl_SendCto(const uint8 *data, uint8 length);
 
