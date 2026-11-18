@@ -161,6 +161,7 @@ extern "C" {
 #define XCP_DAQ_LIST_PROP_EVENT_FIXED       (0x02U)
 #define XCP_DAQ_LIST_PROP_DAQ               (0x04U)
 #define XCP_DAQ_LIST_PROP_STIM              (0x08U)
+#define XCP_DAQ_LIST_PROP_RESUME            (0x10U)
 
 #define XCP_EVENT_PROP_CONSISTENCY_SHIFT    (6U)
 

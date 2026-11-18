@@ -801,6 +801,12 @@ sint16 Xcp_CmdGetDaqListInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
     {
         properties |= XCP_DAQ_LIST_PROP_EVENT_FIXED;
     }
+#if (XCP_RESUME_MODE_ENABLED == STD_ON)
+    if (daq->resume != FALSE)
+    {
+        properties |= XCP_DAQ_LIST_PROP_RESUME;
+    }
+#endif
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     ch->storage_ptr->cto_buffer[1] = properties;
