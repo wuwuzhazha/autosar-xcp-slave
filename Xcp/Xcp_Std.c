@@ -444,7 +444,9 @@ sint16 Xcp_CmdBuildChecksum(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
 
     block_size = Xcp_LeRead32(&cmd_data[4U]);
 
-    if (Xcp_BuildChecksum_Callout(ch->runtime_ptr->mta, block_size, &checksum, &checksum_len) == E_OK)
+    if (Xcp_BuildChecksum_Callout(
+            Xcp_MemTranslate(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta),
+            block_size, &checksum, &checksum_len) == E_OK)
     {
         ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 

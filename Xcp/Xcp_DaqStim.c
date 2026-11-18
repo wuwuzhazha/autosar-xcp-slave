@@ -108,34 +108,32 @@ Std_ReturnType Xcp_ReceiveStimDto(Xcp_Channel *ch, const uint8 *dto_data, uint8 
             break;
         }
 
-        dst_ptr = (uint8 *) Xcp_MemTranslate(ch, entry->address_extension, entry->address);
-
         if (is_bit != FALSE)
         {
-
             uint8  byte_idx  = (uint8) (entry->bit_offset >> 3U);
             uint8  mask      = (uint8) (1U << (entry->bit_offset & 0x07U));
-            uint32 byte_addr = (uint32)(uintptr_t)dst_ptr + byte_idx;
 
-            if (XCP_CHECK_WRITE_ACCESS_EX(entry->address_extension, byte_addr, 1U) == 0U)
+            dst_ptr = Xcp_MemPtrWrite(ch, entry->address_extension,
+                                      entry->address + byte_idx, 1U);
+            if (dst_ptr != NULL_PTR)
             {
                 if ((dto_data[data_idx] & 0x01U) != 0U)
                 {
-                    dst_ptr[byte_idx] = (uint8) (dst_ptr[byte_idx] | mask);
+                    dst_ptr[0] = (uint8) (dst_ptr[0] | mask);
                 }
                 else
                 {
-                    dst_ptr[byte_idx] = (uint8) (dst_ptr[byte_idx] & (uint8)(~mask));
+                    dst_ptr[0] = (uint8) (dst_ptr[0] & (uint8)(~mask));
                 }
             }
         }
-        else if (XCP_CHECK_WRITE_ACCESS_EX(entry->address_extension, (uint32)(uintptr_t)dst_ptr, entry->size) == 0U)
-        {
-            (void) memcpy(dst_ptr, &dto_data[data_idx], entry->size);
-        }
         else
         {
-
+            dst_ptr = Xcp_MemPtrWrite(ch, entry->address_extension, entry->address, entry->size);
+            if (dst_ptr != NULL_PTR)
+            {
+                (void) memcpy(dst_ptr, &dto_data[data_idx], entry->size);
+            }
         }
 
         data_idx += elem_len;
