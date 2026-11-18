@@ -26,27 +26,27 @@ extern "C" {
 #define XCP_PGM_STATUS_PROGRAMMING (0x03U)
 #define XCP_PGM_STATUS_VERIFYING   (0x04U)
 
-void Xcp_CmdProgramStart(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramStart(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgramReset(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramReset(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdGetPgmProcessorInfo(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdGetPgmProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdGetSectorInfo(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdGetSectorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgramPrepare(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramPrepare(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgramFormat(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramFormat(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgramNext(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramNext(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgramMax(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramMax(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdProgramVerify(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdProgramVerify(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
 void Xcp_InitFlashProg(void);
 

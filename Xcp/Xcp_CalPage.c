@@ -14,7 +14,7 @@ Xcp_SegmentType Xcp_SegmentRuntime[XCP_MAX_SEGMENT];   /* 激活页运行态 */
 
 #define XCP_SEG_CFG  (g_xcp_manager.config_ptr->xcp_segment_config)   /* 段描述表别名 */
 
-void Xcp_CmdSetCalPage(const uint8 *data, uint8 length)
+sint16 Xcp_CmdSetCalPage(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     uint8 mode           = 0U;
     uint8 segment_number = 0U;
@@ -29,15 +29,13 @@ void Xcp_CmdSetCalPage(const uint8 *data, uint8 length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (segment_number >= XCP_MAX_SEGMENT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEGMENT_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
     if ((mode & XCP_PAGE_MODE_ALL) != 0U)
@@ -47,8 +45,7 @@ void Xcp_CmdSetCalPage(const uint8 *data, uint8 length)
         {
             if (page_number >= XCP_SEG_CFG[i].num_pages)
             {
-                Xcp_SendErrorResponse(XCP_ERR_PAGE_NOT_VALID);
-                return;
+                return Xcp_ResErr(res, XCP_ERR_PAGE_NOT_VALID);
             }
         }
     }
@@ -56,8 +53,7 @@ void Xcp_CmdSetCalPage(const uint8 *data, uint8 length)
     {
         if (page_number >= XCP_SEG_CFG[segment_number].num_pages)
         {
-            Xcp_SendErrorResponse(XCP_ERR_PAGE_NOT_VALID);
-            return;
+            return Xcp_ResErr(res, XCP_ERR_PAGE_NOT_VALID);
         }
     }
 
@@ -96,10 +92,10 @@ void Xcp_CmdSetCalPage(const uint8 *data, uint8 length)
     g_xcp_manager.runtime_ptr->active_page_xcp = Xcp_SegmentRuntime[segment_number].active_page_xcp;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdGetCalPage(const uint8 *data, uint8 length)
+sint16 Xcp_CmdGetCalPage(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     uint8 mode           = 0U;
     uint8 segment_number = 0U;
@@ -112,8 +108,7 @@ void Xcp_CmdGetCalPage(const uint8 *data, uint8 length)
 
     if (segment_number >= XCP_MAX_SEGMENT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEGMENT_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
     if ((mode & XCP_PAGE_MODE_ECU) != 0U)
@@ -126,8 +121,7 @@ void Xcp_CmdGetCalPage(const uint8 *data, uint8 length)
     }
     else
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
@@ -135,10 +129,10 @@ void Xcp_CmdGetCalPage(const uint8 *data, uint8 length)
     g_xcp_manager.storage_ptr->cto_buffer[2] = 0x00U;
     g_xcp_manager.storage_ptr->cto_buffer[3] = page_number;
 
-    Xcp_SendPositiveResponse(4U);
+    return (sint16)(4U);
 }
 
-void Xcp_CmdGetPagProcessorInfo(const uint8 *data, uint8 length)
+sint16 Xcp_CmdGetPagProcessorInfo(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     (void)data;
     (void)length;
@@ -148,10 +142,10 @@ void Xcp_CmdGetPagProcessorInfo(const uint8 *data, uint8 length)
 
     g_xcp_manager.storage_ptr->cto_buffer[2] = 0x00U;
 
-    Xcp_SendPositiveResponse(3U);
+    return (sint16)(3U);
 }
 
-void Xcp_CmdGetSegmentInfo(const uint8 *data, uint8 length)
+sint16 Xcp_CmdGetSegmentInfo(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     uint8  mode;
     uint8  segment_number;
@@ -166,8 +160,7 @@ void Xcp_CmdGetSegmentInfo(const uint8 *data, uint8 length)
 
     if (segment_number >= XCP_MAX_SEGMENT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEGMENT_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
     if (mode == 0U)
@@ -183,8 +176,7 @@ void Xcp_CmdGetSegmentInfo(const uint8 *data, uint8 length)
         }
         else
         {
-            Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-            return;
+            return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
         }
 
         g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
@@ -193,7 +185,7 @@ void Xcp_CmdGetSegmentInfo(const uint8 *data, uint8 length)
         g_xcp_manager.storage_ptr->cto_buffer[3] = 0x00U;
         Xcp_LeWrite32(&g_xcp_manager.storage_ptr->cto_buffer[4U], basic_info);
 
-        Xcp_SendPositiveResponse(8U);
+        return (sint16)(8U);
     }
     else if (mode == 1U)
     {
@@ -205,20 +197,20 @@ void Xcp_CmdGetSegmentInfo(const uint8 *data, uint8 length)
         g_xcp_manager.storage_ptr->cto_buffer[4] = 0x00U;
         g_xcp_manager.storage_ptr->cto_buffer[5] = 0x00U;
 
-        Xcp_SendPositiveResponse(6U);
+        return (sint16)(6U);
     }
     else if (mode == 2U)
     {
         /* MAX_MAPPING = 0: 无地址映射，任何 MAPPING_INDEX 都越界 */
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
     else
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 }
 
-void Xcp_CmdGetPageInfo(const uint8 *data, uint8 length)
+sint16 Xcp_CmdGetPageInfo(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     uint8 segment_number;
     uint8 page_number;
@@ -230,14 +222,12 @@ void Xcp_CmdGetPageInfo(const uint8 *data, uint8 length)
 
     if (segment_number >= XCP_MAX_SEGMENT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEGMENT_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
     if (page_number >= XCP_SEG_CFG[segment_number].num_pages)
     {
-        Xcp_SendErrorResponse(XCP_ERR_PAGE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_PAGE_NOT_VALID);
     }
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
@@ -261,10 +251,10 @@ void Xcp_CmdGetPageInfo(const uint8 *data, uint8 length)
     /* INIT_SEGMENT: 由本段参考页初始化 */
     g_xcp_manager.storage_ptr->cto_buffer[2] = segment_number;
 
-    Xcp_SendPositiveResponse(3U);
+    return (sint16)(3U);
 }
 
-void Xcp_CmdSetSegmentMode(const uint8 *data, uint8 length)
+sint16 Xcp_CmdSetSegmentMode(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     uint8 mode;
     uint8 segment_number;
@@ -276,21 +266,19 @@ void Xcp_CmdSetSegmentMode(const uint8 *data, uint8 length)
 
     if (segment_number >= XCP_MAX_SEGMENT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEGMENT_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
     if (mode != 0x00U)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdGetSegmentMode(const uint8 *data, uint8 length)
+sint16 Xcp_CmdGetSegmentMode(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     uint8 segment_number;
 
@@ -300,18 +288,17 @@ void Xcp_CmdGetSegmentMode(const uint8 *data, uint8 length)
 
     if (segment_number >= XCP_MAX_SEGMENT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEGMENT_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
     g_xcp_manager.storage_ptr->cto_buffer[1] = 0x00U;
     g_xcp_manager.storage_ptr->cto_buffer[2] = 0x00U;
 
-    Xcp_SendPositiveResponse(3U);
+    return (sint16)(3U);
 }
 
-void Xcp_CmdCopyCalPage(const uint8 *data, uint8 length)
+sint16 Xcp_CmdCopyCalPage(const uint8 *data, uint8 length, Xcp_ResFrame *res)
 {
     uint8 src_segment;
     uint8 src_page;
@@ -328,38 +315,34 @@ void Xcp_CmdCopyCalPage(const uint8 *data, uint8 length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_CAL_PAG))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if ((src_segment >= XCP_MAX_SEGMENT) || (dst_segment >= XCP_MAX_SEGMENT))
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEGMENT_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
     }
 
     if ((src_page >= XCP_SEG_CFG[src_segment].num_pages) ||
         (dst_page >= XCP_SEG_CFG[dst_segment].num_pages))
     {
-        Xcp_SendErrorResponse(XCP_ERR_PAGE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_PAGE_NOT_VALID);
     }
 
     if (dst_page == 0U)
     {
-        Xcp_SendErrorResponse(XCP_ERR_WRITE_PROTECTED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_WRITE_PROTECTED);
     }
 
     if (Xcp_CopyCalPage_Callout(src_segment, src_page, dst_segment, dst_page) == E_OK)
     {
         g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-        Xcp_SendPositiveResponse(1U);
+        return (sint16)(1U);
     }
     else
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 }
 

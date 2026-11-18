@@ -233,6 +233,11 @@ extern "C" {
 #define XCP_PGM_MODE_ABSOLUTE           (0x01U)
 #define XCP_PGM_MODE_FUNCTIONAL         (0x02U)
 
+/* 命令处理函数的响应：写入 cto_buffer，返回待发送长度 */
+typedef uint8 Xcp_ResFrame;
+
+typedef sint16 (*Xcp_CmdFn)(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
+
 typedef enum
 {
     XCP_UNINIT = 0x00U,

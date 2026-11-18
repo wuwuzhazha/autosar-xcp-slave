@@ -8,39 +8,39 @@
 extern "C" {
 #endif
 
-void Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdDisconnect(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdDisconnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdGetStatus(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdGetStatus(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdSynch(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdGetCommModeInfo(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdGetCommModeInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdGetId(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdGetId(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdSetMta(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdSetMta(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdUpload(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdUpload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdShortUpload(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdShortUpload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdDownload(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdDownload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdShortDownload(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdShortDownload(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdDownloadNext(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdDownloadNext(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdDownloadMax(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdDownloadMax(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdBuildChecksum(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdBuildChecksum(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdModifyBits(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdModifyBits(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdSetRequest(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdSetRequest(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdTransportLayerCmd(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdTransportLayerCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
 

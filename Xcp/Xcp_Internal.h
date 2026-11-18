@@ -4,7 +4,6 @@
 #include "StandardTypes.h"
 #include "Xcp_Config.h"
 #include "Xcp_Types.h"
-#include "Xcp_FlashProg.h"
 
 #if (XCP_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
@@ -211,6 +210,27 @@ typedef struct
 } Xcp_ManagerType;
 
 extern Xcp_ManagerType g_xcp_manager;
+
+/* 构造两字节 ERR 帧并返回 2。fr 即调用方收到的 res 缓冲（== cto_buffer）。 */
+static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)
+{
+    fr[0] = XCP_PID_ERR;
+    fr[1] = error_code;
+    return 2;
+}
+
+/* 分发表 guard 列：未连接时仍可接收 CONNECT */
+#define XCP_GUARD_NONE                (0U)
+#define XCP_GUARD_ALLOW_DISCONNECTED  (1U)
+
+typedef struct
+{
+    uint8      cmd;
+    uint8      min_len;
+    uint8      resource;
+    uint8      guard;
+    Xcp_CmdFn  fn;
+} Xcp_CmdEntryType;
 
 
 void Xcp_SendPositiveResponse(uint8 length);

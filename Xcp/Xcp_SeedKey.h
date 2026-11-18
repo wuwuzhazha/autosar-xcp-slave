@@ -10,9 +10,9 @@ extern "C" {
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
 
-void Xcp_CmdGetSeed(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdGetSeed(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-void Xcp_CmdUnlock(const uint8 *cmd_data, uint8 cmd_length);
+sint16 Xcp_CmdUnlock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
 boolean Xcp_IsResourceUnlocked(uint8 resource);
 

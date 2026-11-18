@@ -16,6 +16,7 @@
 #include "Xcp_Resume.h"
 #include "Xcp_Std.h"
 #include "Xcp_Callback.h"
+#include "Xcp_FlashProg.h"
 
 /*====== 测试桩外部符号 =======================================================*/
 extern uint8  test_tx_buf[64][64];

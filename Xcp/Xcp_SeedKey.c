@@ -11,7 +11,7 @@
 static void Xcp_GenerateSeed(uint8 resource, uint8* seed, uint8* seed_length);
 static boolean Xcp_VerifyKey(uint8 resource, const uint8* key, uint8 key_length);
 
-void Xcp_CmdGetSeed(const uint8* cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetSeed(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8 mode = 0U;
     uint8 resource = 0U;
@@ -25,22 +25,19 @@ void Xcp_CmdGetSeed(const uint8* cmd_data, uint8 cmd_length)
     if (mode > 0x01U)
     {
 
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (mode == 0x01U)
     {
         if (!g_xcp_manager.runtime_ptr->seed_requested)
         {
-            Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-            return;
+            return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
         }
 
         g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
         g_xcp_manager.storage_ptr->cto_buffer[1] = 0x00U;
-        Xcp_SendPositiveResponse(2U);
-        return;
+        return (sint16)(2U);
     }
 
     if ((resource != XCP_RESOURCE_CAL_PAG) &&
@@ -48,8 +45,7 @@ void Xcp_CmdGetSeed(const uint8* cmd_data, uint8 cmd_length)
         (resource != XCP_RESOURCE_STIM) &&
         (resource != XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if ((g_xcp_manager.runtime_ptr->protection_status & resource) == 0U)
@@ -57,8 +53,7 @@ void Xcp_CmdGetSeed(const uint8* cmd_data, uint8 cmd_length)
 
         g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
         g_xcp_manager.storage_ptr->cto_buffer[1] = 0x00U;
-        Xcp_SendPositiveResponse(2U);
-        return;
+        return (sint16)(2U);
     }
 
     Xcp_GenerateSeed(resource, g_xcp_manager.runtime_ptr->seed, &seed_length);
@@ -82,10 +77,10 @@ void Xcp_CmdGetSeed(const uint8* cmd_data, uint8 cmd_length)
 
     (void)memcpy(&g_xcp_manager.storage_ptr->cto_buffer[2], g_xcp_manager.runtime_ptr->seed, seed_length);
 
-    Xcp_SendPositiveResponse((uint8)(2U + seed_length));
+    return (sint16)(2U + seed_length);
 }
 
-void Xcp_CmdUnlock(const uint8* cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdUnlock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8 key_length = 0U;
     const uint8* key = NULL;
@@ -95,20 +90,17 @@ void Xcp_CmdUnlock(const uint8* cmd_data, uint8 cmd_length)
 
     if (!g_xcp_manager.runtime_ptr->seed_requested)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     if ((key_length == 0U) || (key_length > XCP_MAX_KEY_LENGTH))
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     if ((2U + key_length) > cmd_length)
     {
-        Xcp_SendErrorResponse(XCP_ERR_CMD_SYNTAX);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_CMD_SYNTAX);
     }
 
     if (Xcp_VerifyKey(g_xcp_manager.runtime_ptr->seed_resource, key, key_length))
@@ -121,17 +113,17 @@ void Xcp_CmdUnlock(const uint8* cmd_data, uint8 cmd_length)
         g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
         g_xcp_manager.storage_ptr->cto_buffer[1] = unlocked_resource;
 
-        Xcp_SendPositiveResponse(2U);
+        return (sint16)(2U);
     }
     else
     {
 
         g_xcp_manager.runtime_ptr->seed_requested = FALSE;
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
 #if (XCP_DAQ_ENABLED == STD_ON)
         Xcp_FreeDaqLists();
 #endif
         g_xcp_manager.runtime_ptr->connection_state = XCP_DISCONNECTED;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 }
 

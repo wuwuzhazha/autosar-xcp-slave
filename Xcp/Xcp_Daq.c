@@ -152,7 +152,7 @@ void Xcp_ResetEventChannelCounters(void)
 #endif
 }
 
-void Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     /* 位级 STIM（WRITE_DAQ BIT_OFFSET）与 EV_DAQ_OVERLOAD 恒实现 */
     uint8 daq_properties = XCP_DAQ_PROP_BIT_STIM_SUPPORTED | XCP_DAQ_PROP_OVERLOAD_EVENT;
@@ -184,10 +184,10 @@ void Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[7] =
         (uint8) ((XCP_IDENTIFICATION_FIELD_TYPE & 0x03U) << XCP_DAQ_KEY_ID_FIELD_SHIFT);
 
-    Xcp_SendPositiveResponse(8U);
+    return (sint16)(8U);
 }
 
-void Xcp_CmdGetDaqResolutionInfo(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetDaqResolutionInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8 timestamp_mode;
 
@@ -210,10 +210,10 @@ void Xcp_CmdGetDaqResolutionInfo(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[6] = (uint8) (XCP_TIMESTAMP_TICKS & 0xFFU);
     g_xcp_manager.storage_ptr->cto_buffer[7] = (uint8) ((XCP_TIMESTAMP_TICKS >> 8U) & 0xFFU);
 
-    Xcp_SendPositiveResponse(8U);
+    return (sint16)(8U);
 }
 
-void Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16                      event_channel;
     const Xcp_EventChannelType *event_cfg;
@@ -225,8 +225,7 @@ void Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length)
 
     if (event_channel >= XCP_MAX_EVENT_CHANNEL)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     event_cfg = &g_xcp_manager.config_ptr->xcp_event_channel[event_channel];
@@ -243,7 +242,7 @@ void Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[5] = (uint8) event_cfg->time_unit;
     g_xcp_manager.storage_ptr->cto_buffer[6] = event_cfg->event_channel_priority;
 
-    Xcp_SendPositiveResponse(7U);
+    return (sint16)(7U);
 }
 
 void Xcp_FreeDaqLists(void)
@@ -277,25 +276,24 @@ void Xcp_FreeDaqLists(void)
     Xcp_RebuildActiveDaqList();
 }
 
-void Xcp_CmdFreeDaq(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdFreeDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
 #if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
-    Xcp_SendErrorResponse(XCP_ERR_DAQ_CONFIG);
-    return;
+    return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #endif
     Xcp_FreeDaqLists();
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdAllocDaq(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdAllocDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
 #if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
     (void) cmd_data;
     (void) cmd_length;
-    Xcp_SendErrorResponse(XCP_ERR_DAQ_CONFIG);
+    return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #else
     uint16 daq_count = (uint16) cmd_data[2];
     uint16 i;
@@ -304,26 +302,24 @@ void Xcp_CmdAllocDaq(const uint8 *cmd_data, uint8 cmd_length)
 
     if ((XCP_MIN_DAQ + daq_count) > XCP_MAX_DAQ)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MEMORY_OVERFLOW);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
     }
 
     for (i = 0U; i < g_xcp_manager.runtime_ptr->daq_count; i++)
     {
         if (g_xcp_manager.storage_ptr->daq_list[i].state == XCP_DAQ_STATE_RUNNING)
         {
-            Xcp_SendErrorResponse(XCP_ERR_DAQ_ACTIVE);
-            return;
+            return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
         }
     }
 
     g_xcp_manager.runtime_ptr->daq_count = XCP_MIN_DAQ + daq_count;
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 #endif
 }
 
-void Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16 daq_list_no;
     uint8  odt_count;
@@ -331,8 +327,7 @@ void Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length)
     (void) cmd_length;
 
 #if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
-    Xcp_SendErrorResponse(XCP_ERR_DAQ_CONFIG);
-    return;
+    return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #endif
 
     daq_list_no = Xcp_LeRead16(&cmd_data[2U]);
@@ -340,38 +335,34 @@ void Xcp_CmdAllocOdt(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
 #if (XCP_MIN_DAQ > 0U)
     if (daq_list_no < XCP_MIN_DAQ)
     {
-        Xcp_SendErrorResponse(XCP_ERR_WRITE_PROTECTED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_WRITE_PROTECTED);
     }
 #endif
 
     if (odt_count > XCP_MAX_ODT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MEMORY_OVERFLOW);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
     }
 
     if (g_xcp_manager.storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
     {
-        Xcp_SendErrorResponse(XCP_ERR_DAQ_ACTIVE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
     g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt_count = odt_count;
     g_xcp_manager.storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_CONFIGURED;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16 daq_list_no;
     uint8  odt_no;
@@ -380,8 +371,7 @@ void Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length)
     (void) cmd_length;
 
 #if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
-    Xcp_SendErrorResponse(XCP_ERR_DAQ_CONFIG);
-    return;
+    return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #endif
 
     daq_list_no = Xcp_LeRead16(&cmd_data[2U]);
@@ -390,36 +380,31 @@ void Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
 #if (XCP_MIN_DAQ > 0U)
     if (daq_list_no < XCP_MIN_DAQ)
     {
-        Xcp_SendErrorResponse(XCP_ERR_WRITE_PROTECTED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_WRITE_PROTECTED);
     }
 #endif
 
     if (odt_no >= g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
 #if (XCP_MAX_ODT_ENTRIES < 255U)   /* uint8 计数天然 <= 255 */
     if (odt_entry_count > XCP_MAX_ODT_ENTRIES)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MEMORY_OVERFLOW);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
     }
 #endif
 
     if (g_xcp_manager.storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
     {
-        Xcp_SendErrorResponse(XCP_ERR_DAQ_ACTIVE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
     {
@@ -439,10 +424,10 @@ void Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_CONFIGURED;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdSetDaqPtr(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdSetDaqPtr(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16 daq_list_no;
     uint8  odt_no;
@@ -456,20 +441,17 @@ void Xcp_CmdSetDaqPtr(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (odt_no >= g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (odt_entry_no >= g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     g_xcp_manager.runtime_ptr->daq_list_ptr = daq_list_no;
@@ -477,10 +459,10 @@ void Xcp_CmdSetDaqPtr(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.runtime_ptr->odt_entry_ptr = odt_entry_no;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8             bit_offset;
     uint8             size;
@@ -503,8 +485,7 @@ void Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length)
                    .odt[g_xcp_manager.runtime_ptr->odt_ptr]
                    .odt_entry_count))
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
 #if (XCP_MIN_DAQ > 0U)
@@ -512,22 +493,19 @@ void Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length)
         && (g_xcp_manager.config_ptr->xcp_static_daq_list[g_xcp_manager.runtime_ptr->daq_list_ptr]
                 .write_protected != FALSE))
     {
-        Xcp_SendErrorResponse(XCP_ERR_WRITE_PROTECTED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_WRITE_PROTECTED);
     }
 #endif
 
     if ((bit_offset > XCP_BIT_OFFSET_MAX) && (bit_offset != XCP_BIT_OFFSET_NONE))
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (g_xcp_manager.storage_ptr->daq_list[g_xcp_manager.runtime_ptr->daq_list_ptr].state
         == (uint8) XCP_DAQ_STATE_RUNNING)
     {
-        Xcp_SendErrorResponse(XCP_ERR_DAQ_ACTIVE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
     entry = &g_xcp_manager.storage_ptr->daq_list[g_xcp_manager.runtime_ptr->daq_list_ptr]
@@ -540,10 +518,10 @@ void Xcp_CmdWriteDaq(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.runtime_ptr->odt_entry_ptr++;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  mode;
     uint16 daq_list_no;
@@ -561,41 +539,35 @@ void Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if ((mode & 0x4DU) != 0U)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
     /* PID_OFF 未实现（DAQ_PROPERTIES.PID_OFF_SUPPORTED=0） */
     if ((mode & XCP_DAQ_MODE_PID_OFF) != 0U)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 #if (XCP_RESUME_MODE_ENABLED == STD_OFF)
     if ((mode & XCP_DAQ_MODE_RESUME) != 0U)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 #endif
 #if (XCP_TIMESTAMP_TYPE == XCP_NO_TIME_STAMP)
     if ((mode & XCP_DAQ_MODE_TIMESTAMP) != 0U)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 #endif
 
     if (event_channel >= XCP_MAX_EVENT_CHANNEL)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     {
@@ -607,8 +579,7 @@ void Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
 
         if ((evt_type & dir_bit) == 0U)
         {
-            Xcp_SendErrorResponse(XCP_ERR_DAQ_CONFIG);
-            return;
+            return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
         }
 
         if ((daq->event_fixed != FALSE)
@@ -616,8 +587,7 @@ void Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
                 || ((daq->direction == XCP_DAQ_LIST_TYPE_STIM)
                     != ((mode & XCP_DAQ_MODE_DIRECTION_STIM) != 0U))))
         {
-            Xcp_SendErrorResponse(XCP_ERR_DAQ_CONFIG);
-            return;
+            return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
         }
 
         daq->mode = mode;
@@ -639,10 +609,10 @@ void Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
     }
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16           daq_list_no;
     Xcp_DaqListType *daq;
@@ -654,8 +624,7 @@ void Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     daq = &g_xcp_manager.storage_ptr->daq_list[daq_list_no];
@@ -692,10 +661,10 @@ void Xcp_CmdGetDaqListMode(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[6] = daq->prescaler;
     g_xcp_manager.storage_ptr->cto_buffer[7] = daq->priority;
 
-    Xcp_SendPositiveResponse(8U);
+    return (sint16)(8U);
 }
 
-void Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  mode;
     uint16 daq_list_no;
@@ -707,8 +676,7 @@ void Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (mode == XCP_START_STOP_STOP)
@@ -732,8 +700,7 @@ void Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length)
     }
     else
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
     Xcp_RebuildActiveDaqList();
@@ -754,10 +721,10 @@ void Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[1] = 0U;
 #endif
 
-    Xcp_SendPositiveResponse(2U);
+    return (sint16)(2U);
 }
 
-void Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8  mode;
     uint16 i;
@@ -769,8 +736,7 @@ void Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length)
     /* 0=stop all, 1=start selected, 2=stop selected */
     if (mode > XCP_START_STOP_SELECT)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
     for (i = 0U; i < g_xcp_manager.runtime_ptr->daq_count; i++)
@@ -816,7 +782,7 @@ void Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length)
     Xcp_RebuildActiveDaqList();
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
 /* DAQ_LIST_PROPERTIES 的 DAQ/STIM 位：静态列表按配置类型，其余列表两种方向均可 */
@@ -849,7 +815,7 @@ static uint8 Xcp_DaqListTypeProperties(uint16 daq_list_no)
     return properties;
 }
 
-void Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16           daq_list_no;
     Xcp_DaqListType *daq;
@@ -861,8 +827,7 @@ void Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     daq = &g_xcp_manager.storage_ptr->daq_list[daq_list_no];
@@ -887,10 +852,10 @@ void Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[4] = (uint8) (daq->event_channel & 0xFFU);
     g_xcp_manager.storage_ptr->cto_buffer[5] = (uint8) ((daq->event_channel >> 8U) & 0xFFU);
 
-    Xcp_SendPositiveResponse(6U);
+    return (sint16)(6U);
 }
 
-void Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16           daq_list_no;
     Xcp_DaqListType *daq;
@@ -901,16 +866,14 @@ void Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     daq = &g_xcp_manager.storage_ptr->daq_list[daq_list_no];
 
     if (daq->state == (uint8) XCP_DAQ_STATE_RUNNING)
     {
-        Xcp_SendErrorResponse(XCP_ERR_DAQ_ACTIVE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
 #if (XCP_MIN_DAQ > 0U)
@@ -935,10 +898,10 @@ void Xcp_CmdClearDaqList(const uint8 *cmd_data, uint8 cmd_length)
     Xcp_RebuildActiveDaqList();
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdReadDaq(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdReadDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     Xcp_OdtEntryType *entry;
     uint16            daq_list_no = g_xcp_manager.runtime_ptr->daq_list_ptr;
@@ -950,20 +913,17 @@ void Xcp_CmdReadDaq(const uint8 *cmd_data, uint8 cmd_length)
 
     if (daq_list_no >= g_xcp_manager.runtime_ptr->daq_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (odt_no >= g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (odt_entry_no >= g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry_count)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     entry = &g_xcp_manager.storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry[odt_entry_no];
@@ -978,10 +938,10 @@ void Xcp_CmdReadDaq(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[6] = (uint8) ((entry->address >> 16U) & 0xFFU);
     g_xcp_manager.storage_ptr->cto_buffer[7] = (uint8) ((entry->address >> 24U) & 0xFFU);
 
-    Xcp_SendPositiveResponse(8U);
+    return (sint16)(8U);
 }
 
-void Xcp_CmdGetDaqClock(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetDaqClock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint32 timestamp;
 
@@ -999,7 +959,7 @@ void Xcp_CmdGetDaqClock(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[6] = (uint8) ((timestamp >> 16U) & 0xFFU);
     g_xcp_manager.storage_ptr->cto_buffer[7] = (uint8) ((timestamp >> 24U) & 0xFFU);
 
-    Xcp_SendPositiveResponse(8U);
+    return (sint16)(8U);
 }
 
 void Xcp_ProcessDaq(uint16 event_channel)

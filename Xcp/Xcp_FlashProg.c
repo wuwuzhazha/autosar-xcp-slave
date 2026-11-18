@@ -32,7 +32,7 @@ static boolean Xcp_CheckProgramRange(uint32 addr, uint32 len)
     return FALSE;
 }
 
-void Xcp_CmdProgramStart(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramStart(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
@@ -40,15 +40,13 @@ void Xcp_CmdProgramStart(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_PGM_ACTIVE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_PGM_ACTIVE);
     }
 
 #if (XCP_DAQ_ENABLED == STD_ON)
@@ -78,10 +76,10 @@ void Xcp_CmdProgramStart(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[4] = 0x00U;
     g_xcp_manager.storage_ptr->cto_buffer[5] = 0x00U;
 
-    Xcp_SendPositiveResponse(7U);
+    return (sint16)(7U);
 }
 
-void Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8          mode = 0U;
     uint32         clear_range = 0U;
@@ -93,15 +91,13 @@ void Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     mode = cmd_data[1];
@@ -117,8 +113,7 @@ void Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length)
 
     if (clear_end < clear_address)
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     uint32 current_check_addr = clear_address;
@@ -138,8 +133,7 @@ void Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length)
                 if (XCP_SECTORS[i].clear_sequence_number == 0U)
                 {
 
-                    Xcp_SendErrorResponse(XCP_ERR_ACCESS_DENIED);
-                    return;
+                    return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
                 }
 
                 if (clear_end > sector_end_addr)
@@ -171,8 +165,7 @@ void Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length)
 
     if (!valid_address)
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_CLEARING;
@@ -182,18 +175,17 @@ void Xcp_CmdProgramClear(const uint8 *cmd_data, uint8 cmd_length)
     if (result != E_OK)
     {
         g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_STARTED;
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     g_xcp_manager.runtime_ptr->mta = clear_address + clear_range;
     g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_STARTED;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8          number_of_data_elements = 0U;
     uint8          data_size = 0U;
@@ -202,15 +194,13 @@ void Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     number_of_data_elements = cmd_data[1];
@@ -225,8 +215,7 @@ void Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length)
 
             if (result != E_OK)
             {
-                Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-                return;
+                return Xcp_ResErr(res, XCP_ERR_GENERIC);
             }
 
             g_xcp_manager.runtime_ptr->mta += Xcp_ProgramBufferIndex;
@@ -234,22 +223,19 @@ void Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length)
         }
 
         g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-        Xcp_SendPositiveResponse(1U);
-        return;
+        return (sint16)(1U);
     }
 
     data_size = number_of_data_elements;
 
     if ((data_size + 2U) > cmd_length)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (!Xcp_CheckProgramRange(g_xcp_manager.runtime_ptr->mta, data_size))
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_PROGRAMMING;
@@ -259,8 +245,7 @@ void Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length)
     if (result != E_OK)
     {
         g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_STARTED;
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     g_xcp_manager.runtime_ptr->mta += data_size;
@@ -268,37 +253,34 @@ void Xcp_CmdProgram(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_STARTED;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdProgramReset(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramReset(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
 
     if (g_xcp_manager.runtime_ptr == NULL)
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     g_xcp_manager.runtime_ptr->pgm_started = FALSE;
     g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_IDLE;
-
-    g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
-
     g_xcp_manager.runtime_ptr->connection_state = XCP_DISCONNECTED;
     Xcp_EcuReset_Callout();
+
+    g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
+    return (sint16)(1U);
 }
 
-void Xcp_CmdGetPgmProcessorInfo(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetPgmProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     (void) cmd_data;
     (void) cmd_length;
@@ -310,10 +292,10 @@ void Xcp_CmdGetPgmProcessorInfo(const uint8 *cmd_data, uint8 cmd_length)
 
     g_xcp_manager.storage_ptr->cto_buffer[2] = XCP_MAX_FLASH_SECTOR;
 
-    Xcp_SendPositiveResponse(3U);
+    return (sint16)(3U);
 }
 
-void Xcp_CmdGetSectorInfo(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdGetSectorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8                      mode;
     uint8                      sector_number;
@@ -326,8 +308,7 @@ void Xcp_CmdGetSectorInfo(const uint8 *cmd_data, uint8 cmd_length)
 
     if (sector_number >= XCP_MAX_FLASH_SECTOR)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     sector = &XCP_SECTORS[sector_number];
@@ -345,7 +326,7 @@ void Xcp_CmdGetSectorInfo(const uint8 *cmd_data, uint8 cmd_length)
         g_xcp_manager.storage_ptr->cto_buffer[6] = (uint8) ((sector->start_address >> 16U) & 0xFFU);
         g_xcp_manager.storage_ptr->cto_buffer[7] = (uint8) ((sector->start_address >> 24U) & 0xFFU);
 
-        Xcp_SendPositiveResponse(8U);
+        return (sint16)(8U);
     }
     else if (mode == 1U)
     {
@@ -358,21 +339,21 @@ void Xcp_CmdGetSectorInfo(const uint8 *cmd_data, uint8 cmd_length)
         g_xcp_manager.storage_ptr->cto_buffer[6] = (uint8) ((sector->length >> 16U) & 0xFFU);
         g_xcp_manager.storage_ptr->cto_buffer[7] = (uint8) ((sector->length >> 24U) & 0xFFU);
 
-        Xcp_SendPositiveResponse(8U);
+        return (sint16)(8U);
     }
     else if (mode == 2U)
     {
 
         g_xcp_manager.storage_ptr->cto_buffer[1] = 0x00U;
-        Xcp_SendPositiveResponse(2U);
+        return (sint16)(2U);
     }
     else
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 }
 
-void Xcp_CmdProgramPrepare(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramPrepare(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint16 code_size;
 
@@ -381,23 +362,20 @@ void Xcp_CmdProgramPrepare(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     code_size = ((uint16) cmd_data[2]) | ((uint16) cmd_data[3] << 8U);
 
     if (code_size > XCP_MAX_PGM_BLOCK_SIZE)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     Xcp_ExpectedProgramSize = code_size;
@@ -405,10 +383,10 @@ void Xcp_CmdProgramPrepare(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.runtime_ptr->pgm_address = g_xcp_manager.runtime_ptr->mta;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdProgramFormat(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramFormat(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8 compression_method;
     uint8 encryption_method;
@@ -420,15 +398,13 @@ void Xcp_CmdProgramFormat(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     compression_method = cmd_data[1];
@@ -438,23 +414,21 @@ void Xcp_CmdProgramFormat(const uint8 *cmd_data, uint8 cmd_length)
 
     if ((compression_method != 0U) || (encryption_method != 0U))
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (programming_method != XCP_PGM_MODE_ABSOLUTE)
     {
-        Xcp_SendErrorResponse(XCP_ERR_MODE_NOT_VALID);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
     (void) access_method;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdProgramNext(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramNext(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8          number_of_data_elements;
     uint8          data_size;
@@ -463,15 +437,13 @@ void Xcp_CmdProgramNext(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     number_of_data_elements = cmd_data[1];
@@ -479,22 +451,19 @@ void Xcp_CmdProgramNext(const uint8 *cmd_data, uint8 cmd_length)
 
     if ((data_size + 2U) > cmd_length)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (!Xcp_CheckProgramRange(g_xcp_manager.runtime_ptr->mta, data_size))
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     result = Xcp_FlashProgram_Callout(g_xcp_manager.runtime_ptr->mta, &cmd_data[2], data_size);
 
     if (result != E_OK)
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     g_xcp_manager.runtime_ptr->mta += data_size;
@@ -506,10 +475,10 @@ void Xcp_CmdProgramNext(const uint8 *cmd_data, uint8 cmd_length)
     g_xcp_manager.storage_ptr->cto_buffer[3] = 0x00U;
     g_xcp_manager.storage_ptr->cto_buffer[4] = 0x00U;
 
-    Xcp_SendPositiveResponse(5U);
+    return (sint16)(5U);
 }
 
-void Xcp_CmdProgramMax(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramMax(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8          data_size;
     Std_ReturnType result;
@@ -517,47 +486,42 @@ void Xcp_CmdProgramMax(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     data_size = cmd_length - 1U;
 
     if (data_size == 0U)
     {
-        Xcp_SendErrorResponse(XCP_ERR_OUT_OF_RANGE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     if (!Xcp_CheckProgramRange(g_xcp_manager.runtime_ptr->mta, data_size))
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     result = Xcp_FlashProgram_Callout(g_xcp_manager.runtime_ptr->mta, &cmd_data[1], data_size);
 
     if (result != E_OK)
     {
-        Xcp_SendErrorResponse(XCP_ERR_GENERIC);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_GENERIC);
     }
 
     g_xcp_manager.runtime_ptr->mta += data_size;
     g_xcp_manager.runtime_ptr->pgm_size += data_size;
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
-void Xcp_CmdProgramVerify(const uint8 *cmd_data, uint8 cmd_length)
+sint16 Xcp_CmdProgramVerify(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
     uint8          verification_mode;
     uint16         verification_type;
@@ -574,15 +538,13 @@ void Xcp_CmdProgramVerify(const uint8 *cmd_data, uint8 cmd_length)
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(XCP_RESOURCE_PGM))
     {
-        Xcp_SendErrorResponse(XCP_ERR_ACCESS_LOCKED);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
 
     if (!g_xcp_manager.runtime_ptr->pgm_started)
     {
-        Xcp_SendErrorResponse(XCP_ERR_SEQUENCE);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
     (void) verification_mode;
@@ -593,12 +555,11 @@ void Xcp_CmdProgramVerify(const uint8 *cmd_data, uint8 cmd_length)
 
     if (result != E_OK)
     {
-        Xcp_SendErrorResponse(XCP_ERR_VERIFY);
-        return;
+        return Xcp_ResErr(res, XCP_ERR_VERIFY);
     }
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    Xcp_SendPositiveResponse(1U);
+    return (sint16)(1U);
 }
 
 void Xcp_InitFlashProg(void)
