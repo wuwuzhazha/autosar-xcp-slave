@@ -26,6 +26,11 @@ sint16 Xcp_CmdSetCalPage(Xcp_Channel *ch, const uint8 *data, uint8 length, Xcp_R
     segment_number = data[2];
     page_number    = data[3];
 
+    if ((mode & (uint8)~(XCP_PAGE_MODE_ECU | XCP_PAGE_MODE_XCP | XCP_PAGE_MODE_ALL)) != 0U)
+    {
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+    }
+
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
     if (!Xcp_IsResourceUnlocked(&g_xcp_channel, XCP_RESOURCE_CAL_PAG))
     {
@@ -201,8 +206,20 @@ sint16 Xcp_CmdGetSegmentInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, X
     }
     else if (mode == 2U)
     {
+        /* mode2 = MAPPING_INFO: address_extension + mapping_addr (页起始物理) */
+        uint32 page_len = (XCP_SEG_CFG[segment_number].num_pages != 0U)
+                          ? (XCP_SEG_CFG[segment_number].length
+                             / XCP_SEG_CFG[segment_number].num_pages) : 0U;
+        uint32 map_addr = XCP_SEG_CFG[segment_number].start_address
+                          + ((uint32)Xcp_SegmentRuntime[segment_number].active_page_xcp * page_len);
 
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+        ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+        ch->storage_ptr->cto_buffer[1] = 0x00U;
+        ch->storage_ptr->cto_buffer[2] = 0x00U;
+        ch->storage_ptr->cto_buffer[3] = (uint8)((segment_number + 1U) << 4U);
+        Xcp_LeWrite32(&ch->storage_ptr->cto_buffer[4U], map_addr);
+
+        return (sint16)(8U);
     }
     else
     {

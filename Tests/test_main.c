@@ -704,8 +704,9 @@ int main(void)
     CHECK("D6b GET_SEGMENT_INFO mode1: 2 pages, no mapping/compression/encryption",
           frame_is(res, l, (const uint8[]){ 0xFF, 0x02, 0x00, 0x00, 0x00, 0x00 }, 6U));
     l = xcp_cmd((const uint8 *)"\xE8\x02\x00\x00\x00", 5U, res);
-    CHECK("D6c GET_SEGMENT_INFO mode2 (MAX_MAPPING=0) -> ERR_OUT_OF_RANGE",
-          (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+    CHECK("D6c GET_SEGMENT_INFO mode2 mapping: ext=0x10, addr=seg0_page0",
+          (l == 8U) && (res[0] == XCP_PID_RES) && (res[3] == 0x10U)
+          && (res[4] == 0x00U) && (res[5] == 0x00U) && (res[6] == 0x00U) && (res[7] == 0x20U));
     l = xcp_cmd((const uint8 *)"\xE8\x00\x00\x02\x00", 5U, res);
     CHECK("D6d GET_SEGMENT_INFO mode0 info2 -> ERR_OUT_OF_RANGE",
           (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
