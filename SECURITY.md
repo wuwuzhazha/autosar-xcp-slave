@@ -1,4 +1,5 @@
 # Security Policy
+> **中文**: [SECURITY.zh-CN.md](SECURITY.zh-CN.md)
 
 XCP is a debugging/calibration protocol — a slave implementation with a memory
 safety or unlock-bypass bug is a real ECU attack surface. Please report

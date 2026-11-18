@@ -1,4 +1,5 @@
 # Architecture
+> **中文**: [docs/architecture.zh-CN.md](architecture.zh-CN.md)
 
 Single-channel XCP slave, layered for a clean line between protocol state,
 transport, and integration.

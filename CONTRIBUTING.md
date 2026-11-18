@@ -1,4 +1,5 @@
 # Contributing
+> **中文**: [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)
 
 Thanks for your interest. This project is an independent implementation of the
 ASAM XCP Part 2 v1.1 slave — contributions are welcome as long as they keep the

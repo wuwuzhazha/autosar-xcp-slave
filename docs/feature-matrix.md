@@ -1,4 +1,5 @@
 # XCP Feature Matrix
+> **中文**: [docs/feature-matrix.zh-CN.md](feature-matrix.zh-CN.md)
 
 Coverage against ASAM XCP Part 2 v1.1 commands. `✓` = implemented + covered by the
 test suite (`Tests/test_main.c`, `Tests/test_matrix_func.c`, `Tests/test_predef.c`).

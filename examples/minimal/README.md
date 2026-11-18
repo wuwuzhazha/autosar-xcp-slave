@@ -1,4 +1,5 @@
 # Minimal XCP slave example
+> **中文**: [examples/minimal/README.zh-CN.md](README.zh-CN.md)
 
 One-file bring-up that drives the `can` profile end-to-end through the
 internal entry point — no real CAN hardware required.

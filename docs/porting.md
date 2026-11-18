@@ -1,4 +1,5 @@
 # Porting / Integration Guide
+> **中文**: [docs/porting.zh-CN.md](porting.zh-CN.md)
 
 What you must supply to drop `Xcp/` into an ECU. Everything outside `Xcp/` is
 replaceable — the core only touches the host through **callouts** and **transport
