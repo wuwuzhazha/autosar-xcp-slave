@@ -1,0 +1,5 @@
+# CDD 自定义传输层
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "CDD"

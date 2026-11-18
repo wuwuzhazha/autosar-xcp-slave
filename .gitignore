@@ -1,0 +1,16 @@
+# 构建产物
+*.exe
+*.o
+*.obj
+
+# Python
+__pycache__/
+*.pyc
+
+# 临时分析输出
+.tmp/
+/all.txt
+/avail.txt
+/cfg.txt
+/o.txt
+/used.txt

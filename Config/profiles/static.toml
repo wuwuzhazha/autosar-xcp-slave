@@ -1,0 +1,7 @@
+# CAN + DAQ_STATIC 静态 DAQ 配置
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "CAN"
+XcpDaqConfigType = "DAQ_STATIC"
+XcpMinDaq = 1

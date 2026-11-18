@@ -1,0 +1,7 @@
+# CAN + RELATIVE_WORD 寻址 (ODT 条目上限 255)
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "CAN"
+XcpIdentificationFieldType = "RELATIVE_WORD"
+XcpOdtEntriesCount = 255

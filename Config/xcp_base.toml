@@ -1,0 +1,139 @@
+# XCP base 配置 (ECUC general + 表容器)。TOML, 只含数据, 不执行代码。
+# 未列参数取 xcpgen schema 默认值; profile 用 extends 继承本文件。
+#   event_channels   行数 == XcpMaxEventChannel
+#   static_daq_lists 行数 == XcpMinDaq, 每行的 entries 为 ODT 条目
+#   segments         行数 == XcpMaxSegment (XcpCalibrationPageEnabled 时)
+#   flash_sectors    行数 == XcpMaxFlashSector (XcpFlashProgrammingEnabled 时)
+#
+# 查看生效配置: python Tools/xcpgen/xcpgen.py --config Config/xcp_base.toml --show
+
+[general]
+XcpOnCanEnabled = true
+
+[pdu]
+rx = 0
+tx = 1
+
+[fr]
+lpdu_handle = 0
+frame_id = 0
+channel = 0
+cycle_rep = 0
+offset = 0
+config_idx = 0
+
+[[event_channels]]
+event_channel_number = 0
+event_channel_priority = 0
+max_daq_list = 255
+time_cycle = 10
+time_unit = "XCP_TIMESTAMP_UNIT_1MS"
+event_channel_type = "0x0C"
+consistency = "0x00"
+
+[[event_channels]]
+event_channel_number = 1
+event_channel_priority = 1
+max_daq_list = 255
+time_cycle = 1
+time_unit = "XCP_TIMESTAMP_UNIT_1MS"
+event_channel_type = "0x0C"
+consistency = "0x00"
+
+[[event_channels]]
+event_channel_number = 2
+event_channel_priority = 2
+max_daq_list = 255
+time_cycle = 100
+time_unit = "XCP_TIMESTAMP_UNIT_1MS"
+event_channel_type = "0x04"
+consistency = "0x01"
+
+[[event_channels]]
+event_channel_number = 3
+event_channel_priority = 3
+max_daq_list = 255
+time_cycle = 0
+time_unit = "XCP_TIMESTAMP_UNIT_1MS"
+event_channel_type = "0x08"
+consistency = "0x02"
+
+[[static_daq_lists]]
+daq_list_number = 0
+event_channel_number = 0
+direction = "0x00"
+odt_count = 1
+odt_entry_count = 2
+event_fixed = 1
+write_protected = 0
+
+[[static_daq_lists.entries]]
+address = 0x20000000
+address_extension = 0
+size = 4
+bit_offset = "XCP_BIT_OFFSET_NONE"
+
+[[static_daq_lists.entries]]
+address = 0x20000004
+address_extension = 0
+size = 2
+bit_offset = "XCP_BIT_OFFSET_NONE"
+
+[[static_daq_lists]]
+daq_list_number = 1
+event_channel_number = 1
+direction = "0x00"
+odt_count = 1
+odt_entry_count = 1
+event_fixed = 0
+write_protected = 1
+
+[[static_daq_lists.entries]]
+address = 0x20000008
+address_extension = 0
+size = 1
+bit_offset = "XCP_BIT_OFFSET_NONE"
+
+[[segments]]
+start_address = 0x20000000
+length = 4096
+segment_number = 0
+num_pages = 2
+
+[[segments]]
+start_address = 0x20001000
+length = 4096
+segment_number = 1
+num_pages = 2
+
+[[flash_sectors]]
+start_address = 0x8000000
+length = 16384
+sector_number = 0
+clear_sequence_number = 1
+program_sequence_number = 1
+program_method = 0
+
+[[flash_sectors]]
+start_address = 0x8004000
+length = 16384
+sector_number = 1
+clear_sequence_number = 1
+program_sequence_number = 1
+program_method = 0
+
+[[flash_sectors]]
+start_address = 0x8008000
+length = 32768
+sector_number = 2
+clear_sequence_number = 1
+program_sequence_number = 1
+program_method = 0
+
+[[flash_sectors]]
+start_address = 0x8010000
+length = 0x10000
+sector_number = 3
+clear_sequence_number = 1
+program_sequence_number = 1
+program_method = 0

@@ -1,0 +1,5 @@
+# FlexRay 传输层
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "FLEXRAY"

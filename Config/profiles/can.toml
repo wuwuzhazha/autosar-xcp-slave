@@ -1,0 +1,5 @@
+# CAN 链路 · 单命令模式 (基线)
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "CAN"

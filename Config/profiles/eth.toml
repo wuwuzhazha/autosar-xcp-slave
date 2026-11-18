@@ -1,0 +1,5 @@
+# Ethernet (UDP) 传输层
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "ETHERNET"

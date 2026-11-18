@@ -1,0 +1,6 @@
+# CAN + 2 个预定义 DAQ 列表 (dynamic + predefined)
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "CAN"
+XcpMinDaq = 2

@@ -1,0 +1,6 @@
+# CAN + 交织命令队列 (XcpInterleavedModeEnabled)
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "CAN"
+XcpInterleavedModeEnabled = true

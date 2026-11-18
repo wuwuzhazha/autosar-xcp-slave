@@ -1,0 +1,6 @@
+# CAN + RELATIVE_WORD_ALIGNED 寻址
+extends = "../xcp_base.toml"
+
+[general]
+LinkType = "CAN"
+XcpIdentificationFieldType = "RELATIVE_WORD_ALIGNED"
