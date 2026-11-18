@@ -463,6 +463,10 @@ def emit_h(vals, src="--config"):
           "#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON) && (XCP_BLOCK_TRANSFER_ENABLED == STD_OFF)",
           '#error "XcpInterleavedModeEnabled requires XcpBlockTransferEnabled"',
           "#endif",
+          "#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE) \\",
+          "    && ((XCP_MAX_DAQ * XCP_MAX_ODT) > 255U)",
+          '#error "ABSOLUTE abs_pid 是 u8, XCP_MAX_DAQ*XCP_MAX_ODT 必须 <= 255"',
+          "#endif",
           "", "#endif /* XCP_CFG_H */", ""]
     return "\n".join(L)
 
