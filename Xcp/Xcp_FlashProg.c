@@ -384,6 +384,7 @@ sint16 Xcp_CmdProgramPrepare(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
     }
 
     Xcp_ExpectedProgramSize = code_size;
+    ch->runtime_ptr->pgm_size    = 0U;
     ch->runtime_ptr->pgm_address = ch->runtime_ptr->mta;
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
