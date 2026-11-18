@@ -353,9 +353,12 @@ sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     {
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
-#endif
 
     return Xcp_CmdDownload(ch, cmd_data, cmd_length, res);
+#else
+    (void)ch; (void)cmd_data; (void)cmd_length;
+    return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
+#endif
 }
 
 sint16 Xcp_CmdShortDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)

@@ -152,6 +152,7 @@ typedef struct
 
     uint8   seed[XCP_MAX_KEY_LENGTH];
     uint8   seed_length;
+    uint8   seed_total;
     boolean seed_requested;
 
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)

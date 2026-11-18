@@ -30,14 +30,31 @@ sint16 Xcp_CmdGetSeed(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 
     if (mode == 0x01U)
     {
+        uint8 remaining;
+        uint8 chunk;
+
         if (!ch->runtime_ptr->seed_requested)
         {
             return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
         }
 
+        if (ch->runtime_ptr->seed_length >= ch->runtime_ptr->seed_total)
+        {
+            ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
+            ch->storage_ptr->cto_buffer[1] = 0x00U;
+            return (sint16)(2U);
+        }
+
+        remaining = (uint8)(ch->runtime_ptr->seed_total - ch->runtime_ptr->seed_length);
+        chunk = (remaining > (XCP_MAX_CTO - 2U)) ? (uint8)(XCP_MAX_CTO - 2U) : remaining;
+
         ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
-        ch->storage_ptr->cto_buffer[1] = 0x00U;
-        return (sint16)(2U);
+        ch->storage_ptr->cto_buffer[1] = chunk;
+        (void)memcpy(&ch->storage_ptr->cto_buffer[2],
+                     &ch->runtime_ptr->seed[ch->runtime_ptr->seed_length], chunk);
+
+        ch->runtime_ptr->seed_length = (uint8)(ch->runtime_ptr->seed_length + chunk);
+        return (sint16)(2U + chunk);
     }
 
     if ((resource != XCP_RESOURCE_CAL_PAG) &&
@@ -58,14 +75,16 @@ sint16 Xcp_CmdGetSeed(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 
     Xcp_GenerateSeed(resource, ch->runtime_ptr->seed, &seed_length);
 
-    if (seed_length > XCP_MAX_CTO - 2U)
-    {
-        seed_length = XCP_MAX_CTO - 2U;
-    }
-
     if (seed_length > (uint8) sizeof(ch->runtime_ptr->seed))
     {
         seed_length = (uint8) sizeof(ch->runtime_ptr->seed);
+    }
+
+    ch->runtime_ptr->seed_total = seed_length;
+
+    if (seed_length > XCP_MAX_CTO - 2U)
+    {
+        seed_length = XCP_MAX_CTO - 2U;
     }
 
     ch->runtime_ptr->seed_length = seed_length;

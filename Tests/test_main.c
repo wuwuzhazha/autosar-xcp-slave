@@ -517,6 +517,23 @@ int main(void)
         CHECK("G3c GET_SEED mode=1 no-seed -> ERR_SEQUENCE",
               (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
 
+        /* mode=1 续段：8B seed > CTO-2=6, 首段 6B, mode=1 回剩 2B, 再调回 0 */
+        {
+        extern void test_seed_override_len(uint8);
+        test_seed_override_len(8U);
+        cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_PGM;
+        l = xcp_cmd(cmd, 3U, res);
+        CHECK("G3e GET_SEED 8B -> first chunk len6",
+              (l == 8U) && (res[1] == 6U));
+        l = xcp_cmd((const uint8 *)"\xF8\x01\x04", 3U, res);
+        CHECK("G3f GET_SEED mode=1 -> remaining 2B",
+              (l == 4U) && (res[1] == 2U) && (res[2] == 0x33U) && (res[3] == 0x44U));
+        l = xcp_cmd((const uint8 *)"\xF8\x01\x04", 3U, res);
+        CHECK("G3g GET_SEED mode=1 again -> len0",
+              (l == 2U) && (res[1] == 0U));
+        test_seed_override_len(0U);
+        }
+
         cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_CAL_PAG;
         l = xcp_cmd(cmd, 3U, res); memcpy(seed, &res[2], 4U);
         cmd[0] = 0xF7; cmd[1] = 4U;
