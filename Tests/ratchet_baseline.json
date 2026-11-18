@@ -24,7 +24,7 @@
     "files": {}
   },
   "xcp_preprocessor": {
-    "total": 170,
+    "total": 171,
     "files": {
       "Xcp/Xcp.c": 28,
       "Xcp/Xcp.h": 3,
@@ -37,7 +37,7 @@
       "Xcp/Xcp_Callback.h": 7,
       "Xcp/Xcp_Cmd.c": 4,
       "Xcp/Xcp_Daq.h": 2,
-      "Xcp/Xcp_DaqCfg.c": 28,
+      "Xcp/Xcp_DaqCfg.c": 29,
       "Xcp/Xcp_DaqInt.h": 17,
       "Xcp/Xcp_DaqRun.c": 4,
       "Xcp/Xcp_DaqStim.c": 4,

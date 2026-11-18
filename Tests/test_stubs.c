@@ -261,20 +261,6 @@ Std_ReturnType Xcp_BuildChecksum_Callout(uint32 addr, uint32 len, uint32 *checks
     return E_OK;
 }
 
-Std_ReturnType Xcp_CalcChecksum_Callout(uint32 address, uint32 length, uint8 *checksum_type, uint32 *checksum)
-{
-    uint32 sum = 0U;
-    const uint8 *p = (const uint8 *)(uintptr_t)address;
-    uint32 i;
-    for (i = 0U; i < length; i++)
-    {
-        sum += p[i];
-    }
-    *checksum_type = 0xFFU;
-    *checksum      = sum;
-    return E_OK;
-}
-
 uint8 test_cal_ram[2][0x1000];
 uint8 test_cal_rom[2][0x1000];
 

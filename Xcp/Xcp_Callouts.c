@@ -29,24 +29,6 @@ Std_ReturnType Xcp_BuildChecksum_Callout(uint32 addr, uint32 len, uint32 *checks
     return E_NOT_OK;
 }
 
-Std_ReturnType Xcp_CalcChecksum_Callout(uint32 address, uint32 length, uint8 *checksum_type, uint32 *checksum)
-{
-    (void)address;
-    (void)length;
-
-    if (checksum_type != NULL)
-    {
-        *checksum_type = 0U;
-    }
-
-    if (checksum != NULL)
-    {
-        *checksum = 0U;
-    }
-
-    return E_NOT_OK;
-}
-
 Std_ReturnType Xcp_CopyCalPage_Callout(uint8 src_segment, uint8 src_page, uint8 dst_segment, uint8 dst_page)
 {
     (void)src_segment;
