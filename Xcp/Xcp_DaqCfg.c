@@ -690,15 +690,17 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
 
         if (mode == XCP_START_STOP_STOP)
         {
+            /* mode 0: 停所有 RUNNING (不要求 selected) */
             if (daq->state == (uint8) XCP_DAQ_STATE_RUNNING)
             {
                 daq->state = XCP_DAQ_STATE_STOPPED;
             }
             daq->selected = FALSE;
         }
-        else if (daq->selected != FALSE)
+        else if (mode == XCP_START_STOP_START)
         {
-            if (mode == XCP_START_STOP_START)
+            /* mode 1: 启所有 selected */
+            if (daq->selected != FALSE)
             {
                 daq->state = XCP_DAQ_STATE_RUNNING;
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
@@ -707,20 +709,18 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
                     Xcp_ResetStimTimeout(&g_xcp_channel, i);
                 }
 #endif
+                daq->selected = FALSE;
             }
-            else if (daq->state == (uint8) XCP_DAQ_STATE_RUNNING)
-            {
-                daq->state = XCP_DAQ_STATE_STOPPED;
-            }
-            else
-            {
-
-            }
-            daq->selected = FALSE;
         }
         else
         {
-
+            /* mode 2: 停 selected 的 RUNNING */
+            if ((daq->selected != FALSE)
+                && (daq->state == (uint8) XCP_DAQ_STATE_RUNNING))
+            {
+                daq->state = XCP_DAQ_STATE_STOPPED;
+            }
+            daq->selected = FALSE;
         }
     }
 
