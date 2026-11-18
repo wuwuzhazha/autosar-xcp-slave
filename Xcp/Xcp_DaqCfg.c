@@ -228,9 +228,7 @@ sint16 Xcp_CmdFreeDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
 {
     (void) cmd_data;
     (void) cmd_length;
-#if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
-    return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
-#endif
+
     Xcp_FreeDaqLists(&g_xcp_channel);
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
