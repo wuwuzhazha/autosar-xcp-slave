@@ -213,12 +213,20 @@ sint16 Xcp_CmdGetSegmentInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, X
     }
     else if (mode == 2U)
     {
-        /* mode2 = MAPPING_INFO: address_extension + mapping_addr (页起始物理) */
+        /* mode2 = MAPPING_INFO: data[3] 是 page_number, 返回 ext + 该页起始物理 */
+        uint8  page_no  = segment_info;
         uint32 page_len = (XCP_SEG_CFG[segment_number].num_pages != 0U)
                           ? (XCP_SEG_CFG[segment_number].length
                              / XCP_SEG_CFG[segment_number].num_pages) : 0U;
-        uint32 map_addr = XCP_SEG_CFG[segment_number].start_address
-                          + ((uint32)Xcp_SegmentRuntime[segment_number].active_page_xcp * page_len);
+        uint32 map_addr;
+
+        if (page_no >= XCP_SEG_CFG[segment_number].num_pages)
+        {
+            return Xcp_ResErr(res, XCP_ERR_PAGE_NOT_VALID);
+        }
+
+        map_addr = XCP_SEG_CFG[segment_number].start_address
+                   + ((uint32)page_no * page_len);
 
         ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
         ch->storage_ptr->cto_buffer[1] = 0x00U;
