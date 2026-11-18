@@ -1044,8 +1044,8 @@ int main(void)
           (l == 2U) && (res[1] == XCP_ERR_PGM_ACTIVE));
     l = xcp_cmd((const uint8 *)"\xCE", 1U, res);
 
-    CHECK("F3 GET_PGM_PROCESSOR_INFO bytes: ABSOLUTE|NON_SEQ_SUPPORTED",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x41, XCP_MAX_FLASH_SECTOR }, 3U));
+    CHECK("F3 GET_PGM_PROCESSOR_INFO bytes: ABSOLUTE",
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x01, XCP_MAX_FLASH_SECTOR }, 3U));
     l = xcp_cmd((const uint8 *)"\xCD\x00\x00", 3U, res);
 
     CHECK("F4 GET_SECTOR_INFO mode0 sec0 bytes",

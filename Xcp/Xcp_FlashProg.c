@@ -293,8 +293,7 @@ sint16 Xcp_CmdGetPgmProcessorInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
-    ch->storage_ptr->cto_buffer[1] = XCP_PGM_PROP_ABSOLUTE_MODE |
-                                               XCP_PGM_PROP_NON_SEQ_PGM_SUPPORTED;
+    ch->storage_ptr->cto_buffer[1] = XCP_PGM_PROP_ABSOLUTE_MODE;
 
     ch->storage_ptr->cto_buffer[2] = XCP_MAX_FLASH_SECTOR;
 
