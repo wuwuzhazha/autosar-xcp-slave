@@ -98,7 +98,7 @@ typedef struct
     Xcp_DaqListType  daq_list[XCP_MAX_DAQ];
     Xcp_OdtType      odt[XCP_MAX_DAQ * XCP_MAX_ODT];
     Xcp_OdtEntryType odt_entry[XCP_MAX_DAQ * XCP_MAX_ODT * XCP_MAX_ODT_ENTRIES];
-    uint8  dto_queue[XCP_MAX_ODT][XCP_MAX_DTO];
+    uint8  dto_queue[XCP_DTO_QUEUE_DEPTH][XCP_MAX_DTO];
     uint8  dto_queue_count;
     uint8  dto_queue_head;
     uint8  dto_queue_tail;
@@ -113,8 +113,8 @@ typedef struct
     uint16  overload_ev_cooldown;
     uint16  dto_busy_watchdog_cnt;
 
-#if (XCP_MAX_ODT > 255U)
-    #error "XCP_MAX_ODT must be <= 255 for uint8 DTO ring buffer indices"
+#if (XCP_DTO_QUEUE_DEPTH > 255U)
+    #error "XCP_DTO_QUEUE_DEPTH must be <= 255 for uint8 DTO ring buffer indices"
 #endif
 #endif
 } Xcp_StorageType;

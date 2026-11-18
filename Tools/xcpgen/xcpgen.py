@@ -96,6 +96,7 @@ P = [
     ("XcpBlockTransferEnabled", "bool", True, 0, 1, "XCP_BLOCK_TRANSFER_ENABLED", "VENDOR"),
     ("XcpInterleavedModeEnabled", "bool", False, 0, 1, "XCP_INTERLEAVED_MODE_ENABLED", "VENDOR"),
     ("XcpCmdQueueSize", "int", 4, 1, 255, "XCP_CMD_QUEUE_SIZE", "VENDOR"),
+    ("XcpDtoQueueDepth", "int", 4, 1, 255, "XCP_DTO_QUEUE_DEPTH", "VENDOR"),
     ("XcpTxRetryMax", "int", 3, 0, 255, "XCP_TX_RETRY_MAX", "VENDOR"),
     ("XcpStimTimeoutEnabled", "bool", True, 0, 1, "XCP_STIM_TIMEOUT_ENABLED", "VENDOR"),
     ("XcpStimTimeoutMs", "int", 100, 1, 65535, "XCP_STIM_TIMEOUT_MS", "VENDOR"),
