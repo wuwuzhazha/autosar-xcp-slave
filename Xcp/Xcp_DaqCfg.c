@@ -453,6 +453,17 @@ sint16 Xcp_CmdWriteDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
         return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
+    {
+        uint8 max_size = (ch->storage_ptr->daq_list[ch->runtime_ptr->daq_list_ptr].direction
+                          == XCP_DAQ_LIST_TYPE_STIM)
+                         ? (uint8) XCP_ODT_ENTRY_SIZE_STIM
+                         : (uint8) XCP_ODT_ENTRY_SIZE_DAQ;
+        if (size > max_size)
+        {
+            return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+        }
+    }
+
     entry = &ch->storage_ptr->daq_list[ch->runtime_ptr->daq_list_ptr]
                  .odt[ch->runtime_ptr->odt_ptr]
                  .odt_entry[ch->runtime_ptr->odt_entry_ptr];
