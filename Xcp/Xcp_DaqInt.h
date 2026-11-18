@@ -119,6 +119,21 @@ static inline Std_ReturnType Xcp_PidFieldDecode(Xcp_Channel *ch, const uint8 *dt
     return E_NOT_OK;
 }
 
+/* event_channel_number -> config 表 index。找不到返回 XCP_MAX_EVENT_CHANNEL */
+static inline uint8 Xcp_EventChannelIdx(const Xcp_Channel *ch, uint16 number)
+{
+    uint8 i;
+
+    for (i = 0U; i < XCP_MAX_EVENT_CHANNEL; i++)
+    {
+        if (ch->config_ptr->xcp_event_channel[i].event_channel_number == number)
+        {
+            return i;
+        }
+    }
+    return XCP_MAX_EVENT_CHANNEL;
+}
+
 static inline uint8 Xcp_TimestampSize(void)
 {
 #if (XCP_TIMESTAMP_TYPE == XCP_FOUR_BYTE)

@@ -168,12 +168,14 @@ sint16 Xcp_CmdGetDaqEventInfo(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_
 
     event_channel = Xcp_LeRead16(&cmd_data[2U]);
 
-    if (event_channel >= XCP_MAX_EVENT_CHANNEL)
     {
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+        uint8 idx = Xcp_EventChannelIdx(ch, event_channel);
+        if (idx >= XCP_MAX_EVENT_CHANNEL)
+        {
+            return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+        }
+        event_cfg = &ch->config_ptr->xcp_event_channel[idx];
     }
-
-    event_cfg = &ch->config_ptr->xcp_event_channel[event_channel];
 
     event_properties = (uint8) (event_cfg->event_channel_type & XCP_EVENT_CHANNEL_TYPE_DAQ_STIM);
     event_properties |= (uint8) ((event_cfg->consistency & 0x03U) << XCP_EVENT_PROP_CONSISTENCY_SHIFT);
@@ -507,15 +509,17 @@ sint16 Xcp_CmdSetDaqListMode(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
     }
 #endif
 
-    if (event_channel >= XCP_MAX_EVENT_CHANNEL)
-    {
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
-    }
-
     {
         Xcp_DaqListType *daq = &ch->storage_ptr->daq_list[daq_list_no];
+        uint8 evt_idx = Xcp_EventChannelIdx(ch, event_channel);
+
+        if (evt_idx >= XCP_MAX_EVENT_CHANNEL)
+        {
+            return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+        }
+
         const uint8 evt_type
-            = ch->config_ptr->xcp_event_channel[event_channel].event_channel_type;
+            = ch->config_ptr->xcp_event_channel[evt_idx].event_channel_type;
         const uint8 dir_bit = ((mode & XCP_DAQ_MODE_DIRECTION_STIM) != 0U)
                               ? XCP_EVENT_CHANNEL_TYPE_STIM : XCP_EVENT_CHANNEL_TYPE_DAQ;
 
