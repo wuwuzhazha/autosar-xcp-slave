@@ -233,6 +233,19 @@ static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)
 extern Xcp_SegmentType Xcp_SegmentRuntime[XCP_MAX_SEGMENT];
 #endif
 
+/* ext 是否合法：高 4 位非 0 时必须落在配置的段数内 */
+static inline boolean Xcp_ExtValid(Xcp_Channel *ch, uint8 ext)
+{
+#if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
+    uint8 seg = (uint8)(ext >> 4U);
+    (void)ch;
+    return ((seg == 0U) || (seg <= XCP_MAX_SEGMENT)) ? TRUE : FALSE;
+#else
+    (void)ch;
+    return (ext == 0U) ? TRUE : FALSE;
+#endif
+}
+
 /* 地址扩展：ext 高 4 位选地址空间。
    0 = 默认（addr 原样）；s = CalPage 段 s-1，按激活的 XCP 页翻译。
    CALPAGE 未启用或 ext==0 时不翻译。 */

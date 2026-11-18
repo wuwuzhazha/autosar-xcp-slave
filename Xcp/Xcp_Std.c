@@ -223,9 +223,16 @@ sint16 Xcp_CmdGetId(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xc
 
 sint16 Xcp_CmdSetMta(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
+    uint8 ext = cmd_data[3];
+
     (void) cmd_length;
 
-    ch->runtime_ptr->mta_extension = cmd_data[3];
+    if (Xcp_ExtValid(ch, ext) == FALSE)
+    {
+        return Xcp_ResErr(res, XCP_ERR_SEGMENT_NOT_VALID);
+    }
+
+    ch->runtime_ptr->mta_extension = ext;
 
     ch->runtime_ptr->mta = Xcp_LeRead32(&cmd_data[4U]);
 
