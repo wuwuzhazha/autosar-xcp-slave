@@ -26,6 +26,23 @@ MODULE_SRC = [
 LINK_ONLY = ["Tests/test_stubs.c", "Tests/matrix_main.c"]
 SYNTAX_ONLY = ["Xcp/Xcp_Callouts.c"]
 
+# 这些变体跑完整功能测试而非 sanity：替换 matrix_main 为 test_main / predef_main
+FUNC_TESTS = {
+    "can/default":      "Tests/matrix_func.c",
+    "can/interleaved":  "Tests/matrix_func.c",
+    "can/daq_static":   "Tests/matrix_func.c",
+    "can/predef":       "Tests/matrix_func.c",
+    "can/minimal":      "Tests/matrix_func.c",
+    "can/daq_off":      "Tests/matrix_func.c",
+    "can/seedkey_off":  "Tests/matrix_func.c",
+    "can/calpage_off":  "Tests/matrix_func.c",
+    "can/pgm_off":      "Tests/matrix_func.c",
+    "can/resume_off":   "Tests/matrix_func.c",
+    "fr/default":       "Tests/matrix_func.c",
+    "eth/default":      "Tests/matrix_func.c",
+    "cdd/default":      "Tests/matrix_func.c",
+}
+
 CFLAGS = [
     "-std=c99", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
                                              
@@ -94,9 +111,11 @@ def build(vid, sets, workdir):
     if gen.returncode != 0:
         return vid, sets, "xcpgen: " + (gen.stderr or gen.stdout).strip()
     exe = gendir / (vid.replace("/", "_") + ".exe")
-    cflags = [CFLAGS[0], f"-I{gendir}", *CFLAGS[1:]]              
+    cflags = [CFLAGS[0], f"-I{gendir}", *CFLAGS[1:]]
+    test_src = FUNC_TESTS.get(vid)
+    link = ["Tests/test_stubs.c", test_src] if test_src else LINK_ONLY
     steps = [
-        ["gcc", *cflags, "-o", str(exe), *MODULE_SRC, str(gendir / "Xcp_Cfg.c"), *LINK_ONLY],
+        ["gcc", *cflags, "-o", str(exe), *MODULE_SRC, str(gendir / "Xcp_Cfg.c"), *link],
         ["gcc", *cflags, "-fsyntax-only", *SYNTAX_ONLY],
     ]
     for cmd in steps:
