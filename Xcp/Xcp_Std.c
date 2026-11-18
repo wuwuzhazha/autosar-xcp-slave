@@ -214,7 +214,7 @@ sint16 Xcp_CmdGetId(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xc
 
     if (id_len > 0U)
     {
-        ch->runtime_ptr->mta = (uint32) id_ptr;
+        ch->runtime_ptr->mta = (uint32)(uintptr_t) id_ptr;
         ch->runtime_ptr->mta_extension = 0U;
     }
 

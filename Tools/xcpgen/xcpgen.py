@@ -1,23 +1,24 @@
-                      
-"""XCP 配置生成器: ECUC schema -> Xcp_Cfg.h / Xcp_Cfg.c / Xcp_MemMap.h / Xcp_IfData.a2l
+#!/usr/bin/env python3
+"""XCP configuration generator: ECUC schema -> Xcp_Cfg.h / Xcp_Cfg.c / Xcp_MemMap.h / Xcp_IfData.a2l
 
-schema 覆盖 AUTOSAR XCP R4.4.0 的 12 容器 / 54 个 AUTOSAR 参数 + 本项目厂商参数。
-配置为 TOML (或 JSON), 支持 extends 继承:
+The schema covers the 12 containers / 54 AUTOSAR parameters of AUTOSAR XCP R4.4.0
+plus this project's vendor parameters.
+Configuration is TOML (or JSON) and supports extends-based inheritance:
   # Config/profiles/ilv.toml
   extends = "../xcp_base.toml"
   [general]
   XcpInterleavedModeEnabled = true
 
-用法:
-  python Tools/xcpgen/xcpgen.py --profile ilv --out Gen/ilv     按 profile 生成
-  python Tools/xcpgen/xcpgen.py --config X.toml --out Gen/x     按文件生成
-  python Tools/xcpgen/xcpgen.py --profile ilv --show            打印生效配置
-  python Tools/xcpgen/xcpgen.py --profile ilv --diff base       与另一配置逐项比较
-  python Tools/xcpgen/xcpgen.py --list-profiles                 列出可用 profile
-  python Tools/xcpgen/xcpgen.py --config X.toml --check         只校验
-  ... --set ECUC=v         覆盖单项 (可重复, 用于组合测试)
---set 特殊键 LinkType=CAN|FLEXRAY|ETHERNET|CDD 展开为四条 XcpOn*Enabled。
-校验失败 => 退出码 1, 不写文件。
+Usage:
+  python Tools/xcpgen/xcpgen.py --profile ilv --out Gen/ilv     generate from a profile
+  python Tools/xcpgen/xcpgen.py --config X.toml --out Gen/x     generate from a file
+  python Tools/xcpgen/xcpgen.py --profile ilv --show            print the effective config
+  python Tools/xcpgen/xcpgen.py --profile ilv --diff base       diff against another config
+  python Tools/xcpgen/xcpgen.py --list-profiles                 list available profiles
+  python Tools/xcpgen/xcpgen.py --config X.toml --check         validate only
+  ... --set ECUC=v         override a single item (repeatable, for combinatorial tests)
+The special --set key LinkType=CAN|FLEXRAY|ETHERNET|CDD expands to the four XcpOn*Enabled flags.
+On validation failure => exit code 1, no files written.
 """
 import argparse
 import json
@@ -26,21 +27,21 @@ import sys
 import tomllib
 from pathlib import Path
 
-                                                                             
-                                                                                 
-                                    
-                                                      
-                                              
-                                                                             
+# ---------------------------------------------------------------------------
+# ECUC parameter schema table P.
+# Each entry: (EcucName, kind, default, lo, hi_or_enum, C_macro, cls)
+#   kind: bool | int | enum | str | hex | func | schm | ident
+#   cls : PC (pre-compile) | VENDOR (project-specific extension)
+# ---------------------------------------------------------------------------
 
-                                        
+# Parameters whose C macro name cannot be derived as XCP_ + CamelCase.
 MACRO_ALIASES = {
     "XcpOdtCount": "XCP_MAX_ODT",
     "XcpOdtEntriesCount": "XCP_MAX_ODT_ENTRIES",
     "XcpMaxEventChannel": "XCP_MAX_EVENT_CHANNEL",
 }
 
-                    
+# Prefix prepended to enum literals when emitted as C tokens.
 ENUM_PREFIX = {
     "XcpDaqConfigType": "XCP_",
     "XcpTimestampType": "XCP_",
@@ -49,7 +50,7 @@ ENUM_PREFIX = {
 }
 
 P = [
-                                      
+    # ---- AUTOSAR standard parameters ----
     ("XcpOnCanEnabled", "bool", True, 0, 1, "XCP_ON_CAN_ENABLED", "PC"),
     ("XcpOnFlexRayEnabled", "bool", False, 0, 1, "XCP_ON_FLEXRAY_ENABLED", "PC"),
     ("XcpOnEthernetEnabled", "bool", False, 0, 1, "XCP_ON_ETHERNET_ENABLED", "PC"),
@@ -87,7 +88,7 @@ P = [
      ("ABSOLUTE", "RELATIVE_BYTE", "RELATIVE_WORD", "RELATIVE_WORD_ALIGNED"),
      "XCP_IDENTIFICATION_FIELD_TYPE", "PC"),
     ("XcpIdText", "str", "AUTOSAR XCP Slave", None, None, "XCP_ID_TEXT", "PC"),
-                                     
+    # ---- Vendor parameters (feature switches, performance tuning) ----
     ("XcpDaqEnabled", "bool", True, 0, 1, "XCP_DAQ_ENABLED", "VENDOR"),
     ("XcpSeedKeyEnabled", "bool", True, 0, 1, "XCP_SEED_KEY_ENABLED", "VENDOR"),
     ("XcpCalibrationPageEnabled", "bool", True, 0, 1, "XCP_CALIBRATION_PAGE_ENABLED", "VENDOR"),
@@ -120,7 +121,7 @@ P = [
     ("XcpSwMajorVersion", "int", 1, 0, 255, "XCP_SW_MAJOR_VERSION", "VENDOR"),
     ("XcpSwMinorVersion", "int", 0, 0, 255, "XCP_SW_MINOR_VERSION", "VENDOR"),
     ("XcpSwPatchVersion", "int", 0, 0, 255, "XCP_SW_PATCH_VERSION", "VENDOR"),
-                                                               
+    # ---- CDD transport layer function names ----
     ("XcpCddTransmitName", "ident", "Xcp_CddTransmit", None, None,
      "XCP_CDD_TRANSMIT_NAME", "VENDOR"),
     ("XcpCddRxIndicationName", "ident", "Xcp_CddRxIndication", None, None,
@@ -130,7 +131,7 @@ P = [
     ("XcpCddTriggerTransmitName", "ident", "Xcp_CddTriggerTransmit", None, None,
      "XCP_CDD_TRIGGER_TRANSMIT_NAME", "VENDOR"),
 ]
-                                     
+# Top-level config tables validated against row-count parameters.
 TABLE_KEYS = ("event_channels", "static_daq_lists", "segments", "flash_sectors")
 
 SCHEMA = {p[0]: p for p in P}
@@ -159,18 +160,18 @@ def _read_cfg_file(path):
             return tomllib.load(f)
     if suf == ".json":
         return json.loads(path.read_text(encoding="utf-8"))
-    raise SchemaError(f"{path}: 配置须为 .toml 或 .json")
+    raise SchemaError(f"{path}: config must be .toml or .json")
 
 def load_config(path, _seen=None):
     path = Path(path).resolve()
     seen = _seen or []
     if path in seen:
-        raise SchemaError("extends 循环: " + " -> ".join(str(p) for p in seen + [path]))
+        raise SchemaError("extends cycle: " + " -> ".join(str(p) for p in seen + [path]))
     if not path.exists():
-        raise SchemaError(f"{path}: 配置不存在")
+        raise SchemaError(f"{path}: config does not exist")
     raw = _read_cfg_file(path)
     if not isinstance(raw, dict):
-        raise SchemaError(f"{path}: 配置根须为映射 (missing CONFIG)")
+        raise SchemaError(f"{path}: config root must be a mapping (missing CONFIG)")
     parent = raw.pop("extends", None)
     cfg = {}
     if parent:
@@ -178,7 +179,7 @@ def load_config(path, _seen=None):
             cfg = _merge(cfg, load_config(path.parent / b, seen + [path]))
     cfg = _merge(cfg, raw)
     if not isinstance(cfg.get("general", {}), dict):
-        raise SchemaError(f"{path}: [general] 须为表")
+        raise SchemaError(f"{path}: [general] must be a table")
     return cfg
 
 def _toml_scalar(v):
@@ -232,7 +233,7 @@ def resolve_profile(name):
     p = profiles_dir() / f"{name}.toml"
     if not p.exists():
         have = ", ".join(sorted(x.stem for x in profiles_dir().glob("*.toml")))
-        raise SchemaError(f"未知 profile {name!r}; 可用: {have or '(无)'}")
+        raise SchemaError(f"unknown profile {name!r}; available: {have or '(none)'}")
     return p
 
 def coerce(name, raw, p):
@@ -240,23 +241,23 @@ def coerce(name, raw, p):
     if kind == "bool":
         if raw in BOOL_TOK:
             return BOOL_TOK[raw]
-        raise SchemaError(f"{name}: bool 需 0/1/true/false/STD_ON/STD_OFF, 得 {raw!r}")
+        raise SchemaError(f"{name}: bool expects 0/1/true/false/STD_ON/STD_OFF, got {raw!r}")
     if kind == "int":
         try:
             return int(raw, 0)
         except ValueError:
-            raise SchemaError(f"{name}: int 需整数, 得 {raw!r}")
-    return raw                                 
+            raise SchemaError(f"{name}: int expects an integer, got {raw!r}")
+    return raw  # str/hex/func/schm/ident pass through unchanged
 
 def check_range(name, v, p):
     lo, hi = p[3], p[4]
     if v < lo or (hi is not None and v > hi):
-        raise SchemaError(f"{name}: {v} 越界 [{lo},{hi}]")
+        raise SchemaError(f"{name}: {v} out of range [{lo},{hi}]")
 
 def apply_link(vals, name):
     up = str(name).upper()
     if up not in LINK_NAMES:
-        raise SchemaError(f"LinkType: {name} 不在 {LINK_NAMES}")
+        raise SchemaError(f"LinkType: {name} not in {LINK_NAMES}")
     i = LINK_NAMES.index(up)
     for j, lk in enumerate(LINKS):
         vals[lk] = (j == i)
@@ -271,18 +272,18 @@ def normalize(cfg, sets):
 
     unknown = sorted(set(vals) - set(SCHEMA))
     if unknown:
-        raise SchemaError("未知 ECUC 参数: " + ", ".join(unknown))
+        raise SchemaError("unknown ECUC parameters: " + ", ".join(unknown))
 
     for kv in sets:
         m = re.fullmatch(r"([A-Za-z0-9_]+)=(.*)", kv)
         if not m:
-            raise SchemaError(f"--set '{kv}': 需 Name=Value")
+            raise SchemaError(f"--set '{kv}': expects Name=Value")
         k, v = m.groups()
         if k == "LinkType":
             apply_link(vals, v)
             continue
         if k not in SCHEMA:
-            raise SchemaError(f"--set '{k}': 未知 ECUC 参数")
+            raise SchemaError(f"--set '{k}': unknown ECUC parameter")
         vals[k] = coerce(k, v, SCHEMA[k])
 
     errs = []
@@ -290,38 +291,38 @@ def normalize(cfg, sets):
         v = vals[k]
         kind, lo, hi = p[1], p[3], p[4]
         if kind == "bool" and not isinstance(v, bool):
-            errs.append(f"{k}: bool 需 True/False, 得 {v!r}")
+            errs.append(f"{k}: bool expects True/False, got {v!r}")
         elif kind == "int":
             if not isinstance(v, int):
-                errs.append(f"{k}: int 需整数, 得 {v!r}")
+                errs.append(f"{k}: int expects an integer, got {v!r}")
             else:
                 check_range(k, v, p)
         elif kind == "enum" and v not in hi:
-            errs.append(f"{k}: {v} 不在 {hi}")
+            errs.append(f"{k}: {v} not in {hi}")
         elif kind == "ident" and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", str(v)):
-            errs.append(f"{k}: 需 C 标识符, 得 {v!r}")
+            errs.append(f"{k}: expects a C identifier, got {v!r}")
     if errs:
         raise SchemaError("\n".join(errs))
 
     n_links = sum(1 for k in LINKS if vals[k])
     if n_links != 1:
-        errs.append(f"XcpOn*Enabled: 恰 1 条链路, 得 {n_links}")
+        errs.append(f"XcpOn*Enabled: exactly 1 link expected, got {n_links}")
     if vals["XcpMinDaq"] > vals["XcpMaxDaq"]:
         errs.append(f"XcpMinDaq > XcpMaxDaq")
     if vals["XcpDaqConfigType"] == "DAQ_STATIC" and vals["XcpMinDaq"] == 0:
-        errs.append("DAQ_STATIC 需 XcpMinDaq>0")
+        errs.append("DAQ_STATIC requires XcpMinDaq>0")
     if vals["XcpResumeModeEnabled"] and not vals["XcpDaqEnabled"]:
-        errs.append("XcpResumeModeEnabled 依赖 XcpDaqEnabled")
+        errs.append("XcpResumeModeEnabled requires XcpDaqEnabled")
     if vals["XcpTimestampType"] == "NO_TIME_STAMP" and vals["XcpTimestampFixed"]:
-        errs.append("XcpTimestampFixed 需非 NO_TIME_STAMP")
+        errs.append("XcpTimestampFixed requires a non-NO_TIME_STAMP type")
     if vals["XcpInterleavedModeEnabled"] and not vals["XcpBlockTransferEnabled"]:
-        errs.append("XcpInterleavedModeEnabled 依赖 XcpBlockTransferEnabled")
+        errs.append("XcpInterleavedModeEnabled requires XcpBlockTransferEnabled")
 
     t = {k: cfg.get(k, []) for k in TABLE_KEYS}
     t["pdu"] = cfg.get("pdu", {"rx": 0, "tx": 1})
     t["fr"] = cfg.get("fr", {})
 
-                                                          
+    # Row-count checks: table rows must match the declaring parameter.
     counts = {
         "event_channels": (vals["XcpMaxEventChannel"], "XcpMaxEventChannel", True),
         "static_daq_lists": (vals["XcpMinDaq"], "XcpMinDaq",
@@ -334,22 +335,22 @@ def normalize(cfg, sets):
     for key, (need, pname, enabled) in counts.items():
         rows = t[key]
         if enabled and len(rows) < need:
-            errs.append(f"{key} 行数({len(rows)}) < {pname}({need})")
+            errs.append(f"{key} row count ({len(rows)}) < {pname} ({need})")
         elif enabled and len(rows) > need:
-            print(f"warn: {key} {len(rows)} 行截断为 {need} ({pname})", file=sys.stderr)
+            print(f"warn: {key} {len(rows)} rows truncated to {need} ({pname})", file=sys.stderr)
             t[key] = rows[:need]
         elif not enabled and len(rows) > 0:
-            t[key] = rows                 
+            t[key] = rows  # keep extra rows; the feature is off anyway
     for i, e in enumerate(t["event_channels"]):
         for f in ("event_channel_number", "event_channel_priority", "max_daq_list",
                   "time_cycle", "time_unit", "event_channel_type", "consistency"):
             if f not in e:
-                errs.append(f"event_channels[{i}] 缺 {f}")
+                errs.append(f"event_channels[{i}] missing {f}")
     for i, s in enumerate(t["segments"]):
         if s.get("num_pages", 0) < 1:
             errs.append(f"segments[{i}].num_pages >= 1")
         if s.get("start_address", 0) < 0 or s.get("length", 0) < 1:
-            errs.append(f"segments[{i}] 地址/长度非法")
+            errs.append(f"segments[{i}] invalid address/length")
     for i, s in enumerate(t["flash_sectors"]):
         if s.get("length", 0) < 1:
             errs.append(f"flash_sectors[{i}].length >= 1")
@@ -359,10 +360,10 @@ def normalize(cfg, sets):
         if oc < 1 or ec2 < 1:
             errs.append(f"static_daq_lists[{i}]: odt_count/odt_entry_count >= 1")
         if len(ents) not in (0, oc * ec2):
-            errs.append(f"static_daq_lists[{i}].entries 数({len(ents)}) != odt_count*odt_entry_count({oc*ec2})")
+            errs.append(f"static_daq_lists[{i}].entries count ({len(ents)}) != odt_count*odt_entry_count ({oc*ec2})")
         for j, en in enumerate(ents):
             if "address" not in en or "size" not in en:
-                errs.append(f"static_daq_lists[{i}].entries[{j}] 缺 address/size")
+                errs.append(f"static_daq_lists[{i}].entries[{j}] missing address/size")
     if errs:
         raise SchemaError("\n".join(errs))
     return vals, t
@@ -390,13 +391,13 @@ def mval(name, v):
 def emit_h(vals, src="--config"):
     L = ["#ifndef XCP_CFG_H", "#define XCP_CFG_H", "",
          "/* @generated by Tools/xcpgen/xcpgen.py — DO NOT EDIT",
-         f" * AUTOSAR XCP R4.4.0 ECUC schema; 源: {src} */", ""]
-    L += ["/* 链路选择常量 (XCP_LINK_TYPE 派生用) */",
+         f" * AUTOSAR XCP R4.4.0 ECUC schema; source: {src} */", ""]
+    L += ["/* Link-selection constants (used to derive XCP_LINK_TYPE) */",
           "#define XCP_LINK_CAN      (1U)",
           "#define XCP_LINK_FLEXRAY  (2U)",
           "#define XCP_LINK_ETHERNET (3U)",
           "#define XCP_LINK_CDD      (4U)", "",
-          "/* enum 字面量常量: #if 及宏体在 Xcp_Types.h 前需要 */",
+          "/* enum literal constants: needed by #if and macro bodies before Xcp_Types.h */",
           "#define XCP_DAQ_STATIC  (0U)",
           "#define XCP_DAQ_DYNAMIC (1U)",
           "",
@@ -425,7 +426,7 @@ def emit_h(vals, src="--config"):
         tok = mval(name, vals[name])
         if kind == "schm":
             if not schm_seen:
-                L += ["/* SchM 临界区默认: RTE 提供 SchM_Xcp.h (-D/-include 可覆盖) */",
+                L += ["/* SchM critical-section defaults: SchM_Xcp.h comes from the RTE (-D/-include may override) */",
                       "#if !defined(XCP_DTO_ENTER_CRITICAL) || !defined(XCP_DTO_EXIT_CRITICAL)",
                       '#include "SchM_Xcp.h"', "#endif"]
                 schm_seen = True
@@ -438,11 +439,11 @@ def emit_h(vals, src="--config"):
                 L += [f"#ifndef {ex}", f"#define {ex}(ext, addr, size) {m}(addr, size)", "#endif"]
         else:
             L.append(f"#define {m} {tok}")
-    L += ["", "/* 派生 */",
+    L += ["", "/* Derived */",
           "#define XCP_DAQ_COUNT (XCP_MAX_DAQ - XCP_MIN_DAQ)",
           "#define XCP_LINK_TYPE XCP_LINK_" + LINK_NAMES[[i for i, k in enumerate(LINKS)
                                                           if vals[k]][0]],
-          "", "/* 编译期硬约束 (生成器已先行校验, 手改亦被拦) */",
+          "", "/* Compile-time hard constraints (the generator validates these first, but manual edits are caught too) */",
           "#if ((XCP_ON_CAN_ENABLED == STD_ON) + (XCP_ON_FLEXRAY_ENABLED == STD_ON) + (XCP_ON_ETHERNET_ENABLED == STD_ON) + (XCP_ON_CDD_ENABLED == STD_ON)) != 1",
           '#error "exactly one XCP transport link must be enabled"',
           "#endif",
@@ -450,7 +451,7 @@ def emit_h(vals, src="--config"):
           '#error "XCP_MAX_CTO must be 8..255"',
           "#endif",
           "#if (XCP_MAX_DTO < 8U) || (XCP_MAX_DTO > 255U)",
-          '#error "XCP_MAX_DTO must be 8..255 (uint8 帧长)"',
+          '#error "XCP_MAX_DTO must be 8..255 (uint8 frame length)"',
           "#endif",
           "#if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC) && (XCP_MIN_DAQ == 0U)",
           '#error "XCP_DAQ_CONFIG_TYPE=DAQ_STATIC requires XCP_MIN_DAQ > 0"',
@@ -466,7 +467,7 @@ def emit_h(vals, src="--config"):
           "#endif",
           "#if (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE) \\",
           "    && ((XCP_MAX_DAQ * XCP_MAX_ODT) > 255U)",
-          '#error "ABSOLUTE abs_pid 是 u8, XCP_MAX_DAQ*XCP_MAX_ODT 必须 <= 255"',
+          '#error "ABSOLUTE abs_pid is u8, XCP_MAX_DAQ*XCP_MAX_ODT must be <= 255"',
           "#endif",
           "", "#endif /* XCP_CFG_H */", ""]
     return "\n".join(L)
@@ -477,7 +478,7 @@ def tok(v):
 def emit_c(vals, t, src="--config"):
     L = ['#include "Xcp.h"', '#include "Xcp_Internal.h"', "",
          "/* @generated by Tools/xcpgen/xcpgen.py — DO NOT EDIT",
-         f" * 源: {src} */", "",
+         f" * source: {src} */", "",
          '#define XCP_START_SEC_CONST_UNSPECIFIED', '#include "Xcp_MemMap.h"', ""]
     ec = t["event_channels"]
     L.append("static const Xcp_EventChannelType xcp_event_channels[XCP_MAX_EVENT_CHANNEL] =")
@@ -550,7 +551,7 @@ def emit_c(vals, t, src="--config"):
     return "\n".join(L)
 
 def emit_memmap():
-    return """/* @generated default MemMap — 集成方以同名文件覆盖为本项目段 pragma */
+    return """/* @generated default MemMap — the integrator overrides this with a same-named file providing the project section pragmas */
 #ifdef XCP_START_SEC_CONST_UNSPECIFIED
 #undef XCP_START_SEC_CONST_UNSPECIFIED
 #endif
@@ -646,7 +647,7 @@ def cmd_diff(cfg, other_name):
     if not diffs:
         print(f"identical: {other} == current")
         return 0
-    print(f"{other} -> current  ({len(diffs)} 处不同)")
+    print(f"{other} -> current  ({len(diffs)} differences)")
     for k, va, vb in diffs:
         print(f"  {k}: {va} -> {vb}")
     return 0
@@ -659,8 +660,8 @@ def main():
     src.add_argument("--list-profiles", action="store_true")
     ap.add_argument("--out", default="Gen")
     ap.add_argument("--check", action="store_true")
-    ap.add_argument("--show", action="store_true", help="打印生效配置后退出")
-    ap.add_argument("--diff", metavar="FILE|PROFILE", help="与另一配置逐项比较")
+    ap.add_argument("--show", action="store_true", help="print the effective config and exit")
+    ap.add_argument("--diff", metavar="FILE|PROFILE", help="diff item-by-item against another config")
     ap.add_argument("--set", action="append", default=[], metavar="ECUC=v")
     args = ap.parse_args()
 

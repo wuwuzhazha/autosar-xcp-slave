@@ -16,7 +16,7 @@
 #define XCP_DAQ_HAS_TIMESTAMP(daq) ((((daq)->mode) & XCP_DAQ_MODE_TIMESTAMP) != 0U)
 #endif
 
-/* ActiveDaqIndices/Count 字段在 Xcp_StorageType::active_daq_idx/count */
+/* ActiveDaqIndices/Count live in Xcp_StorageType::active_daq_idx/count */
 
 static inline uint16 Xcp_AbsPidEncode(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no)
 {
@@ -118,7 +118,7 @@ static inline Std_ReturnType Xcp_PidFieldDecode(Xcp_Channel *ch, const uint8 *dt
     return E_NOT_OK;
 }
 
-/* event_channel_number -> config 表 index。找不到返回 XCP_MAX_EVENT_CHANNEL */
+/* event_channel_number -> config table index. Returns XCP_MAX_EVENT_CHANNEL if not found. */
 static inline uint8 Xcp_EventChannelIdx(const Xcp_Channel *ch, uint16 number)
 {
     uint8 i;

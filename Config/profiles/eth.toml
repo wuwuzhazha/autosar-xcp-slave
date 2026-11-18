@@ -1,4 +1,4 @@
-# Ethernet (UDP) 传输层
+# Ethernet (UDP) transport layer
 extends = "../xcp_base.toml"
 
 [general]

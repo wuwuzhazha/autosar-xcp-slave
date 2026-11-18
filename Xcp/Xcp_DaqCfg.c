@@ -677,7 +677,7 @@ sint16 Xcp_CmdStartStopDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd
 
     ch->storage_ptr->cto_buffer[1] = (uint8) (first_pid & 0xFFU);
 #else
-    /* RELATIVE_*: first_pid = list 编号(ODT0 在该 list 内的相对 PID 隐含=0) */
+    /* RELATIVE_*: first_pid = list number (relative PID of ODT0 in that list is implicitly 0) */
     ch->storage_ptr->cto_buffer[1] = (uint8) (daq_list_no & 0xFFU);
 #endif
 
@@ -704,7 +704,7 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
 
         if (mode == XCP_START_STOP_STOP)
         {
-            /* mode 0: 停所有 RUNNING (不要求 selected) */
+            /* mode 0: stop all RUNNING lists (selected not required) */
             if (daq->state == (uint8) XCP_DAQ_STATE_RUNNING)
             {
                 daq->state = XCP_DAQ_STATE_STOPPED;
@@ -713,7 +713,7 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
         }
         else if (mode == XCP_START_STOP_START)
         {
-            /* mode 1: 启所有 selected */
+            /* mode 1: start all selected lists */
             if (daq->selected != FALSE)
             {
                 daq->state = XCP_DAQ_STATE_RUNNING;
@@ -728,7 +728,7 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
         }
         else
         {
-            /* mode 2: 停 selected 的 RUNNING */
+            /* mode 2: stop RUNNING lists that are selected */
             if ((daq->selected != FALSE)
                 && (daq->state == (uint8) XCP_DAQ_STATE_RUNNING))
             {

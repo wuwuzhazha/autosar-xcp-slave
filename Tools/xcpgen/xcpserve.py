@@ -1,11 +1,11 @@
-"""XCP 配置器 Web UI: 本地 HTTP 服务 + 单页界面, 直接读写 Config/profiles/*.toml。
+"""XCP configurator Web UI: local HTTP server + single-page UI, reads and writes Config/profiles/*.toml directly.
 
-用法:
-  python Tools/xcpgen/xcpserve.py            # 启动并打开浏览器 (默认 8765)
+Usage:
+  python Tools/xcpgen/xcpserve.py            # start and open browser (default port 8765)
   python Tools/xcpgen/xcpserve.py --port 9000 --no-browser
 
-只用标准库 (http.server + json + tkinter 无), 生成/校验复用 xcpgen 的 schema 与 emitter。
-保存时只写与基线不同的键, profile 文件保持最小差异。
+Standard library only (http.server + json, no tkinter); generation/validation reuse xcpgen's schema and emitters.
+On save only keys that differ from the baseline are written, keeping profile files minimal-diff.
 """
 import argparse
 import importlib.util
@@ -22,9 +22,9 @@ XCPGEN = ROOT / "Tools" / "xcpgen" / "xcpgen.py"
 BASE_NAME = "xcp_base"
 
 GROUPS = [
-    ("传输层", lambda n: n.startswith("XcpOn") or n.startswith("XcpEth")
+    ("Transport", lambda n: n.startswith("XcpOn") or n.startswith("XcpEth")
      or n.startswith("XcpFr") or n.startswith("XcpCdd")),
-    ("基本 STD", lambda n: n in (
+    ("Basic STD", lambda n: n in (
         "XcpMaxCto", "XcpMaxDto", "XcpMaxBs", "XcpMinSt", "XcpIdentificationFieldType",
         "XcpIdText", "XcpMainFunctionPeriod", "XcpDevErrorDetect", "XcpVersionInfoApi",
         "XcpSuppressTxSupport")),
@@ -32,19 +32,19 @@ GROUPS = [
                               or "Prescaler" in n or "Stim" in n or "Dto" in n
                               or "Interleaved" in n or "BlockTransfer" in n
                               or "CmdQueue" in n or "TxRetry" in n)),
-    ("时间戳", lambda n: n.startswith("XcpTimestamp") or n == "XcpOsCounter"),
-    ("特性开关", lambda n: n in (
+    ("Timestamp", lambda n: n.startswith("XcpTimestamp") or n == "XcpOsCounter"),
+    ("Feature switches", lambda n: n in (
         "XcpSeedKeyEnabled", "XcpCalibrationPageEnabled", "XcpResumeModeEnabled",
         "XcpFlashProgrammingEnabled", "XcpEnableDtoDropStats")),
-    ("内存 / 编程", lambda n: n in (
+    ("Memory / Programming", lambda n: n in (
         "XcpMaxKeyLength", "XcpSeedLength", "XcpKeyLength", "XcpMaxSegment",
         "XcpMaxFlashSector", "XcpMaxPgmBlockSize", "XcpNvmBlockIdResume")),
-    ("版本", lambda n: n.startswith("XcpSw")),
-    ("集成钩子", lambda n: n.startswith("XcpCheck") or n.startswith("XcpDto")),
+    ("Version", lambda n: n.startswith("XcpSw")),
+    ("Integration hooks", lambda n: n.startswith("XcpCheck") or n.startswith("XcpDto")),
 ]
 CONTAINERS = {
     "event_channels": ("XcpEventChannel", "XcpMaxEventChannel", None),
-    "static_daq_lists": ("XcpDaqList (预定义)", "XcpMinDaq", None),
+    "static_daq_lists": ("XcpDaqList (predefined)", "XcpMinDaq", None),
     "segments": ("XcpSegment", "XcpMaxSegment", "XcpCalibrationPageEnabled"),
     "flash_sectors": ("XcpFlashSector", "XcpMaxFlashSector", "XcpFlashProgrammingEnabled"),
 }
@@ -62,7 +62,7 @@ def group_of(name):
     for title, pred in GROUPS:
         if pred(name):
             return title
-    return "其它"
+    return "Other"
 
 def base_path():
     return X.profiles_dir().parent / f"{BASE_NAME}.toml"
@@ -71,7 +71,7 @@ def base_config():
     return X.load_config(base_path())
 
 def base_effective(base=None):
-    """基线 + schema 默认值后的生效 general, 供差异比较。"""
+    """Effective general values after applying baseline + schema defaults; used for diffing."""
     b = base if base is not None else base_config()
     g = b.get("general", {})
     return {name: g.get(name, default) for name, _k, default, _lo, _hi, _m, _c in X.P}
@@ -142,7 +142,7 @@ def profile_list():
             link = str(g.get("LinkType", "")).upper() or next(
                 (n for k, n in zip(X.LINKS, X.LINK_NAMES) if g.get(k)), "")
         except X.SchemaError:
-            link, doc = "ERROR", doc or "解析失败"
+            link, doc = "ERROR", doc or "parse failed"
         out.append({"name": p.stem, "doc": doc, "link": link})
     return out
 
@@ -150,7 +150,7 @@ def _eq(a, b):
     return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
 
 def profile_delta(cfg, base, base_eff):
-    """只保留与基线不同的部分, 用于最小化 profile 文件。"""
+    """Keep only the parts that differ from the baseline, to minimize the profile file."""
     delta = {}
     g = {k: v for k, v in cfg.get("general", {}).items()
          if k not in base_eff or not _eq(v, base_eff[k])}
@@ -203,11 +203,11 @@ def diff_rows(cfg, base, base_eff=None):
     return out
 
 def equivalent(cfg, other, base_eff):
-    """cfg 与 other 在 schema 语义上等价 (忽略未显式列出的默认值)。"""
+    """cfg and other are semantically equivalent under the schema (unlisted defaults ignored)."""
     return not diff_rows(cfg, other, base_eff)
 
 def coerce_config(raw):
-    """前端传来的是字符串/布尔混合; 交给 xcpgen 做权威校验。"""
+    """The frontend sends a mix of strings/booleans; xcpgen performs the authoritative validation."""
     cfg = {"general": dict(raw.get("general", {}))}
     for key, (_l, _n, _d) in CONTAINERS.items():
         rows = raw.get(key)
@@ -309,7 +309,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not equivalent(back, cfg, eff):
                     left = diff_rows(back, cfg, eff)
                     return self._json({"ok": False, "errors": [
-                        "保存后回读不一致: " + ", ".join(r["key"] for r in left[:5])]}, 500)
+                        "read-back mismatch after save: " + ", ".join(r["key"] for r in left[:5])]}, 500)
                 return self._json({"ok": True, "path": str(path.relative_to(ROOT)),
                                    "lines": len(text.splitlines()),
                                    "bytes": len(text.encode()),
@@ -334,14 +334,14 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/api/newprofile":
                 prof = (body.get("name") or "").strip()
                 if not prof or not prof.replace("_", "").isalnum():
-                    return self._json({"ok": False, "errors": ["名称只能含字母数字下划线"]}, 400)
+                    return self._json({"ok": False, "errors": ["name may only contain letters, digits and underscores"]}, 400)
                 p = X.profiles_dir() / f"{prof}.toml"
                 if p.exists():
-                    return self._json({"ok": False, "errors": ["同名 profile 已存在"]}, 400)
+                    return self._json({"ok": False, "errors": ["a profile with the same name already exists"]}, 400)
                 src = body.get("from") or "can"
                 cfg = X.load_config(X.resolve_profile(src))
                 p.write_text(emit_profile_text(cfg, base_config(),
-                                               body.get("doc") or f"{src} 的副本"),
+                                               body.get("doc") or f"copy of {src}"),
                              encoding="utf-8")
                 return self._json({"ok": True, "profile": prof})
             return self._json({"error": "not found"}, 404)
@@ -351,8 +351,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "errors": [f"{type(e).__name__}: {e}"]}, 500)
 
 PAGE = r"""<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<title>XCP 配置器</title>
+<html lang="en"><head><meta charset="utf-8">
+<title>XCP Configurator</title>
 <style>
 :root{
   --bg:#fbfbfc; --pane:#f3f4f6; --card:#fff; --line:#e2e4e8; --line2:#eef0f3;
@@ -471,29 +471,29 @@ footer{height:150px;flex:none;border-top:1px solid var(--line);background:var(--
 .row.flash{animation:fl 1.5s ease-out}
 </style></head><body>
 <header>
-  <div class="brand">XCP<span>配置器</span></div>
-  <select id="profile" title="选择 profile"></select>
-  <button id="newp" title="以当前 profile 为模板新建">新建…</button>
+  <div class="brand">XCP<span>Configurator</span></div>
+  <select id="profile" title="Select profile"></select>
+  <button id="newp" title="Create a new profile from the current one">New…</button>
   <span class="spacer"></span>
   <span class="chip" id="stat">—</span>
-  <button id="check" title="校验 (Ctrl+Enter)">校验</button>
-  <button id="save" title="保存到 profile (Ctrl+S)">保存</button>
-  <button id="gen" class="primary" title="生成 Xcp_Cfg.h/.c (Ctrl+G)">生成</button>
+  <button id="check" title="Check (Ctrl+Enter)">Check</button>
+  <button id="save" title="Save to profile (Ctrl+S)">Save</button>
+  <button id="gen" class="primary" title="Generate Xcp_Cfg.h/.c (Ctrl+G)">Generate</button>
 </header>
 <main>
   <nav id="nav"></nav>
   <section>
     <div class="bar"><h2 id="title">—</h2><span class="hint" id="hint"></span>
-      <div class="searchbox" id="swrap" hidden><input id="search" placeholder="过滤参数…"></div>
+      <div class="searchbox" id="swrap" hidden><input id="search" placeholder="Filter parameters…"></div>
     </div>
     <div class="content" id="body"></div>
   </section>
 </main>
 <footer>
   <div class="tabs">
-    <button data-tab="log" class="on">输出</button>
-    <button data-tab="diff">差异 (基线 → 当前)</button>
-    <button data-tab="eff">生效配置</button>
+    <button data-tab="log" class="on">Output</button>
+    <button data-tab="diff">Diff (base → current)</button>
+    <button data-tab="eff">Effective config</button>
   </div>
   <div class="log" id="log"></div>
   <div class="content" id="diff" hidden></div>
@@ -501,7 +501,7 @@ footer{height:150px;flex:none;border-top:1px solid var(--line);background:var(--
 </footer>
 <script>
 const S={schema:null,profiles:[],profile:"can",base:null,cfg:null,base0:null,
-        view:"p:传输层",dirty:false,search:"",selList:0};
+        view:"p:Transport",dirty:false,search:"",selList:0};
 const $=s=>document.querySelector(s);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 function log(msg,cls){const d=el("div");d.innerHTML='<span class="t">'
@@ -520,7 +520,7 @@ function renderStat(){
   const on=S.schema.links.params.filter(k=>S.cfg.general[k]===true);
   const link=on.length===1?S.schema.links.names[S.schema.links.params.indexOf(on[0])]:(on.length?"MULTI":"—");
   const n=countDiff();
-  $("#stat").textContent=(link?link+" · ":"")+(S.dirty?"未保存 · ":"")+(n?n+" 处差异":"基线一致");
+  $("#stat").textContent=(link?link+" · ":"")+(S.dirty?"unsaved · ":"")+(n?n+" diffs":"matches base");
   $("#stat").className="chip"+(S.dirty?" dirty":"");}
 function countDiff(){
   let n=0;
@@ -536,12 +536,12 @@ function navItem(key,label,count){
   return b;}
 function renderNav(){
   const n=$("#nav");n.innerHTML="";
-  n.appendChild(el("h4",null,"参数"));
+  n.appendChild(el("h4",null,"Parameters"));
   for(const g of S.schema.groups)n.appendChild(navItem("p:"+g.title,g.title,g.count));
-  n.appendChild(el("h4",null,"表容器"));
+  n.appendChild(el("h4",null,"Table containers"));
   for(const k in S.schema.containers)n.appendChild(navItem("t:"+k,S.schema.containers[k].label,
     (S.cfg[k]||[]).length));
-  n.appendChild(el("h4",null,"传输/杂项"));
+  n.appendChild(el("h4",null,"Transport/Misc"));
   n.appendChild(navItem("t:pdu","PDU {rx,tx}",""));
   n.appendChild(navItem("t:fr","FlexRay LPDU",""));}
 function need(key){
@@ -594,7 +594,7 @@ function renderParams(group){
     lab.appendChild(nm);
     r.appendChild(lab);r.appendChild(renderCtl(p));
     b.appendChild(r);}
-  if(!rows)b.appendChild(el("div","empty","没有匹配的参数"));}
+  if(!rows)b.appendChild(el("div","empty","No matching parameters"));}
 function tableHead(fields,rows,extra){
   const t=el("table");const thead=el("thead");const tr=el("tr");
   fields.forEach(f=>{
@@ -623,7 +623,7 @@ function cellInput(f,obj,onchange){
       obj[f.name]=isNaN(v)?i.value:v;
     }else obj[f.name]=i.value;
     markDirty();renderStat();};
-  if(f.type==="int")i.title="支持十进制或 0x 十六进制";
+  if(f.type==="int")i.title="Accepts decimal or 0x hex";
   td.appendChild(i);return td;}
 function renderTable(key){
   if(key==="pdu"||key==="fr")return renderSimple(key);
@@ -631,14 +631,14 @@ function renderTable(key){
   const b=$("#body");b.innerHTML="";
   const bar=el("div","toolbar");
   const nb=el("span","badge");const needN=need(key);
-  nb.textContent=needN==null?("("+c.need+" 未开启)"):(needN===0?rows.length+" 行"
-    :(rows.length+"/"+needN+" 行"));
+  nb.textContent=needN==null?("("+c.need+" not enabled)"):(needN===0?rows.length+" rows"
+    :(rows.length+"/"+needN+" rows"));
   nb.classList.add(needN==null||needN===0?"":(rows.length===needN?"ok":"bad"));
   bar.appendChild(nb);
-  if(c.dep)bar.appendChild(el("span","hint","行数由 "+c.need+" 决定 (依赖 "+c.dep+"); 改表会把整张表写入 profile"));
-  else bar.appendChild(el("span","hint","行数由 "+c.need+" 决定; 改表会把整张表写入 profile"));
+  if(c.dep)bar.appendChild(el("span","hint","row count is set by "+c.need+" (depends on "+c.dep+"); editing writes the whole table to the profile"));
+  else bar.appendChild(el("span","hint","row count is set by "+c.need+"; editing writes the whole table to the profile"));
   bar.appendChild(el("span","spacer"));
-  const add=el("button",null,"+ 增加行");
+  const add=el("button",null,"+ Add row");
   add.onclick=()=>{const r={};c.fields.forEach(f=>r[f.name]=f.type==="int"?0:"");
     if(key==="static_daq_lists")r.entries=[];
     if(key==="event_channels"){r.event_channel_number=rows.length;}
@@ -647,14 +647,14 @@ function renderTable(key){
     rows.push(r);markDirty();render();};
   bar.appendChild(add);b.appendChild(bar);
 
-  if(!rows.length){b.appendChild(el("div","empty","没有行。点“+ 增加行”。"));return;}
+  if(!rows.length){b.appendChild(el("div","empty","No rows. Click \"+ Add row\"."));return;}
   const t=tableHead(c.fields,rows,true);
   const tb=el("tbody");
   rows.forEach((row,idx)=>{
     const tr=el("tr",key==="static_daq_lists"&&idx===S.selList?"sel":"");
     c.fields.forEach(f=>tr.appendChild(cellInput(f,row,()=>renderStat())));
     const td=el("td","act");const del=el("button",null,"✕");
-    del.title="删除该行";
+    del.title="Delete this row";
     del.onclick=()=>{rows.splice(idx,1);markDirty();render();};
     td.appendChild(del);tr.appendChild(td);
     if(key==="static_daq_lists"){
@@ -665,17 +665,17 @@ function renderTable(key){
 
   if(key!=="static_daq_lists")return;
   const sel=rows[S.selList];
-  b.appendChild(el("div","sub","entries — 选中列表 #"+S.selList+(sel?"":"")));
-  if(!sel){b.appendChild(el("div","empty","先点一行选中列表"));return;}
+  b.appendChild(el("div","sub","entries — selected list #"+S.selList+(sel?"":"")));
+  if(!sel){b.appendChild(el("div","empty","Click a row to select a list first"));return;}
   if(!sel.entries)sel.entries=[];
   const want=(parseInt(sel.odt_count,10)||0)*(parseInt(sel.odt_entry_count,10)||0);
   const bar2=el("div","toolbar");
-  const nb2=el("span","badge");nb2.textContent=sel.entries.length+"/"+want+" 条";
+  const nb2=el("span","badge");nb2.textContent=sel.entries.length+"/"+want+" entries";
   nb2.classList.add(want===0?"":(sel.entries.length===want?"ok":"bad"));
   bar2.appendChild(nb2);
   bar2.appendChild(el("span","hint","odt_count × odt_entry_count = "+want));
   bar2.appendChild(el("span","spacer"));
-  const addE=el("button",null,"+ 增加条目");
+  const addE=el("button",null,"+ Add entry");
   addE.onclick=()=>{sel.entries.push({address:0,address_extension:0,size:1,
     bit_offset:"XCP_BIT_OFFSET_NONE"});markDirty();render();};
   bar2.appendChild(addE);b.appendChild(bar2);
@@ -690,7 +690,7 @@ function renderTable(key){
 function renderSimple(key){
   const fields=S.schema.simpleTables[key];const obj=S.cfg[key]||(S.cfg[key]={});
   const b=$("#body");b.innerHTML="";
-  b.appendChild(el("div","sub",key==="pdu"?"CAN 收发 PDU ID":"FlexRay LPDU 参数"));
+  b.appendChild(el("div","sub",key==="pdu"?"CAN rx/tx PDU IDs":"FlexRay LPDU parameters"));
   fields.forEach(f=>{
     const r=el("div","row"+(eq(obj[f.name],S.base[key][f.name])?"":" changed"));
     const lab=el("div","label");lab.appendChild(el("div","name",f.name));
@@ -704,10 +704,10 @@ function render(){
   const [kind,key]=S.view.split(":");
   renderNav();
   $("#swrap").hidden=kind!=="p";
-  if(kind==="p"){$("#title").textContent=key;$("#hint").textContent="点击控件修改, 改动标记 •";
+  if(kind==="p"){$("#title").textContent=key;$("#hint").textContent="Click a control to edit; changes are marked •";
     renderParams(key);}
   else if(S.schema.containers[key]){$("#title").textContent=S.schema.containers[key].label;
-    $("#hint").textContent="直接编辑单元格";renderTable(key);}
+    $("#hint").textContent="Edit cells directly";renderTable(key);}
   else{$("#title").textContent=key==="pdu"?"PDU":"FlexRay LPDU";
     $("#hint").textContent="";renderSimple(key);}
   renderStat();renderDiff();}
@@ -735,14 +735,14 @@ function renderDiff(){
   }
   for(const k in S.schema.containers){
     const a=S.base[k]||[],b=S.cfg[k]||[];
-    if(!eq(a,b))rows.push({k:k,a:a.length+" 行",b:b.length+" 行"+(eq(a,b)?"":" (内容不同)")});}
+    if(!eq(a,b))rows.push({k:k,a:a.length+" rows",b:b.length+" rows"+(eq(a,b)?"":" (contents differ)")});}
   for(const k in S.schema.simpleTables){
     const a=S.base[k]||{},b=S.cfg[k]||{};
     for(const f in a)if(!eq(a[f],b[f]))rows.push({k:k+"."+f,a:a[f],b:b[f]});}
-  if(!rows.length){box.appendChild(el("div","empty","与基线一致"));return;}
+  if(!rows.length){box.appendChild(el("div","empty","Matches baseline"));return;}
   const t=el("table","difftbl");const tb=el("tbody");
   rows.forEach(r=>{const tr=el("tr");
-    tr.title="点击跳转";
+    tr.title="Click to jump";
     tr.appendChild(el("td","k",r.k));
     tr.appendChild(el("td","v",String(r.a)));
     tr.appendChild(el("td","v new",String(r.b)));
@@ -750,7 +750,7 @@ function renderDiff(){
     tb.appendChild(tr);});
   t.appendChild(tb);box.appendChild(t);
   const btn=document.querySelector('.tabs button[data-tab="diff"]');
-  btn.textContent="差异 (基线 → 当前) · "+rows.length;}
+  btn.textContent="Diff (base → current) · "+rows.length;}
 async function refreshEff(){
   const txt=await (await fetch("/api/show?profile="+encodeURIComponent(S.profile))).text();
   $("#efftext").textContent=txt;}
@@ -763,26 +763,26 @@ function toast(msg,cls){
   setTimeout(()=>n.remove(),4000);}
 async function doCheck(){
   const r=await jpost("/api/check",{config:S.cfg});
-  if(r.ok){log("校验通过 · "+r.diff+" 处与基线不同","ok");toast("校验通过");}
-  else{r.errors.forEach(e=>log(e,"err"));toast("校验失败: "+r.errors[0],"err");}}
+  if(r.ok){log("Check passed · "+r.diff+" diffs from base","ok");toast("Check passed");}
+  else{r.errors.forEach(e=>log(e,"err"));toast("Check failed: "+r.errors[0],"err");}}
 async function doSave(){
   const r=await jpost("/api/save",{profile:S.profile,config:S.cfg,
     doc:(S.profiles.find(p=>p.name===S.profile)||{}).doc||""});
-  if(r.ok){log("已保存 "+r.path+" ("+r.lines+" 行, "+r.bytes+" B, "+r.diff+" 处差异)","ok");
-    S.dirty=false;renderStat();toast("已保存 "+r.path);refreshEff();}
-  else{r.errors.forEach(e=>log(e,"err"));toast("保存失败","err");}}
+  if(r.ok){log("Saved "+r.path+" ("+r.lines+" lines, "+r.bytes+" B, "+r.diff+" diffs)","ok");
+    S.dirty=false;renderStat();toast("Saved "+r.path);refreshEff();}
+  else{r.errors.forEach(e=>log(e,"err"));toast("Save failed","err");}}
 async function doGen(){
   const out="Gen/"+S.profile;
   const r=await jpost("/api/generate",{profile:S.profile,config:S.cfg,out});
   if(r.ok){const names=Object.keys(r.files);
-    log("生成 "+r.out+"/ → "+names.join(", "),"ok");toast("已生成到 "+r.out);}
-  else{r.errors.forEach(e=>log(e,"err"));toast("生成失败","err");}}
+    log("Generated "+r.out+"/ → "+names.join(", "),"ok");toast("Generated to "+r.out);}
+  else{r.errors.forEach(e=>log(e,"err"));toast("Generation failed","err");}}
 async function doNew(){
-  const name=prompt("新 profile 名称 (字母数字下划线):","mycfg");
+  const name=prompt("New profile name (letters, digits, underscores):","mycfg");
   if(!name)return;
   const r=await jpost("/api/newprofile",{name:name,from:S.profile});
   if(!r.ok){toast(r.errors[0],"err");return;}
-  await boot(r.profile);log("已创建 profile "+r.profile,"ok");}
+  await boot(r.profile);log("Created profile "+r.profile,"ok");}
 async function boot(profile){
   const data=await jget("/api/bootstrap"+(profile?"?profile="+encodeURIComponent(profile):""));
   S.schema=data.schema;S.profiles=data.profiles;S.profile=data.profile;
@@ -794,10 +794,10 @@ async function boot(profile){
   const sel=$("#profile");sel.innerHTML="";
   for(const p of S.profiles){const o=el("option",null,p.name+(p.doc?" — "+p.doc:""));
     o.value=p.name;if(p.name===S.profile)o.selected=true;sel.appendChild(o);}
-  if(!S.groupsInit){S.groupsInit=true;S.view="p:"+(S.schema.groups[0]||{title:"传输层"}).title;}
+  if(!S.groupsInit){S.groupsInit=true;S.view="p:"+(S.schema.groups[0]||{title:"Transport"}).title;}
   S.selList=0;S.dirty=false;
   render();refreshEff();
-  log("载入 profile "+S.profile+" · "+(S.cfg.event_channels||[]).length+" 事件通道","dim");}
+  log("Loaded profile "+S.profile+" · "+(S.cfg.event_channels||[]).length+" event channels","dim");}
 $("#profile").onchange=e=>boot(e.target.value);
 $("#newp").onclick=doNew;
 $("#check").onclick=doCheck;
@@ -820,13 +820,13 @@ boot();
 """
 
 def main():
-    ap = argparse.ArgumentParser(description="XCP 配置器 Web UI")
+    ap = argparse.ArgumentParser(description="XCP configurator Web UI")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}/"
-    print(f"XCP 配置器: {url}  (Ctrl+C 退出)")
+    print(f"XCP configurator: {url}  (Ctrl+C to quit)")
     print(f"profiles: {X.profiles_dir()}")
     if not args.no_browser:
         threading.Timer(0.4, lambda: webbrowser.open(url)).start()

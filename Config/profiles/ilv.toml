@@ -1,4 +1,4 @@
-# CAN + 交织命令队列 (XcpInterleavedModeEnabled)
+# CAN + interleaved command queue (XcpInterleavedModeEnabled)
 extends = "../xcp_base.toml"
 
 [general]

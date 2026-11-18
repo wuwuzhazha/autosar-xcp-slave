@@ -3,8 +3,9 @@
 #include "Xcp_Internal.h"
 #include "Xcp_Types.h"
 
-/* 每个编译变体都做：Init -> CONNECT -> GET_STATUS，验证内核可运行。
-   不经链路壳，直接注入内部入口，与 XcpOn* 名字无关。 */
+/* Every build variant runs: Init -> CONNECT -> GET_STATUS, to verify the kernel works.
+   Inject directly into the internal entry point, bypassing the link shell;
+   independent of the XcpOn* names. */
 
 static void send_cmd(const uint8 *cmd, uint8 len)
 {

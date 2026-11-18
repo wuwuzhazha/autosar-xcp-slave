@@ -1,0 +1,71 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, ${{ matrix.cc }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        cc: [gcc]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install gcc (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: mingw-w64-x86_64-gcc
+
+      - name: Ratchet + regen
+        run: python Tests/ratchet.py
+
+      - name: Regen all 10 profiles
+        shell: bash
+        run: |
+          set -e
+          for p in can ilv fr eth rbyte rword rwal cdd static predef; do
+            python Tools/xcpgen/xcpgen.py --profile $p --out Gen/$p
+          done
+
+      - name: Build + run CAN variant (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          gcc -std=c99 -g -Wall -Wextra -Wno-unused-parameter \
+              -Werror=implicit-function-declaration \
+              -ITests/stubs -ITests -IXcp -IGen/can \
+              -include Tests/test_config.h \
+              Xcp/Xcp.c Xcp/Xcp_Cmd.c Xcp/Xcp_Std.c Xcp/Xcp_DaqCfg.c \
+              Xcp/Xcp_DaqRun.c Xcp/Xcp_DaqStim.c Xcp/Xcp_SeedKey.c \
+              Xcp/Xcp_CalPage.c Xcp/Xcp_FlashProg.c Xcp/Xcp_Resume.c \
+              Xcp/XcpOnCan.c Xcp/XcpOnFr.c Xcp/XcpOnEth.c Xcp/XcpOnCdd.c \
+              Tests/test_stubs.c Tests/test_main.c Gen/can/Xcp_Cfg.c \
+              -o Tests/xcp_test_can
+          ./Tests/xcp_test_can
+
+      - name: Build + run matrix (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: python Tests/build_matrix.py
+
+      - name: xcpgen unit tests
+        run: python Tests/test_xcpgen.py
+
+      - name: Build + run matrix (Windows)
+        if: matrix.os == 'windows-latest'
+        run: python Tests/build_matrix.py

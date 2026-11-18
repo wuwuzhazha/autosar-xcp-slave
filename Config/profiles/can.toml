@@ -1,4 +1,4 @@
-# CAN 链路 · 单命令模式 (基线)
+# CAN link - single-command mode (baseline)
 extends = "../xcp_base.toml"
 
 [general]

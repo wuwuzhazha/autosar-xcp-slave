@@ -1,0 +1,8 @@
+# Default owner for everything — adjust to actual GitHub handles
+* @Harry
+
+# Protocol core
+Xcp/ @Harry
+
+# Generated output — reviewers should not need to eyeball these
+Gen/ @Harry

@@ -5,8 +5,9 @@
 #include "Xcp_Types.h"
 #include "Xcp_Callback.h"
 
-/* 特性自适应功能测试：每段 #if 守卫，裁剪变体只测开着的特性。
-   编译矩阵用它替代 matrix_main ——不只跑通，还验证命令往返。 */
+/* Feature-adaptive functional test: each section is #if-guarded, so trimmed
+   variants only test enabled features. The build matrix uses it in place of
+   matrix_main — it verifies command round-trips, not just that it runs. */
 
 static int pass_count = 0;
 static int fail_count = 0;
@@ -73,7 +74,7 @@ int main(void)
     CHECK("connected state", g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED);
 
 #if (XCP_SEED_KEY_ENABLED == STD_ON)
-    /* 解锁全部资源以便后续命令可用 */
+    /* Unlock all resources so subsequent commands are usable */
     {
         static const uint8 rsc[3] = {0x01U, 0x04U, 0x10U};  /* CAL_PAG, DAQ, PGM */
         uint8 k;
@@ -115,19 +116,19 @@ int main(void)
     CHECK("set_mta", (l == 1U) && (res[0] == XCP_PID_RES));
 
 #if (XCP_SEED_KEY_ENABLED == STD_OFF)
-    /* 未启用 seed&key 时资源恒解锁，DOWNLOAD 直接可用 */
+    /* With seed&key disabled, resources are always unlocked; DOWNLOAD works directly */
 #endif
     cmd[0] = 0xF0; cmd[1] = 4; cmd[2] = 0x11; cmd[3] = 0x22; cmd[4] = 0x33; cmd[5] = 0x44;
     l = do_cmd(cmd, 6U, res);
     CHECK("download", (l == 1U) && (res[0] == XCP_PID_RES)
           && (ram_var[0] == 0x11U) && (ram_var[3] == 0x44U));
 
-    /* DOWNLOAD 后 MTA 推进 4，UPLOAD 读推进后的位置 */
+    /* After DOWNLOAD the MTA advances by 4; UPLOAD reads the advanced position */
     cmd[0] = 0xF5; cmd[1] = 4;
     l = do_cmd(cmd, 2U, res);
     CHECK("upload advances mta", (l == 5U) && (res[0] == XCP_PID_RES));
 
-    /* 重新 SET_MTA 读回刚写的地址 */
+    /* SET_MTA again to read back the address just written */
     cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
     (void)memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)ram_var}, 4U);
     (void)do_cmd(cmd, 8U, res);

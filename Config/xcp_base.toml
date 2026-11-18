@@ -1,11 +1,11 @@
-# XCP base 配置 (ECUC general + 表容器)。TOML, 只含数据, 不执行代码。
-# 未列参数取 xcpgen schema 默认值; profile 用 extends 继承本文件。
-#   event_channels   行数 == XcpMaxEventChannel
-#   static_daq_lists 行数 == XcpMinDaq, 每行的 entries 为 ODT 条目
-#   segments         行数 == XcpMaxSegment (XcpCalibrationPageEnabled 时)
-#   flash_sectors    行数 == XcpMaxFlashSector (XcpFlashProgrammingEnabled 时)
+# XCP base configuration (ECUC general + table containers). TOML, data only, no executable code.
+# Parameters not listed here take the xcpgen schema defaults; profiles inherit this file via extends.
+#   event_channels   row count == XcpMaxEventChannel
+#   static_daq_lists row count == XcpMinDaq, each row's entries are ODT entries
+#   segments         row count == XcpMaxSegment (when XcpCalibrationPageEnabled)
+#   flash_sectors    row count == XcpMaxFlashSector (when XcpFlashProgrammingEnabled)
 #
-# 查看生效配置: python Tools/xcpgen/xcpgen.py --config Config/xcp_base.toml --show
+# Show effective configuration: python Tools/xcpgen/xcpgen.py --config Config/xcp_base.toml --show
 
 [general]
 XcpOnCanEnabled = true

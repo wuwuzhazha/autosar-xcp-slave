@@ -213,7 +213,7 @@ sint16 Xcp_CmdGetSegmentInfo(Xcp_Channel *ch, const uint8 *data, uint8 length, X
     }
     else if (mode == 2U)
     {
-        /* mode2 = MAPPING_INFO: data[3] 是 page_number, 返回 ext + 该页起始物理 */
+        /* mode2 = MAPPING_INFO: data[3] is page_number; return ext + that page's physical start */
         uint8  page_no  = segment_info;
         uint32 page_len = (XCP_SEG_CFG[segment_number].num_pages != 0U)
                           ? (XCP_SEG_CFG[segment_number].length

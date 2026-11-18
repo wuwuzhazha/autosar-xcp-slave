@@ -1,0 +1,22 @@
+# Auto-normalize line endings for text files
+* text=auto eol=lf
+
+# Explicit text rules
+*.c         text
+*.h         text
+*.md        text
+*.toml      text
+*.py        text
+*.bat       text
+*.yml       text
+*.yaml      text
+*.json      text
+
+# Binary
+*.pdf       binary
+*.exe       binary
+*.a2l       text
+
+# Generated outputs — linguist stats + collapsed diffs
+Gen/**              linguist-generated=true
+Tests/ratchet_baseline.json linguist-generated=true

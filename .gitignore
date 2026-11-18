@@ -1,16 +1,44 @@
-# 构建产物
+# Build artifacts
 *.exe
 *.o
 *.obj
+*.elf
+*.map
+*.a
+*.so
+*.dll
+*.lib
+*.dSYM/
+build/
+out/
+cmake-build-*/
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
 
-# 临时分析输出
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Session / scratch
 .tmp/
-/all.txt
-/avail.txt
-/cfg.txt
-/o.txt
-/used.txt
+.claude/
+all.txt
+avail.txt
+cfg.txt
+o.txt
+used.txt
+
+# Test output binaries (rebuilt by run_all_tests.bat)
+Tests/xcp_test*.exe

@@ -1,4 +1,4 @@
-# CAN + RELATIVE_BYTE DTO 寻址
+# CAN + RELATIVE_BYTE DTO addressing
 extends = "../xcp_base.toml"
 
 [general]

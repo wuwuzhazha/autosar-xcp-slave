@@ -1,10 +1,13 @@
                       
-"""XCP 编译矩阵: 每个开关组合经 xcpgen 生成 Xcp_Cfg.{h,c} 后, -Werror 编译+链接全部模块源。
+"""XCP build matrix: for each switch combination, xcpgen generates Xcp_Cfg.{h,c}, then all
+module sources are compiled and linked with -Werror.
 
-变体以 ECUC 参数表达 (--set), 由 Tools/xcpgen/xcpgen.py 生成变体配置; 覆盖校验规则时
-生成器直接报错(负例), 编译断链/未定义符号在链接步暴露。
-产品 callout 文件 Xcp_Callouts.c 与测试桩同名, 只做 -fsyntax-only, 不参与链接。
-用法: python Tests/build_matrix.py [-j N] [-k 子串]    全部通过返回 0
+Variants are expressed as ECUC parameters (--set); Tools/xcpgen/xcpgen.py generates each
+variant's config. When a validation rule is violated the generator reports the error
+directly (negative case); broken references / undefined symbols surface at the link step.
+The product callout file Xcp_Callouts.c shares its name with the test stub and is only
+checked with -fsyntax-only, not linked.
+Usage: python Tests/build_matrix.py [-j N] [-k substring]    returns 0 when all pass
 """
 import argparse
 import os
@@ -26,7 +29,7 @@ MODULE_SRC = [
 LINK_ONLY = ["Tests/test_stubs.c", "Tests/matrix_main.c"]
 SYNTAX_ONLY = ["Xcp/Xcp_Callouts.c"]
 
-# 这些变体跑完整功能测试而非 sanity：替换 matrix_main 为 test_main / predef_main
+# These variants run the full functional test instead of sanity: matrix_main is replaced by test_main / predef_main
 FUNC_TESTS = {
     "can/default":      "Tests/matrix_func.c",
     "can/interleaved":  "Tests/matrix_func.c",

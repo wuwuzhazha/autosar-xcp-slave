@@ -28,7 +28,7 @@ static boolean Xcp_CheckProgramRange(Xcp_Channel *ch, uint32 addr, uint32 len)
     return FALSE;
 }
 
-/* PROGRAM_PREPARE 声明的块大小; 0 = 未声明(不限制) */
+/* Block size declared via PROGRAM_PREPARE; 0 = no declared limit */
 static boolean Xcp_CheckProgramSize(Xcp_Channel *ch, uint32 data_size)
 {
     if (Xcp_ExpectedProgramSize == 0U)

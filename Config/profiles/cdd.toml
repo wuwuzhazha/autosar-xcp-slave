@@ -1,4 +1,4 @@
-# CDD 自定义传输层
+# CDD custom transport layer
 extends = "../xcp_base.toml"
 
 [general]

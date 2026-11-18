@@ -1,7 +1,8 @@
-                      
-"""xcpgen 生成器测试: golden 输出断言 + 每条校验规则负例 + --check 语义。
+#!/usr/bin/env python3
+"""xcpgen generator tests: golden output assertions + one negative case per validation
+rule + --check semantics.
 
-用法: python Tests/test_xcpgen.py      全过返回 0
+Usage: python Tests/test_xcpgen.py      returns 0 when all pass
 """
 import copy
 import importlib.util
@@ -44,7 +45,8 @@ def defines(path):
     return d
 
 def cfg_file(tmp, mutate):
-    """载入 base 配置, 应用 mutate(dict) 后以 JSON 落盘 (机器生成配置走 JSON)。"""
+    """Load base config, apply mutate(dict), then write as JSON
+    (machine-generated configs use JSON)."""
     cfg = load_base()
     mutate(cfg)
     p = tmp / f"cfg_{abs(hash(str(cfg)))}.json"
@@ -71,7 +73,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="xcpgen_t_") as tdir:
         tmp = Path(tdir)
 
-                                                          
+        # --- golden: default CAN profile ---
         out = tmp / "can"
         r = run(cfg=BASE, out=out)
         ok(r.returncode == 0, "gen default rc", r.stderr[:200])
@@ -87,11 +89,11 @@ def main():
         ok(h.get("XCP_IDENTIFICATION_FIELD_TYPE") == "XCP_ABSOLUTE", "h idtype")
         ok(h.get("XCP_SW_MAJOR_VERSION") == "(1U)", "h swmajor")
         ok(h.get("XCP_MODULE_ID") is None, "h no module id dup")
-                        
+        # literal constants
         ok(h.get("XCP_DAQ_DYNAMIC") == "(1U)", "h lit daq dyn")
         ok(h.get("XCP_RELATIVE_WORD_ALIGNED") == "(3U)", "h lit rwa")
         ok(h.get("XCP_TIMESTAMP_UNIT_1MS") == "(6U)", "h lit 1ms")
-                           
+        # header / c / memmap / a2l content
         htxt = (out / "Xcp_Cfg.h").read_text()
         ok("#ifndef XCP_CHECK_READ_ACCESS" in htxt, "h hook ifndef")
         ok("#error" in htxt and "XCP_ON_CDD_ENABLED == STD_ON" in htxt, "h #error guards")
@@ -108,7 +110,7 @@ def main():
         ok("XCP_ON_CAN" in a2l and "MAX_CTO 8" in a2l, "a2l can")
         ok("XCP_ON_ETHERNET" not in a2l, "a2l no eth")
 
-                                                          
+        # --- golden: --set LinkType=ETHERNET ---
         out = tmp / "eth"
         r = run(cfg=BASE, out=out, sets=("LinkType=ETHERNET",))
         ok(r.returncode == 0, "gen eth rc", r.stderr[:200])
@@ -118,7 +120,7 @@ def main():
         ok(h.get("XCP_LINK_TYPE") == "XCP_LINK_ETHERNET", "eth link")
         ok("XCP_ON_ETHERNET" in (out / "Xcp_IfData.a2l").read_text(), "a2l eth")
 
-                                                              
+        # --- golden: DAQ_STATIC via --set ---
         out = tmp / "sta"
         r = run(cfg=BASE, out=out,
                 sets=("XcpDaqConfigType=DAQ_STATIC", "XcpMinDaq=1"))
@@ -127,40 +129,40 @@ def main():
            "static daq type")
         ok(".xcp_static_daq_list" in (out / "Xcp_Cfg.c").read_text(), "static list ref")
 
-                                                           
+        # --- warn: table rows truncated to declared count ---
         out = tmp / "trunc"
         r = run(cfg=BASE, out=out, sets=("XcpMaxEventChannel=2",))
-        ok(r.returncode == 0 and "截断" in r.stderr, "truncate warn", r.stderr[:120])
+        ok(r.returncode == 0 and "truncated" in r.stderr, "truncate warn", r.stderr[:120])
 
-                                                              
+        # --- --check validates only, writes nothing ---
         out = tmp / "chk"
         r = run("--check", cfg=BASE, out=out)
         ok(r.returncode == 0 and "check OK" in r.stdout, "check ok", r.stdout[:80])
         ok(not (out / "Xcp_Cfg.h").exists(), "check writes nothing")
 
-                                                       
+        # --- negative --set cases: one per CLI/schema rule ---
         NEG = [
-            ("link bogus", "不在", ("LinkType=PCI",)),
-            ("unknown param", "未知 ECUC", ("XcpNoSuchParam=1",)),
-            ("cto too big", "越界", ("XcpMaxCto=256",)),
-            ("cto not int", "需整数", ("XcpMaxCto=abc",)),
-            ("bool bad", "bool 需", ("XcpOnCddEnabled=foo",)),
-            ("bad syntax", "需 Name=Value", ("badsyntax",)),
-            ("zero links", "恰 1 条链路", ("XcpOnCanEnabled=0",)),
-            ("two links", "恰 1 条链路", ("XcpOnEthernetEnabled=1",)),
+            ("link bogus", "not in", ("LinkType=PCI",)),
+            ("unknown param", "unknown ECUC", ("XcpNoSuchParam=1",)),
+            ("cto too big", "out of range", ("XcpMaxCto=256",)),
+            ("cto not int", "expects an integer", ("XcpMaxCto=abc",)),
+            ("bool bad", "bool expects", ("XcpOnCddEnabled=foo",)),
+            ("bad syntax", "expects Name=Value", ("badsyntax",)),
+            ("zero links", "exactly 1 link", ("XcpOnCanEnabled=0",)),
+            ("two links", "exactly 1 link", ("XcpOnEthernetEnabled=1",)),
             ("mindaq>maxdaq", "XcpMinDaq > XcpMaxDaq", ("XcpMinDaq=9",)),
-            ("static w/o mindaq", "DAQ_STATIC 需", ("XcpDaqConfigType=DAQ_STATIC",)),
-            ("resume w/o daq", "依赖 XcpDaqEnabled", ("XcpDaqEnabled=0",)),
+            ("static w/o mindaq", "DAQ_STATIC requires", ("XcpDaqConfigType=DAQ_STATIC",)),
+            ("resume w/o daq", "requires XcpDaqEnabled", ("XcpDaqEnabled=0",)),
             ("tsfixed w/ none", "TimestampFixed",
              ("XcpTimestampType=NO_TIME_STAMP", "XcpTimestampFixed=1")),
-            ("ilv w/o block", "依赖 XcpBlockTransferEnabled",
+            ("ilv w/o block", "requires XcpBlockTransferEnabled",
              ("XcpInterleavedModeEnabled=1", "XcpBlockTransferEnabled=0")),
-            ("enum bogus", "不在", ("XcpTimestampType=BOGUS",)),
+            ("enum bogus", "not in", ("XcpTimestampType=BOGUS",)),
         ]
         for name, needle, sets in NEG:
             expect_err("neg " + name, needle, sets=sets, out=tmp)
 
-                                                         
+        # --- negative config cases: mutate base TOML ---
         def drop_ec_row(c):
             c["event_channels"] = c["event_channels"][:3]
 
@@ -188,19 +190,19 @@ def main():
             c["general"]["XcpMinDaq"] = 1
 
         CFGNEG = [
-            ("ec rows short", "行数(3) < XcpMaxEventChannel", drop_ec_row, ()),
-            ("ec missing field", "缺 max_daq_list", drop_ec_field, ()),
+            ("ec rows short", "row count (3) < XcpMaxEventChannel", drop_ec_row, ()),
+            ("ec missing field", "missing max_daq_list", drop_ec_field, ()),
             ("seg pages 0", "num_pages", bad_seg_pages, ()),
-            ("seg len 0", "地址/长度非法", bad_seg_len, ()),
+            ("seg len 0", "invalid address/length", bad_seg_len, ()),
             ("sec len 0", "length >= 1", bad_sec_len, ()),
-            ("seg rows short", "行数(1) < XcpMaxSegment", drop_seg_row, ()),
-            ("sec rows short", "行数(1) < XcpMaxFlashSector", drop_sec_rows, ()),
-            ("static rows 0", "static_daq_lists 行数(0)", drop_static_rows, ()),
+            ("seg rows short", "row count (1) < XcpMaxSegment", drop_seg_row, ()),
+            ("sec rows short", "row count (1) < XcpMaxFlashSector", drop_sec_rows, ()),
+            ("static rows 0", "static_daq_lists row count (0)", drop_static_rows, ()),
         ]
         for name, needle, mut, sets in CFGNEG:
             expect_err("neg cfg " + name, needle, sets=sets, mutate=mut, out=tmp)
 
-                              
+        # --- negative: config root is not a dict ---
         bad = tmp / "cfg_nodict.json"
         bad.write_text("[1, 2]\n", encoding="utf-8")
         r = run(cfg=bad, out=tmp / "nodict")

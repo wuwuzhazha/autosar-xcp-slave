@@ -1,4 +1,4 @@
-# CAN + RELATIVE_WORD_ALIGNED 寻址
+# CAN + RELATIVE_WORD_ALIGNED addressing
 extends = "../xcp_base.toml"
 
 [general]

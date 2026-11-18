@@ -232,7 +232,7 @@ static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)
 extern Xcp_SegmentType Xcp_SegmentRuntime[XCP_MAX_SEGMENT];
 #endif
 
-/* ext 是否合法：高 4 位非 0 时必须落在配置的段数内 */
+/* ext validity: when high nibble is non-zero it must map to a configured segment */
 static inline boolean Xcp_ExtValid(Xcp_Channel *ch, uint8 ext)
 {
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
@@ -245,9 +245,9 @@ static inline boolean Xcp_ExtValid(Xcp_Channel *ch, uint8 ext)
 #endif
 }
 
-/* 地址扩展：ext 高 4 位选地址空间。
-   0 = 默认（addr 原样）；s = CalPage 段 s-1，按激活的 XCP 页翻译。
-   CALPAGE 未启用或 ext==0 时不翻译。 */
+/* Address extension: ext high nibble selects address space.
+   0 = default (addr used as-is); s = CalPage segment s-1, translated via
+   the currently-active XCP page. No translation when CALPAGE is off or ext==0. */
 static inline uint32 Xcp_MemTranslate(Xcp_Channel *ch, uint8 ext, uint32 addr)
 {
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
@@ -276,7 +276,7 @@ static inline uint32 Xcp_MemTranslate(Xcp_Channel *ch, uint8 ext, uint32 addr)
 #endif
 }
 
-/* 内存端口：翻译 + 访问检查 + 取物理指针。NULL = 拒绝。 */
+/* Memory port: translate + access-check + physical pointer. NULL = denied. */
 static inline uint8 *Xcp_MemPtrRead(Xcp_Channel *ch, uint8 ext, uint32 addr, uint32 size)
 {
     uint32 phys = Xcp_MemTranslate(ch, ext, addr);
@@ -285,7 +285,7 @@ static inline uint8 *Xcp_MemPtrRead(Xcp_Channel *ch, uint8 ext, uint32 addr, uin
     {
         return NULL_PTR;
     }
-    return (uint8 *) phys;
+    return (uint8 *) (uintptr_t) phys;
 }
 
 static inline uint8 *Xcp_MemPtrWrite(Xcp_Channel *ch, uint8 ext, uint32 addr, uint32 size)
@@ -296,7 +296,7 @@ static inline uint8 *Xcp_MemPtrWrite(Xcp_Channel *ch, uint8 ext, uint32 addr, ui
     {
         return NULL_PTR;
     }
-    return (uint8 *) phys;
+    return (uint8 *) (uintptr_t) phys;
 }
 
 #define XCP_GUARD_NONE                (0U)

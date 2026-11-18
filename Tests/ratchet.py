@@ -1,17 +1,17 @@
-"""架构棘轮。计数只许下降，下降后必须 --tighten 把新上限写回基线。
+"""Architecture ratchet. Counts may only go down; after a drop you must run --tighten to write the new ceiling back into the baseline.
 
-检查手写运行时 Xcp/（不含 Gen、Tests）:
-  g_xcp_manager          全局管理器引用，按文件封顶
-  xcp_preprocessor       测试 XCP_ 宏的 #if/#elif/#ifdef/#ifndef，按文件封顶
-  c_includes             #include 一个 .c 文件的位置，只许是基线里已有的那几处
-  tx_symbols             tx_last_kind / cto_busy / dto_busy / cto_pending，按文件封顶
-  forbidden_includes     协议核心对 CanIf.h / FrIf.h / SoAd.h / Cdd.h 的包含，只许是基线里已有的那几处
+Checks the hand-written runtime Xcp/ (excluding Gen and Tests):
+  g_xcp_manager          global manager reference, capped per file
+  xcp_preprocessor       #if/#elif/#ifdef/#ifndef testing XCP_ macros, capped per file
+  c_includes             places that #include a .c file; only the ones already in the baseline are allowed
+  tx_symbols             tx_last_kind / cto_busy / dto_busy / cto_pending, capped per file
+  forbidden_includes     includes of CanIf.h / FrIf.h / SoAd.h / Cdd.h in the protocol core; only the ones already in the baseline are allowed
 
-另外把每个 Config/profiles/*.toml 重新生成，与 Gen/<profile>/ 逐文件比较
-（换行符先折成 LF，避免 Windows 检出造成假差异）。
+Also regenerates every Config/profiles/*.toml and compares it file by file with Gen/<profile>/
+(newlines are folded to LF first, to avoid false diffs from Windows checkouts).
 
-  python Tests/ratchet.py            检查，越界或基线偏松都失败
-  python Tests/ratchet.py --tighten  仅当没有任何上升时，把基线收紧到当前值
+  python Tests/ratchet.py            check; fails on any rise or on a baseline that has gone loose
+  python Tests/ratchet.py --tighten  only when nothing has risen, tighten the baseline to the current values
 """
 import difflib
 import json
@@ -130,18 +130,19 @@ def loose_files(current, baseline):
     return drops
 
 def check_metric(name, current, baseline, errors, loose):
-    """合计封顶。总合计上升才 fail（列上升文件）；下降则提示收紧。
+    """Cap on the grand total. Only a rise in the total fails (listing the rising files); a drop prompts a tighten.
 
-    per-file 上升本身不报：拆文件或把函数收口进公共单元会让局部文件涨，
-    只要模块组总合计降就是改进。"""
+    A per-file rise is not reported by itself: splitting files or folding functions
+    into a common unit can raise a single file's count, and as long as the module
+    group's total goes down it is an improvement."""
     if current["total"] > baseline["total"]:
         rises = file_rises(current["files"], baseline["files"])
-        lines = [f"  {name} {current['total']} > 基线 {baseline['total']}"]
+        lines = [f"  {name} {current['total']} > baseline {baseline['total']}"]
         for key, was, now in rises:
             lines.append(f"    {key}: {was} -> {now}")
         errors.append("\n".join(lines))
     elif current["total"] < baseline["total"]:
-        loose.append(f"  {name} {baseline['total']} -> {current['total']}，基线偏松")
+        loose.append(f"  {name} {baseline['total']} -> {current['total']}, baseline is loose")
 
 def check(snapshot):
     base = load_baseline()
@@ -151,7 +152,7 @@ def check(snapshot):
         check_metric(name, snapshot[name], base[name], errors, loose)
 
     if snapshot["g_xcp_manager"]["total"] > 0:
-        errors.append("  g_xcp_manager 重新出现，应使用 g_xcp_channel")
+        errors.append("  g_xcp_manager reappeared; use g_xcp_channel")
     for name in TX_SYMBOLS:
         check_metric(f"tx.{name}", snapshot["tx_symbols"][name], base["tx_symbols"][name], errors, loose)
 
@@ -160,18 +161,18 @@ def check(snapshot):
     extra = sorted(now_inc - was_inc)
     missing = sorted(was_inc - now_inc)
     if extra:
-        errors.append("  新的 .c 包含:\n" + "\n".join(f"    {item}" for item in extra))
+        errors.append("  new .c includes:\n" + "\n".join(f"    {item}" for item in extra))
     if missing:
-        loose.append("  .c 包含减少: " + ", ".join(missing))
+        loose.append("  .c includes removed: " + ", ".join(missing))
 
     now_forb = set(snapshot["forbidden_includes"])
     was_forb = set(base["forbidden_includes"])
     extra_forb = sorted(now_forb - was_forb)
     missing_forb = sorted(was_forb - now_forb)
     if extra_forb:
-        errors.append("  协议核心新增传输层头文件:\n" + "\n".join(f"    {item}" for item in extra_forb))
+        errors.append("  new transport-layer headers in the protocol core:\n" + "\n".join(f"    {item}" for item in extra_forb))
     if missing_forb:
-        loose.append("  传输层头文件包含减少: " + ", ".join(missing_forb))
+        loose.append("  transport-layer header includes removed: " + ", ".join(missing_forb))
     return errors, loose
 
 def norm(data):
@@ -182,7 +183,7 @@ def check_gen():
     profiles = sorted(p.stem for p in PROFILES.glob("*.toml"))
     gen_dirs = sorted(p.name for p in GEN_OUT.iterdir() if p.is_dir())
     if profiles != gen_dirs:
-        errors.append(f"  profile {profiles} 与 Gen 目录 {gen_dirs} 不一致")
+        errors.append(f"  profiles {profiles} do not match Gen directories {gen_dirs}")
         return errors
     with tempfile.TemporaryDirectory(prefix="xcp_ratchet_") as tmp:
         tmp_path = Path(tmp)
@@ -193,17 +194,17 @@ def check_gen():
                 cwd=ROOT, capture_output=True, text=True, errors="replace",
             )
             if proc.returncode != 0:
-                errors.append(f"  生成 {name} 失败: {proc.stderr.strip()[:200]}")
+                errors.append(f"  generating {name} failed: {proc.stderr.strip()[:200]}")
                 continue
             fresh = {p.relative_to(out).as_posix(): p for p in out.rglob("*") if p.is_file()}
             committed = GEN_OUT / name
             have = {p.relative_to(committed).as_posix(): p for p in committed.rglob("*") if p.is_file()}
             for rel_name in sorted(set(fresh) | set(have)):
                 if rel_name not in have:
-                    errors.append(f"  Gen/{name}/{rel_name} 生成有、仓库无")
+                    errors.append(f"  Gen/{name}/{rel_name} generated but absent from repo")
                     continue
                 if rel_name not in fresh:
-                    errors.append(f"  Gen/{name}/{rel_name} 仓库有、生成无")
+                    errors.append(f"  Gen/{name}/{rel_name} in repo but not generated")
                     continue
                 a = norm(fresh[rel_name].read_bytes())
                 b = norm(have[rel_name].read_bytes())
@@ -215,7 +216,7 @@ def check_gen():
                         tofile="regenerated",
                         n=1,
                     ))
-                    errors.append(f"  Gen/{name}/{rel_name} 与重新生成不一致\n" + "\n".join(diff.splitlines()[:24]))
+                    errors.append(f"  Gen/{name}/{rel_name} differs from regeneration\n" + "\n".join(diff.splitlines()[:24]))
     return errors
 
 def report(snapshot):
@@ -239,11 +240,11 @@ def main():
     snapshot = pack(files, forbidden)
     if not BASELINE.exists():
         if not tighten:
-            print("没有基线。先运行 python Tests/ratchet.py --tighten", file=sys.stderr)
+            print("No baseline. Run python Tests/ratchet.py --tighten first", file=sys.stderr)
             return 1
         BASELINE.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         report(snapshot)
-        print(f"基线已写入 {BASELINE.relative_to(ROOT).as_posix()}")
+        print(f"baseline written to {BASELINE.relative_to(ROOT).as_posix()}")
         return 0
 
     errors, loose = check(snapshot)
@@ -255,17 +256,17 @@ def main():
         return 1
     if loose:
         if not tighten:
-            print("ratchet FAIL  计数下降了，基线还停在旧上限。运行 python Tests/ratchet.py --tighten")
+            print("ratchet FAIL  counts dropped but the baseline still holds the old ceilings. Run python Tests/ratchet.py --tighten")
             print("\n".join(loose))
             return 1
         BASELINE.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         report(snapshot)
-        print("基线已收紧")
+        print("baseline tightened")
         print("\n".join(loose))
         return 0
     if tighten:
         report(snapshot)
-        print("基线已与当前一致，未改动")
+        print("baseline already matches current values; unchanged")
         return 0
     report(snapshot)
     if not skip_gen:

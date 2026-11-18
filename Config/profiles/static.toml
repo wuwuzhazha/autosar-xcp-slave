@@ -1,4 +1,4 @@
-# CAN + DAQ_STATIC 静态 DAQ 配置
+# CAN + DAQ_STATIC static DAQ configuration
 extends = "../xcp_base.toml"
 
 [general]

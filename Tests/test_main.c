@@ -517,7 +517,7 @@ int main(void)
         CHECK("G3c GET_SEED mode=1 no-seed -> ERR_SEQUENCE",
               (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
 
-        /* mode=1 续段：8B seed > CTO-2=6, 首段 6B, mode=1 回剩 2B, 再调回 0 */
+        /* mode=1 continuation: 8B seed > CTO-2=6, first chunk 6B, mode=1 returns remaining 2B, then back to 0 */
         {
         extern void test_seed_override_len(uint8);
         test_seed_override_len(8U);
@@ -1242,9 +1242,9 @@ int main(void)
     CHECK("H10 GetTimestamp == runtime timestamp",
           Xcp_GetTimestamp() == g_xcp_channel.runtime_ptr->timestamp);
 #endif
-    CHECK("H11 IsProgrammingActive == FALSE (PGM reset后)",
+    CHECK("H11 IsProgrammingActive == FALSE (after PGM reset)",
           Xcp_IsProgrammingActive(&g_xcp_channel) == FALSE);
-    CHECK("H12 IsResumeModeActive == TRUE (恢复后激活)",
+    CHECK("H12 IsResumeModeActive == TRUE (activated after resume)",
           Xcp_IsResumeModeActive(&g_xcp_channel) == TRUE);
 
     printf("-- I. event packets\n");
@@ -1291,7 +1291,7 @@ int main(void)
         CHECK("I6 SERV_RESET", seen_reset == 1U);
     }
 
-    /* I8: EV_TIME_SYNC 发出 */
+    /* I8: EV_TIME_SYNC sent */
     (void)Xcp_SendEventPacket(XCP_EV_TIME_SYNC, (const uint8 *)"\x01\x02\x03\x04", 4U);
     Xcp_Tl_TxConfirmation(0U, E_OK);
     {
@@ -1301,21 +1301,21 @@ int main(void)
     }
 
 #if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
-    /* ext 地址扩展：ext 高 4 位选 CalPage 段，按激活页翻译 */
+    /* ext address extension: ext high 4 bits select the CalPage segment, translated by the active page */
     printf("-- ext address extension\n");
     {
         uint32 seg_base = g_xcp_channel.config_ptr->xcp_segment_config[0].start_address;
         uint32 seg_len  = g_xcp_channel.config_ptr->xcp_segment_config[0].length;
         uint32 npage    = g_xcp_channel.config_ptr->xcp_segment_config[0].num_pages;
         uint32 page_len = (npage != 0U) ? (seg_len / npage) : 0U;
-        /* ext=0x10 -> 段 0，addr=页内偏移。验证 MemTranslate 的物理地址 */
+        /* ext=0x10 -> segment 0, addr=in-page offset. Verify MemTranslate's physical address */
         {
             uint8 page = Xcp_SegmentRuntime[0].active_page_xcp;
             uint32 phys = seg_base + ((uint32)page * page_len);
 
             CHECK("E1 ext 0x10 -> seg0 page translation",
                   Xcp_MemTranslate(&g_xcp_channel, 0x10U, 0x40U) == (phys + 0x40U));
-            /* 段 1 (ext=0x20) */
+            /* segment 1 (ext=0x20) */
             {
                 const Xcp_SegmentConfigType *c1 = &g_xcp_channel.config_ptr->xcp_segment_config[1];
                 uint32 s1 = c1->start_address;
@@ -1325,7 +1325,7 @@ int main(void)
                       Xcp_MemTranslate(&g_xcp_channel, 0x20U, 0x10U)
                       == (s1 + ((uint32)p1 * pl1) + 0x10U));
             }
-            /* ext=0 不翻译 */
+            /* ext=0 not translated */
             CHECK("E3 ext 0 passthrough",
                   Xcp_MemTranslate(&g_xcp_channel, 0x00U, 0xDEADBEEFUL) == 0xDEADBEEFUL);
         }
