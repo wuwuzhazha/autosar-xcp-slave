@@ -25,7 +25,7 @@ sint16 Xcp_CmdGetSeed(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
     if (mode > 0x01U)
     {
 
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+        return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
     if (mode == 0x01U)
