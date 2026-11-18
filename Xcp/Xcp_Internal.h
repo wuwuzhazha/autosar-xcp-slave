@@ -96,6 +96,13 @@ typedef struct
     uint8  dto_queue_head;
     uint8  dto_queue_tail;
 
+#if (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
+    uint32 dropped_dto_counter;
+#endif
+    boolean dto_overload_pending;
+    uint16  overload_ev_cooldown;
+    uint16  dto_busy_watchdog_cnt;
+
 #if (XCP_MAX_ODT > 255U)
     #error "XCP_MAX_ODT must be <= 255 for uint8 DTO ring buffer indices"
 #endif

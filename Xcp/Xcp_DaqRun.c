@@ -11,14 +11,6 @@
 uint16 Xcp_ActiveDaqIndices[XCP_MAX_DAQ];
 uint16 Xcp_ActiveDaqCount = 0;
 
-#if (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
-static uint32 dropped_dto_counter = 0;
-#endif
-
-static boolean dto_overload_pending = FALSE;
-static uint16  overload_ev_cooldown = 0U;
-static uint16  dto_busy_watchdog_cnt = 0U;
-
 void Xcp_RebuildActiveDaqList(Xcp_Channel *ch)
 {
     uint16 i;
@@ -228,10 +220,10 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length
     else
     {
 #if (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
-        dropped_dto_counter++;
+        storage->dropped_dto_counter++;
 #endif
 
-        dto_overload_pending = TRUE;
+        storage->dto_overload_pending = TRUE;
     }
 
     XCP_DTO_EXIT_CRITICAL();
@@ -286,9 +278,9 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
 
     if (runtime->tx.dto_latch != FALSE)
     {
-        if (dto_busy_watchdog_cnt < XCP_DTO_BUSY_TIMEOUT_CYCLES)
+        if (storage->dto_busy_watchdog_cnt < XCP_DTO_BUSY_TIMEOUT_CYCLES)
         {
-            dto_busy_watchdog_cnt++;
+            storage->dto_busy_watchdog_cnt++;
         }
         else
         {
@@ -299,12 +291,12 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
             }
 
             runtime->tx.dto_latch = FALSE;
-            dto_busy_watchdog_cnt = 0U;
+            storage->dto_busy_watchdog_cnt = 0U;
         }
     }
     else
     {
-        dto_busy_watchdog_cnt = 0U;
+        storage->dto_busy_watchdog_cnt = 0U;
     }
 
     if ((runtime->tx_mode == XCP_TX_ON) &&
@@ -337,13 +329,13 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
 
     XCP_DTO_EXIT_CRITICAL();
 
-    if (overload_ev_cooldown > 0U)
+    if (storage->overload_ev_cooldown > 0U)
     {
-        overload_ev_cooldown--;
+        storage->overload_ev_cooldown--;
         return;
     }
 
-    if (dto_overload_pending != TRUE)
+    if (storage->dto_overload_pending != TRUE)
     {
         return;
     }
@@ -359,20 +351,20 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
     if (i >= XCP_MAX_DAQ)
     {
 
-        dto_overload_pending = FALSE;
+        storage->dto_overload_pending = FALSE;
         return;
     }
 
     if (Xcp_SendDaqOverloadEvent(0xFFFFU) == E_OK)
     {
-        dto_overload_pending = FALSE;
+        storage->dto_overload_pending = FALSE;
 
-        overload_ev_cooldown = (uint16) (1000U / XCP_MAIN_FUNCTION_PERIOD_MS);
+        storage->overload_ev_cooldown = (uint16) (1000U / XCP_MAIN_FUNCTION_PERIOD_MS);
     }
     else
     {
 
-        overload_ev_cooldown = 2U;
+        storage->overload_ev_cooldown = 2U;
     }
 }
 

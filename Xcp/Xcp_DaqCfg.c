@@ -49,6 +49,8 @@ void Xcp_InitDaqLists(Xcp_Channel *ch)
 #if (XCP_MIN_DAQ > 0U)
     Xcp_LoadStaticDaqLists(&g_xcp_channel);
 #endif
+
+    Xcp_RebuildActiveDaqList(&g_xcp_channel);
 }
 
 #if (XCP_MIN_DAQ > 0U)
