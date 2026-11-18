@@ -1,9 +1,9 @@
-# Default owner for everything — replace Harry with the actual
+# Default owner for everything — replace wuwuzhazha with the actual
 # GitHub user or team before publishing.
-* @Harry
+* @wuwuzhazha
 
 # Protocol core
-Xcp/ @Harry
+Xcp/ @wuwuzhazha
 
 # Generated output — reviewers should not need to eyeball these
-Gen/ @Harry
+Gen/ @wuwuzhazha

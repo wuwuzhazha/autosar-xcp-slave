@@ -7,7 +7,7 @@
 
 单通道，C99，除你的集成钩子外无外部依赖。
 
-[![CI](https://github.com/Harry/xcp-slave/workflows/ci/badge.svg)](https://github.com/Harry/xcp-slave/actions)
+[![CI](https://github.com/wuwuzhazha/xcp-slave/workflows/ci/badge.svg)](https://github.com/wuwuzhazha/xcp-slave/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
