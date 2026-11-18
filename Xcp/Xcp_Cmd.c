@@ -14,7 +14,7 @@ static const Xcp_CmdEntryType XCP_CMD_TABLE[] = {
     { XCP_CMD_CONNECT,              2U, 0U,                    XCP_GUARD_ALLOW_DISCONNECTED, Xcp_CmdConnect },
     { XCP_CMD_DISCONNECT,           1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdDisconnect },
     { XCP_CMD_GET_STATUS,           1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdGetStatus },
-    { XCP_CMD_SYNCH,                1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdSynch },
+    { XCP_CMD_SYNCH,                1U, 0U,                    XCP_GUARD_ALLOW_DISCONNECTED, Xcp_CmdSynch },
     { XCP_CMD_GET_COMM_MODE_INFO,   1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdGetCommModeInfo },
     { XCP_CMD_GET_ID,               2U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdGetId },
     { XCP_CMD_SET_MTA,              8U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdSetMta },
