@@ -18,7 +18,6 @@ BASE = ROOT / "Config" / "xcp_base.toml"
 PASS = 0
 FAIL = 0
 
-
 def ok(cond, name, detail=""):
     global PASS, FAIL
     if cond:
@@ -26,7 +25,6 @@ def ok(cond, name, detail=""):
     else:
         FAIL += 1
         print(f"FAIL {name} {detail}")
-
 
 def run(*args, cfg=BASE, out=None, sets=()):
     cmd = [sys.executable, str(XCPGEN), "--config", str(cfg)]
@@ -37,7 +35,6 @@ def run(*args, cfg=BASE, out=None, sets=()):
     return subprocess.run(cmd + list(args), cwd=ROOT,
                           capture_output=True, text=True, errors="replace")
 
-
 def defines(path):
     d = {}
     for ln in path.read_text().splitlines():
@@ -45,7 +42,6 @@ def defines(path):
             parts = ln[8:].split(None, 1)
             d[parts[0]] = parts[1] if len(parts) > 1 else ""
     return d
-
 
 def cfg_file(tmp, mutate):
     """载入 base 配置, 应用 mutate(dict) 后以 JSON 落盘 (机器生成配置走 JSON)。"""
@@ -55,7 +51,6 @@ def cfg_file(tmp, mutate):
     p.write_text(json.dumps(cfg, ensure_ascii=False, indent=1), encoding="utf-8")
     return p
 
-
 def load_base():
     if not hasattr(load_base, "_c"):
         spec = importlib.util.spec_from_file_location("xg", XCPGEN)
@@ -64,7 +59,6 @@ def load_base():
         load_base._c = mod.load_config(str(BASE))
     return copy.deepcopy(load_base._c)
 
-
 def expect_err(name, needle, sets=(), mutate=None, cfg=None, out=None):
     c = cfg or BASE
     if mutate is not None:
@@ -72,7 +66,6 @@ def expect_err(name, needle, sets=(), mutate=None, cfg=None, out=None):
     r = run(cfg=c, out=out / "o" if out else None, sets=sets)
     ok(r.returncode != 0 and needle in r.stderr, name,
        f"rc={r.returncode} err={r.stderr.strip()[:120]}")
-
 
 def main():
     with tempfile.TemporaryDirectory(prefix="xcpgen_t_") as tdir:
@@ -216,7 +209,6 @@ def main():
 
     print(f"xcpgen tests: {PASS} passed, {FAIL} failed")
     return 1 if FAIL else 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

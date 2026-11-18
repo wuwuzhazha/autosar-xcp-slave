@@ -174,11 +174,10 @@ void Xcp_TransmitDto(uint16 daq_list_no, uint8 odt_no)
 
         if (entry->size == 0U)
         {
-            /* 已分配但未 WRITE_DAQ 的条目 */
+
             continue;
         }
 
-        /* 位对象: 取 address 起第 bit_offset 位（LE），以 1 字节承载 */
         is_bit   = (entry->bit_offset <= XCP_BIT_OFFSET_MAX) ? TRUE : FALSE;
         elem_len = (is_bit != FALSE) ? 1U : entry->size;
 
@@ -408,6 +407,5 @@ void Xcp_ReportDtoOverload(void)
         overload_ev_cooldown = 2U;
     }
 }
-
 
 #endif

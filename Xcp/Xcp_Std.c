@@ -78,7 +78,6 @@ sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
     g_xcp_channel.storage_ptr->cto_buffer[1] |= XCP_RESOURCE_PGM;
 #endif
 
-    /* COMM_MODE_BASIC: Intel 字节序、BYTE 地址粒度、无从块模式，GET_COMM_MODE_INFO 可用 */
     g_xcp_channel.storage_ptr->cto_buffer[2] = XCP_COMM_BASIC_OPTIONAL;
 
     g_xcp_channel.storage_ptr->cto_buffer[3] = XCP_MAX_CTO;
@@ -86,8 +85,8 @@ sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
     g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (XCP_MAX_DTO & 0xFFU);
     g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((XCP_MAX_DTO >> 8U) & 0xFFU);
 
-    g_xcp_channel.storage_ptr->cto_buffer[6] = 0x01U;   /* 协议层版本 */
-    g_xcp_channel.storage_ptr->cto_buffer[7] = 0x01U;   /* 传输层版本 */
+    g_xcp_channel.storage_ptr->cto_buffer[6] = 0x01U;
+    g_xcp_channel.storage_ptr->cto_buffer[7] = 0x01U;
 
     return (sint16)(8U);
 }
@@ -162,7 +161,6 @@ sint16 Xcp_CmdGetCommModeInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFr
     g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
     g_xcp_channel.storage_ptr->cto_buffer[1] = 0x00U;
 
-    /* COMM_MODE_OPTIONAL: 主块模式（DOWNLOAD_NEXT）未按 ASAM 实现，不宣称 */
     g_xcp_channel.storage_ptr->cto_buffer[2] = 0x00U;
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
     g_xcp_channel.storage_ptr->cto_buffer[2] |= XCP_COMM_OPT_INTERLEAVED_MODE;
@@ -176,7 +174,7 @@ sint16 Xcp_CmdGetCommModeInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFr
 #else
     g_xcp_channel.storage_ptr->cto_buffer[6] = 0x00U;
 #endif
-    /* XCP 驱动版本: 高半字节主版本、低半字节次版本 */
+
     g_xcp_channel.storage_ptr->cto_buffer[7] = (uint8) (((XCP_SW_MAJOR_VERSION & 0x0FU) << 4U)
                                                         | (XCP_SW_MINOR_VERSION & 0x0FU));
 
@@ -547,7 +545,7 @@ sint16 Xcp_CmdSetRequest(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *
 
     if ((mode & XCP_SET_REQ_STORE_DAQ_NO_RESUME) != 0U)
     {
-        /* 无 RESUME 的 DAQ 配置存储不支持：显式拒绝 */
+
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 

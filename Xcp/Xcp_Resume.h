@@ -14,7 +14,6 @@ extern "C" {
 
 #define XCP_RESUME_DATA_VERSION         (0x0300U)
 
-
 typedef enum
 {
     XCP_RESUME_STATE_IDLE = 0x00U,
@@ -50,7 +49,7 @@ typedef struct
     uint16 checksum;
     uint8  resume_active;
     uint8  reserved;
-    uint16 session_cfg_id;          /* SET_REQUEST 的 SESSION_CONFIGURATION_ID */
+    uint16 session_cfg_id;
 
     Xcp_DaqResumeConfigType daq_config[XCP_MAX_DAQ];
 
@@ -72,7 +71,6 @@ extern Xcp_ResumeDataType g_xcp_resume_data;
 
 void Xcp_InitResumeMode(void);
 
-/* 保存全部 DAQ 列表配置，已 SELECT 的列表标记为上电 RESUME */
 Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id);
 
 Std_ReturnType Xcp_RestoreDaqConfig(void);

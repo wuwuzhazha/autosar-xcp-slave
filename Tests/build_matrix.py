@@ -85,7 +85,6 @@ def variants(name_filter):
                 continue
             yield vid, [f"LinkType={LINKS[link]}", *sets]
 
-
 def build(vid, sets, workdir):
     gendir = workdir / vid.replace("/", "_")
     gen = subprocess.run(
@@ -105,7 +104,6 @@ def build(vid, sets, workdir):
         if r.returncode != 0:
             return vid, sets, (r.stderr or r.stdout).strip()
     return vid, sets, None
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -129,7 +127,6 @@ def main():
             print("     " + line)
     print(f"matrix: {len(results) - len(failed)}/{len(results)} variants OK")
     return 1 if failed else 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

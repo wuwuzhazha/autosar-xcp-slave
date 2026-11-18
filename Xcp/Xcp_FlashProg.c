@@ -8,7 +8,7 @@
 
 #if (XCP_FLASH_PROGRAMMING_ENABLED == STD_ON)
 
-#define XCP_SECTORS  (g_xcp_channel.config_ptr->xcp_flash_sector_config)   /* 扇区描述表别名 */
+#define XCP_SECTORS  (g_xcp_channel.config_ptr->xcp_flash_sector_config)
 
 static uint8 Xcp_ProgramBuffer[XCP_MAX_PGM_BLOCK_SIZE];
 
@@ -64,7 +64,7 @@ sint16 Xcp_CmdProgramStart(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame
 
     g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
     g_xcp_channel.storage_ptr->cto_buffer[1] = 0x00U;
-    /* [2]=COMM_MODE_PGM [3]=MAX_CTO_PGM [4]=MAX_BS_PGM [5]=MIN_ST_PGM [6]=QUEUE_SIZE_PGM */
+
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
     g_xcp_channel.storage_ptr->cto_buffer[2] = XCP_COMM_OPT_INTERLEAVED_MODE;
     g_xcp_channel.storage_ptr->cto_buffer[6] = XCP_CMD_QUEUE_SIZE;

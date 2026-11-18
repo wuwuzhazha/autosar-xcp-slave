@@ -3,8 +3,6 @@
 #include "Xcp_Types.h"
 #include "Xcp_Callback.h"
 
-/* FlexRay：LEN(2) | CTR(1) | MSG | FILL，串联报文按头长度逐段入队。 */
-
 #if (XCP_ON_FLEXRAY_ENABLED == STD_ON)
 #include "FrIf.h"
 

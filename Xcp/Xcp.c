@@ -22,7 +22,7 @@ Xcp_Channel g_xcp_channel;
 void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length)
 {
     if ((cmd_data == NULL) || (cmd_length == 0U)
-#if (XCP_MAX_CTO < 255U)   /* uint8 长度天然 <= 255, 无法超过 255 的 MAX_CTO */
+#if (XCP_MAX_CTO < 255U)
         || (cmd_length > XCP_MAX_CTO)
 #endif
     )
@@ -352,7 +352,7 @@ void Xcp_MainFunction(void)
             case XCP_TIMESTAMP_UNIT_1PS:
             case XCP_TIMESTAMP_UNIT_10PS:
             case XCP_TIMESTAMP_UNIT_100PS:
-                /* time_cycle<=255 时均不足 1ms：按 MainFunction 最小周期触发 */
+
                 cycle_ms = 1U;
                 break;
             case XCP_TIMESTAMP_UNIT_1US:

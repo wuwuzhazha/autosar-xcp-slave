@@ -35,4 +35,4 @@ typedef struct
     uint8  sw_patch_version;
 } Std_VersionInfoType;
 
-#endif /* STANDARD_TYPES_H */
+#endif

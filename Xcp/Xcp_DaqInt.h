@@ -1,9 +1,6 @@
 #ifndef XCP_DAQ_INT_H
 #define XCP_DAQ_INT_H
 
-/* DAQ 内部共享：cfg/run/stim 三个编译单元共用的声明与宏。
-   不对外；只被 Xcp_Daq*.c 包含。 */
-
 #include "Xcp_Daq.h"
 #include "Xcp_Types.h"
 #include "Xcp_Config.h"
@@ -11,7 +8,6 @@
 
 #if (XCP_DAQ_ENABLED == STD_ON)
 
-/* ODT0 是否携带时间戳：TIMESTAMP_FIXED 时恒带，否则看 DAQ 列表 mode */
 #if (XCP_TIMESTAMP_TYPE == XCP_NO_TIME_STAMP)
 #define XCP_DAQ_HAS_TIMESTAMP(daq) (FALSE)
 #elif (XCP_TIMESTAMP_FIXED == 1U)
@@ -20,11 +16,9 @@
 #define XCP_DAQ_HAS_TIMESTAMP(daq) ((((daq)->mode) & XCP_DAQ_MODE_TIMESTAMP) != 0U)
 #endif
 
-/* 运行态活动 DAQ 索引：run 写（RebuildActiveDaqList），stim 读（ProcessStim 遍历）。 */
 extern uint16 Xcp_ActiveDaqIndices[XCP_MAX_DAQ];
 extern uint16 Xcp_ActiveDaqCount;
 
-/* 绝对 ODT PID：编码和解码走同一前缀和定义，避免两套算法。 */
 static inline uint16 Xcp_AbsPidEncode(uint16 daq_list_no, uint8 odt_no)
 {
     uint16 abs_id = 0U;
@@ -57,6 +51,6 @@ static inline Std_ReturnType Xcp_AbsPidDecode(uint16 abs_odt, uint16 *daq_list_n
     return E_NOT_OK;
 }
 
-#endif /* XCP_DAQ_ENABLED */
+#endif
 
-#endif /* XCP_DAQ_INT_H */
+#endif

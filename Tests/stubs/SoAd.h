@@ -5,4 +5,4 @@
 
 Std_ReturnType SoAd_IfTransmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_ptr);
 
-#endif /* SOAD_H */
+#endif

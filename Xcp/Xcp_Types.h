@@ -114,27 +114,25 @@ extern "C" {
 #define XCP_CONNECT_MODE_NORMAL         (0x00U)
 #define XCP_CONNECT_MODE_USER_DEFINED   (0x01U)
 
-/* ===== ASAM XCP 1.1 Part 2 响应/参数位定义（位号与 pyxcp types.py 一致） ===== */
-/* CONNECT: COMM_MODE_BASIC */
-#define XCP_COMM_BASIC_BYTE_ORDER_MOTOROLA  (0x01U)  /* bit0, 0=Intel */
-#define XCP_COMM_BASIC_AG_SHIFT             (1U)     /* bit1-2 ADDRESS_GRANULARITY, 0=BYTE */
+#define XCP_COMM_BASIC_BYTE_ORDER_MOTOROLA  (0x01U)
+#define XCP_COMM_BASIC_AG_SHIFT             (1U)
 #define XCP_COMM_BASIC_SLAVE_BLOCK_MODE     (0x40U)
-#define XCP_COMM_BASIC_OPTIONAL             (0x80U)  /* 支持 GET_COMM_MODE_INFO */
-/* GET_COMM_MODE_INFO: COMM_MODE_OPTIONAL / PROGRAM_START: COMM_MODE_PGM */
+#define XCP_COMM_BASIC_OPTIONAL             (0x80U)
+
 #define XCP_COMM_OPT_MASTER_BLOCK_MODE      (0x01U)
 #define XCP_COMM_OPT_INTERLEAVED_MODE       (0x02U)
-/* GET_STATUS: SESSION_STATUS */
+
 #define XCP_SS_STORE_CAL_REQ                (0x01U)
 #define XCP_SS_STORE_DAQ_REQ                (0x04U)
 #define XCP_SS_CLEAR_DAQ_REQ                (0x08U)
 #define XCP_SS_DAQ_RUNNING                  (0x40U)
 #define XCP_SS_RESUME                       (0x80U)
-/* SET_REQUEST: Mode */
+
 #define XCP_SET_REQ_STORE_CAL_REQ           (0x01U)
 #define XCP_SET_REQ_STORE_DAQ_NO_RESUME     (0x02U)
 #define XCP_SET_REQ_STORE_DAQ_RESUME        (0x04U)
 #define XCP_SET_REQ_CLEAR_DAQ_REQ           (0x08U)
-/* GET_DAQ_PROCESSOR_INFO: DAQ_PROPERTIES */
+
 #define XCP_DAQ_PROP_CONFIG_TYPE_DYNAMIC    (0x01U)
 #define XCP_DAQ_PROP_PRESCALER_SUPPORTED    (0x02U)
 #define XCP_DAQ_PROP_RESUME_SUPPORTED       (0x04U)
@@ -143,35 +141,35 @@ extern "C" {
 #define XCP_DAQ_PROP_PID_OFF_SUPPORTED      (0x20U)
 #define XCP_DAQ_PROP_OVERLOAD_MSB           (0x40U)
 #define XCP_DAQ_PROP_OVERLOAD_EVENT         (0x80U)
-/* GET_DAQ_PROCESSOR_INFO: DAQ_KEY_BYTE */
-#define XCP_DAQ_KEY_OPTIMISATION_SHIFT      (0U)     /* bit0-3, 0=OM_DEFAULT */
-#define XCP_DAQ_KEY_ADDR_EXT_SHIFT          (4U)     /* bit4-5, 0=AE 在 ODT 内可不同 */
-#define XCP_DAQ_KEY_ID_FIELD_SHIFT          (6U)     /* bit6-7, XCP_ABSOLUTE.. */
-/* SET_DAQ_LIST_MODE / GET_DAQ_LIST_MODE: Mode */
-#define XCP_DAQ_MODE_SELECTED               (0x01U)  /* 仅 GET */
+
+#define XCP_DAQ_KEY_OPTIMISATION_SHIFT      (0U)
+#define XCP_DAQ_KEY_ADDR_EXT_SHIFT          (4U)
+#define XCP_DAQ_KEY_ID_FIELD_SHIFT          (6U)
+
+#define XCP_DAQ_MODE_SELECTED               (0x01U)
 #define XCP_DAQ_MODE_DIRECTION_STIM         (0x02U)
 #define XCP_DAQ_MODE_TIMESTAMP              (0x10U)
 #define XCP_DAQ_MODE_PID_OFF                (0x20U)
-#define XCP_DAQ_MODE_RUNNING                (0x40U)  /* 仅 GET */
-#define XCP_DAQ_MODE_RESUME                 (0x80U)  /* 仅 GET */
-/* START_STOP_DAQ_LIST / START_STOP_SYNCH: Mode */
-#define XCP_START_STOP_STOP                 (0x00U)  /* SYNCH: stop all */
-#define XCP_START_STOP_START                (0x01U)  /* SYNCH: start selected */
-#define XCP_START_STOP_SELECT               (0x02U)  /* SYNCH: stop selected */
-/* GET_DAQ_LIST_INFO: DAQ_LIST_PROPERTIES */
+#define XCP_DAQ_MODE_RUNNING                (0x40U)
+#define XCP_DAQ_MODE_RESUME                 (0x80U)
+
+#define XCP_START_STOP_STOP                 (0x00U)
+#define XCP_START_STOP_START                (0x01U)
+#define XCP_START_STOP_SELECT               (0x02U)
+
 #define XCP_DAQ_LIST_PROP_PREDEFINED        (0x01U)
 #define XCP_DAQ_LIST_PROP_EVENT_FIXED       (0x02U)
 #define XCP_DAQ_LIST_PROP_DAQ               (0x04U)
 #define XCP_DAQ_LIST_PROP_STIM              (0x08U)
-/* GET_DAQ_EVENT_INFO: DAQ_EVENT_PROPERTIES bit6-7 = consistency */
+
 #define XCP_EVENT_PROP_CONSISTENCY_SHIFT    (6U)
-/* GET_DAQ_RESOLUTION_INFO: TIMESTAMP_MODE (bit0-2 SIZE) */
+
 #define XCP_TS_MODE_FIXED                   (0x08U)
 #define XCP_TS_MODE_UNIT_SHIFT              (4U)
-/* WRITE_DAQ: BIT_OFFSET 0..31，0xFF = 非位对象 */
+
 #define XCP_BIT_OFFSET_MAX                  (0x1FU)
 #define XCP_BIT_OFFSET_NONE                 (0xFFU)
-/* GET_PAGE_INFO: PAGE_PROPERTIES */
+
 #define XCP_PAGE_PROP_ECU_ACCESS_WITHOUT_XCP     (0x01U)
 #define XCP_PAGE_PROP_ECU_ACCESS_WITH_XCP        (0x02U)
 #define XCP_PAGE_PROP_XCP_READ_ACCESS_WITHOUT_ECU  (0x04U)
@@ -187,7 +185,6 @@ extern "C" {
 #define XCP_TIMESTAMP_ONE_BYTE          (0x01U)
 #define XCP_TIMESTAMP_TWO_BYTE          (0x02U)
 #define XCP_TIMESTAMP_FOUR_BYTE         (0x04U)
-
 
 #define XCP_SID_INIT                    (0x00U)
 #define XCP_SID_GET_VERSION_INFO        (0x01U)
@@ -216,7 +213,7 @@ extern "C" {
 
 #define XCP_MODULE_ID                   (212U)
 #define XCP_VENDOR_ID                   (0U)
-/* XCP_SW_*_VERSION 由生成物 Xcp_Cfg.h 提供 (ECUC XcpSw*Version) */
+
 #define XCP_AR_RELEASE_MAJOR_VERSION    (4U)
 #define XCP_AR_RELEASE_MINOR_VERSION    (4U)
 #define XCP_AR_RELEASE_REVISION_VERSION (0U)
@@ -233,7 +230,6 @@ extern "C" {
 #define XCP_PGM_MODE_ABSOLUTE           (0x01U)
 #define XCP_PGM_MODE_FUNCTIONAL         (0x02U)
 
-/* 命令处理函数的响应：写入 cto_buffer，返回待发送长度 */
 typedef uint8 Xcp_ResFrame;
 
 typedef sint16 (*Xcp_CmdFn)(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
@@ -298,7 +294,6 @@ typedef struct
     uint8            resume_pending;
 } Xcp_DaqListType;
 
-
 typedef struct
 {
     uint16 event_channel_number;
@@ -306,19 +301,17 @@ typedef struct
     uint8  max_daq_list;
     uint8  time_cycle;
     uint8  time_unit;
-    uint8  event_channel_type;   /* XCP_EVENT_CHANNEL_TYPE_* (ECUC_Xcp_00172) */
-    uint8  consistency;          /* XCP_EVT_CONSISTENCY_*   (ECUC_Xcp_00171) */
+    uint8  event_channel_type;
+    uint8  consistency;
 } Xcp_EventChannelType;
 
-/* 取值即 DAQ_EVENT_PROPERTIES 的 DAQ(bit2)/STIM(bit3) 位 */
-#define XCP_EVENT_CHANNEL_TYPE_DAQ      (0x04U)  /* 事件通道仅承载 DAQ */
-#define XCP_EVENT_CHANNEL_TYPE_STIM     (0x08U)  /* 事件通道仅承载 STIM */
-#define XCP_EVENT_CHANNEL_TYPE_DAQ_STIM (0x0CU)  /* 事件通道可承载 DAQ+STIM */
+#define XCP_EVENT_CHANNEL_TYPE_DAQ      (0x04U)
+#define XCP_EVENT_CHANNEL_TYPE_STIM     (0x08U)
+#define XCP_EVENT_CHANNEL_TYPE_DAQ_STIM (0x0CU)
 
-/* 取值即 DAQ_EVENT_PROPERTIES bit6-7 的 CONSISTENCY 编码 */
-#define XCP_EVT_CONSISTENCY_ODT         (0x00U)  /* ODT 级一致 */
-#define XCP_EVT_CONSISTENCY_DAQ         (0x01U)  /* DAQ 列表级一致 */
-#define XCP_EVT_CONSISTENCY_EVENT       (0x02U)  /* 事件通道级一致 */
+#define XCP_EVT_CONSISTENCY_ODT         (0x00U)
+#define XCP_EVT_CONSISTENCY_DAQ         (0x01U)
+#define XCP_EVT_CONSISTENCY_EVENT       (0x02U)
 
 typedef struct
 {
@@ -334,16 +327,16 @@ typedef struct
 
 typedef struct
 {
-    uint32 start_address;      /* 校准段起始地址 (配置, const) */
-    uint32 length;             /* 段长度 (配置, const) */
-    uint8  segment_number;     /* 段号 (配置, const) */
-    uint8  num_pages;          /* 段内页数 (配置, const) */
+    uint32 start_address;
+    uint32 length;
+    uint8  segment_number;
+    uint8  num_pages;
 } Xcp_SegmentConfigType;
 
 typedef struct
 {
-    uint8  active_page_ecu;    /* ECU 当前激活页 (运行态) */
-    uint8  active_page_xcp;    /* XCP 主机当前激活页 (运行态) */
+    uint8  active_page_ecu;
+    uint8  active_page_xcp;
 } Xcp_SegmentType;
 
 typedef struct
@@ -358,8 +351,7 @@ typedef struct
 
 typedef struct
 {
-    /* post-build 引用: 表指针与 PDU/链路参数; 成员不做特性守卫
-       (Xcp_Types.h 先于 Xcp_Config.h 解析, #if 在 XCP_* 宏定义前求值恒为关) */
+
     const Xcp_EventChannelType    *xcp_event_channel;
     const Xcp_StaticDaqListType   *xcp_static_daq_list;
     const Xcp_SegmentConfigType   *xcp_segment_config;

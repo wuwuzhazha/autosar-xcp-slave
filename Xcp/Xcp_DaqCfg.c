@@ -100,7 +100,7 @@ static void Xcp_LoadStaticDaqLists(void)
 
 sint16 Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
-    /* 位级 STIM（WRITE_DAQ BIT_OFFSET）与 EV_DAQ_OVERLOAD 恒实现 */
+
     uint8 daq_properties = XCP_DAQ_PROP_BIT_STIM_SUPPORTED | XCP_DAQ_PROP_OVERLOAD_EVENT;
 
     (void) cmd_data;
@@ -126,7 +126,7 @@ sint16 Xcp_CmdGetDaqProcessorInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_R
     g_xcp_channel.storage_ptr->cto_buffer[4] = (uint8) (XCP_MAX_EVENT_CHANNEL & 0xFFU);
     g_xcp_channel.storage_ptr->cto_buffer[5] = (uint8) ((XCP_MAX_EVENT_CHANNEL >> 8U) & 0xFFU);
     g_xcp_channel.storage_ptr->cto_buffer[6] = (uint8) XCP_MIN_DAQ;
-    /* DAQ_KEY_BYTE: 标识字段类型；地址扩展可在 ODT 内不同；默认优化 */
+
     g_xcp_channel.storage_ptr->cto_buffer[7] =
         (uint8) ((XCP_IDENTIFICATION_FIELD_TYPE & 0x03U) << XCP_DAQ_KEY_ID_FIELD_SHIFT);
 
@@ -140,7 +140,6 @@ sint16 Xcp_CmdGetDaqResolutionInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_
     (void) cmd_data;
     (void) cmd_length;
 
-    /* TIMESTAMP_MODE: bit0-2 SIZE（XCP_*_BYTE 取值即编码）, bit3 FIXED, bit4-7 UNIT */
     timestamp_mode = (uint8) (XCP_TIMESTAMP_TYPE & 0x07U);
 #if (XCP_TIMESTAMP_FIXED == 1U)
     timestamp_mode |= XCP_TS_MODE_FIXED;
@@ -176,7 +175,6 @@ sint16 Xcp_CmdGetDaqEventInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFr
 
     event_cfg = &g_xcp_channel.config_ptr->xcp_event_channel[event_channel];
 
-    /* DAQ_EVENT_PROPERTIES: bit2 DAQ / bit3 STIM（类型常量即位值）, bit6-7 一致性 */
     event_properties = (uint8) (event_cfg->event_channel_type & XCP_EVENT_CHANNEL_TYPE_DAQ_STIM);
     event_properties |= (uint8) ((event_cfg->consistency & 0x03U) << XCP_EVENT_PROP_CONSISTENCY_SHIFT);
 
@@ -341,7 +339,7 @@ sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
-#if (XCP_MAX_ODT_ENTRIES < 255U)   /* uint8 计数天然 <= 255 */
+#if (XCP_MAX_ODT_ENTRIES < 255U)
     if (odt_entry_count > XCP_MAX_ODT_ENTRIES)
     {
         return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
@@ -357,7 +355,6 @@ sint16 Xcp_CmdAllocOdtEntry(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFram
         Xcp_OdtType *odt = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no];
         uint8        e;
 
-        /* 新分配条目清空: size=0 不采样/不刺激，避免沿用上次配置的地址 */
         for (e = 0U; e < odt_entry_count; e++)
         {
             odt->odt_entry[e].address           = 0U;
@@ -493,7 +490,6 @@ sint16 Xcp_CmdSetDaqListMode(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
-    /* PID_OFF 未实现（DAQ_PROPERTIES.PID_OFF_SUPPORTED=0） */
     if ((mode & XCP_DAQ_MODE_PID_OFF) != 0U)
     {
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
@@ -641,7 +637,7 @@ sint16 Xcp_CmdStartStopDaqList(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResF
     }
     else if (mode == XCP_START_STOP_SELECT)
     {
-        /* 仅标记，START_STOP_SYNCH 统一启停 */
+
         g_xcp_channel.storage_ptr->daq_list[daq_list_no].selected = TRUE;
     }
     else
@@ -679,7 +675,6 @@ sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
 
     mode = cmd_data[1];
 
-    /* 0=stop all, 1=start selected, 2=stop selected */
     if (mode > XCP_START_STOP_SELECT)
     {
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
@@ -715,13 +710,13 @@ sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
             }
             else
             {
-                /* stop selected：未运行的列表保持原状态 */
+
             }
             daq->selected = FALSE;
         }
         else
         {
-            /* 未选中的列表不受 start/stop selected 影响 */
+
         }
     }
 
@@ -731,7 +726,6 @@ sint16 Xcp_CmdStartStopSynch(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
     return (sint16)(1U);
 }
 
-/* DAQ_LIST_PROPERTIES 的 DAQ/STIM 位：静态列表按配置类型，其余列表两种方向均可 */
 static uint8 Xcp_DaqListTypeProperties(uint16 daq_list_no)
 {
     uint8 properties = (uint8) (XCP_DAQ_LIST_PROP_DAQ | XCP_DAQ_LIST_PROP_STIM);
@@ -751,7 +745,7 @@ static uint8 Xcp_DaqListTypeProperties(uint16 daq_list_no)
         }
         else
         {
-            /* XCP_DAQ_LIST_TYPE_DAQ_STIM */
+
         }
     }
 #else
@@ -790,7 +784,6 @@ sint16 Xcp_CmdGetDaqListInfo(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFra
         properties |= XCP_DAQ_LIST_PROP_EVENT_FIXED;
     }
 
-    /* [1]=DAQ_LIST_PROPERTIES [2]=MAX_ODT [3]=MAX_ODT_ENTRIES [4..5]=FIXED_EVENT */
     g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
     g_xcp_channel.storage_ptr->cto_buffer[1] = properties;
     g_xcp_channel.storage_ptr->cto_buffer[2] = daq->odt_max_count;
@@ -874,7 +867,6 @@ sint16 Xcp_CmdReadDaq(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
 
     entry = &g_xcp_channel.storage_ptr->daq_list[daq_list_no].odt[odt_no].odt_entry[odt_entry_no];
 
-    /* [1]=BIT_OFFSET [2]=SIZE [3]=ADDRESS_EXTENSION [4..7]=ADDRESS */
     g_xcp_channel.storage_ptr->cto_buffer[0] = XCP_PID_RES;
     g_xcp_channel.storage_ptr->cto_buffer[1] = entry->bit_offset;
     g_xcp_channel.storage_ptr->cto_buffer[2] = entry->size;
@@ -907,6 +899,5 @@ sint16 Xcp_CmdGetDaqClock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame 
 
     return (sint16)(8U);
 }
-
 
 #endif

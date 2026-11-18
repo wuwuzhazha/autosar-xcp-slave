@@ -1,9 +1,5 @@
 #include "Cdd.h"
-/**
- * @file    test_stubs.c
- * @brief   测试桩：CanIf/Det/NvM 捕获 + 可工作 Callout 替身
- *          （替代产品桩 Xcp_Callouts.c，测试构建不编译该文件）
- */
+
 #include <string.h>
 #include "StandardTypes.h"
 #include "ComStack_Types.h"
@@ -15,15 +11,14 @@
 #include "Xcp_Internal.h"
 #include "Os.h"
 
-/*=========================== CAN TX 捕获 ====================================*/
 #define TEST_TX_RING 64
 
 uint8  test_tx_buf[TEST_TX_RING][64];
 uint32 test_tx_len[TEST_TX_RING];
-uint8  test_tx_head = 0;   /* 读取位置 */
-uint8  test_tx_tail = 0;   /* 写入位置 */
-uint32 test_tx_count = 0;  /* 总发送数 */
-uint32 test_tx_drop  = 0;  /* CanIf_Transmit失败计数 */
+uint8  test_tx_head = 0;
+uint8  test_tx_tail = 0;
+uint32 test_tx_count = 0;
+uint32 test_tx_drop  = 0;
 boolean test_tx_fail_next = FALSE;
 
 Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_ptr)
@@ -47,7 +42,6 @@ Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_p
     return E_OK;
 }
 
-/* FrIf/SoAd 发送：同一路径捕获进TX环（验证TL切换） */
 Std_ReturnType FrIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_ptr)
 {
     return CanIf_Transmit(tx_pdu_id, pdu_info_ptr);
@@ -64,7 +58,6 @@ Std_ReturnType FrIf_ReconfigLPdu(uint16 lpdu_handle, uint16 frame_id, uint8 chn_
     return E_OK;
 }
 
-/* 弹出最早一帧TX；返回帧长（0=无帧），len 输出帧长 */
 uint32 test_tx_pop(uint8 *out, uint32 *len)
 {
     uint32 n;
@@ -78,7 +71,7 @@ uint32 test_tx_pop(uint8 *out, uint32 *len)
         *len = n;
         memcpy(out, test_tx_buf[test_tx_head], n);
 #if (XCP_ON_FLEXRAY_ENABLED == STD_ON)
-        /* 剥去 XCP-on-FlexRay 帧封装: LEN(2 LE)|CTR(1)|MSG|FILL，验证层只见XCP报文 */
+
         if ((n > 3U) && (((uint32)out[0] | ((uint32)out[1] << 8U)) + 3U) <= n)
         {
             uint16 ml = (uint16)out[0] | ((uint16)out[1] << 8U);
@@ -88,7 +81,7 @@ uint32 test_tx_pop(uint8 *out, uint32 *len)
         }
 #endif
 #if (XCP_ON_ETHERNET_ENABLED == STD_ON)
-        /* 剥去 XCP-on-Ethernet 帧头: LEN(2 LE)|CTR(2)|MSG，验证层只见XCP报文 */
+
         if ((n > 4U) && (((uint32)out[0] | ((uint32)out[1] << 8U)) + 4U) <= n)
         {
             uint16 ml = (uint16)out[0] | ((uint16)out[1] << 8U);
@@ -102,13 +95,11 @@ uint32 test_tx_pop(uint8 *out, uint32 *len)
     return n;
 }
 
-/* 环中剩余帧数 */
 uint32 test_tx_pending(void)
 {
     return (uint32)((test_tx_tail - test_tx_head) & 0xFFU);
 }
 
-/*=========================== DET 捕获 =======================================*/
 uint8  test_det_api;
 uint8  test_det_err;
 uint32 test_det_count = 0;
@@ -123,12 +114,10 @@ Std_ReturnType Det_ReportError(uint16 module_id, uint8 instance_id, uint8 api_id
     return E_OK;
 }
 
-/*=========================== NvM 模拟（RAM后援） =============================*/
-static uint8   nvm_store[16384];  /* v2 resume block 含完整ODT条目表 */
+static uint8   nvm_store[16384];
 static uint32  nvm_store_size = 0;
 static boolean nvm_valid = FALSE;
 
-/* 敌对桩：向 NvM 块注入任意字节并标 valid，验证恢复路径的字段校验 */
 void test_nvm_corrupt(const uint8 *data, uint32 len)
 {
     if (len > sizeof(nvm_store)) { len = sizeof(nvm_store); }
@@ -148,7 +137,6 @@ Std_ReturnType NvM_ReadBlock(uint16 block_id, void *data_ptr)
     return E_NOT_OK;
 }
 
-
 Std_ReturnType NvM_InvalidateNvBlock(uint16 block_id)
 {
     (void)block_id;
@@ -159,7 +147,7 @@ Std_ReturnType NvM_WriteBlock(uint16 block_id, const void *data_ptr)
 {
     (void)block_id;
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
-    /* Xcp_Resume 传入 g_xcp_resume_data；块小于512B时只复制有效前缀 */
+
     nvm_store_size = sizeof(Xcp_ResumeDataType);
     if (nvm_store_size > sizeof(nvm_store))
     {
@@ -172,9 +160,7 @@ Std_ReturnType NvM_WriteBlock(uint16 block_id, const void *data_ptr)
 #endif
     return E_OK;
 }
-/*=========================== Callout 替身 ===================================*/
-/* 确定性 Seed&Key: seed = {res, res^0x5A, res^0xA5, 0x42}; key = seed^0xFF */
-/* 敌对桩：允许把 seed_length 覆盖为任意值，验证从机侧的契约防御 */
+
 static uint8 test_seed_len_override = 0U;
 void test_seed_override_len(uint8 v) { test_seed_len_override = v; }
 
@@ -188,7 +174,7 @@ void Xcp_GetSeed_Callout(uint8 resource, uint8 *seed, uint8 *seed_length)
     seed[1] = (uint8)(resource ^ 0x5AU);
     seed[2] = (uint8)(resource ^ 0xA5U);
     seed[3] = 0x42U;
-    /* 覆盖模式下填满缓冲并回报超长长度：模拟不守契约的集成方 */
+
     if (test_seed_len_override != 0U)
     {
         seed[4] = 0x11U; seed[5] = 0x22U; seed[6] = 0x33U; seed[7] = 0x44U;
@@ -220,8 +206,7 @@ boolean Xcp_VerifyKey_Callout(uint8 resource, const uint8 *key, uint8 key_length
     return TRUE;
 }
 
-/* Flash 模拟：64KB RAM 缓冲区映射到 0x08000000 */
-uint8 test_flash_mem[0x20000];  /* 128KB 覆盖扇区0-3 */
+uint8 test_flash_mem[0x20000];
 
 Std_ReturnType Xcp_FlashErase_Callout(uint32 address, uint32 length)
 {
@@ -232,7 +217,7 @@ Std_ReturnType Xcp_FlashErase_Callout(uint32 address, uint32 length)
     memset(&test_flash_mem[address - 0x08000000UL], 0xFF, length);
     return E_OK;
 }
-uint32 test_flash_program_calls = 0U; /* 计数：验证扇区校验在 callout 之前拦截 */
+uint32 test_flash_program_calls = 0U;
 
 Std_ReturnType Xcp_FlashProgram_Callout(uint32 address, const uint8 *data, uint32 length)
 {
@@ -259,7 +244,6 @@ Std_ReturnType Xcp_FlashVerify_Callout(uint32 address, uint32 length, uint32 exp
     return E_OK;
 }
 
-/* 校验和：简单加和；test_checksum_len_override!=0 时回报非法长度（敌对桩） */
 static uint8 test_checksum_len_override = 0U;
 void test_checksum_override_len(uint8 v) { test_checksum_len_override = v; }
 
@@ -286,13 +270,12 @@ Std_ReturnType Xcp_CalcChecksum_Callout(uint32 address, uint32 length, uint8 *ch
     {
         sum += p[i];
     }
-    *checksum_type = 0xFFU; /* user-defined */
+    *checksum_type = 0xFFU;
     *checksum      = sum;
     return E_OK;
 }
 
-/* 标定页复制：ram_cal_page[page] 镜像 */
-uint8 test_cal_ram[2][0x1000];   /* [page][offset] segment 0/1 共用模拟 */
+uint8 test_cal_ram[2][0x1000];
 uint8 test_cal_rom[2][0x1000];
 
 Std_ReturnType Xcp_CopyCalPage_Callout(uint8 src_segment, uint8 src_page, uint8 dst_segment, uint8 dst_page)
@@ -303,7 +286,6 @@ Std_ReturnType Xcp_CopyCalPage_Callout(uint8 src_segment, uint8 src_page, uint8 
     return E_OK;
 }
 
-/* USER_CMD：回显命令，作为正向反馈 */
 Std_ReturnType Xcp_UserCommand_Callout(const uint8 *cmd_data, uint8 cmd_length)
 {
     uint8 i;
@@ -322,16 +304,11 @@ Std_ReturnType Xcp_UserCommand_Callout(const uint8 *cmd_data, uint8 cmd_length)
     return E_OK;
 }
 
-/**
- * @brief   ECU复位 Callout（测试空实现）
- */
 void Xcp_EcuReset_Callout(void)
 {
-    /* 测试不复位 */
+
 }
 
-/*=========================== OS 计数器桩（SWS_Xcp_00768） =====================*/
-/* 由测试直接驱动 ticks：每 MainFunction 调用约定 +1，与 Xcp_GetTimestamp 累加 */
 TickType test_os_ticks = 0U;
 
 Std_ReturnType GetCounterValue(uint32 counter_id, TickRefType value)
@@ -348,7 +325,7 @@ Std_ReturnType GetElapsedValue(uint32 counter_id, TickRefType value, TickRefType
     (void)counter_id;
     if ((value == NULL_PTR) || (elapsed_value == NULL_PTR)) { return E_NOT_OK; }
     now = test_os_ticks;
-    /* 输入为上次数值时返回差值；测试直接改 *value 语义见下 */
+
     if (*value <= now) { *elapsed_value = now - *value; }
     else               { *elapsed_value = (0xFFFFFFFFU - *value) + now + 1U; }
     *value = now;

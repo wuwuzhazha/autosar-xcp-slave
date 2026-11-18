@@ -13,4 +13,4 @@ typedef struct
     uint32  sdu_length;
 } PduInfoType;
 
-#endif /* COMSTACK_TYPES_H */
+#endif

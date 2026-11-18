@@ -246,7 +246,7 @@ Std_ReturnType Xcp_StoreDaqConfig(uint16 session_cfg_id)
     {
         g_xcp_resume_runtime.store_pending = TRUE;
         g_xcp_resume_runtime.state = XCP_RESUME_STATE_PENDING;
-        /* SESSION_STATUS.STORE_DAQ_REQ 持续到 NvM 写完成回调 */
+
         g_xcp_channel.runtime_ptr->session_status |= XCP_SS_STORE_DAQ_REQ;
         return E_OK;
     }

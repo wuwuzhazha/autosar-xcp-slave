@@ -4,8 +4,6 @@
 #include "Xcp_Callback.h"
 #include "Xcp_Daq.h"
 
-/* Ethernet：LEN(2) | CTR(2) | MSG，串联报文按头长度逐段入队。 */
-
 #if (XCP_ON_ETHERNET_ENABLED == STD_ON)
 #include "SoAd.h"
 

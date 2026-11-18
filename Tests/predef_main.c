@@ -8,7 +8,7 @@
 #include "Det.h"
 #include "NvM.h"
 #include "Os.h"
-#include "Xcp_Callback.h"   
+#include "Xcp_Callback.h"
 extern uint32 test_tx_count;
 extern uint32 test_schm_enter_count;
 extern uint32 test_schm_exit_count;
@@ -59,7 +59,7 @@ int main(void)
           && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[1].size == 2U));
     CHECK("P4 list1 write_protected flag from config",
           g_xcp_channel.config_ptr->xcp_static_daq_list[1].write_protected == 1U);
-    l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);   
+    l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
     CHECK("P5 CONNECT -> RES", (l == 8U) && (res[0] == XCP_PID_RES));
     l = xcp_cmd((const uint8 *)"\xD8\x00\x00\x00", 4U, res);
     CHECK("P6 list0 info: PREDEFINED|EVENT_FIXED|DAQ",
@@ -67,24 +67,24 @@ int main(void)
     l = xcp_cmd((const uint8 *)"\xD8\x00\x01\x00", 4U, res);
     CHECK("P7 list1 info: PREDEFINED|DAQ (no EVENT_FIXED)",
           (l == 6U) && (res[1] == 0x05U));
-    (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);  
+    (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
     l = xcp_cmd((const uint8 *)"\xE1\xFF\x04\x00\x00\x00\x00\x10", 8U, res);
     CHECK("P8 WRITE_DAQ list0 (unprotected predefined) -> RES",
           (l == 1U) && (res[0] == XCP_PID_RES));
-    (void)xcp_cmd((const uint8 *)"\xE2\x00\x01\x00\x00\x00", 6U, res);  
+    (void)xcp_cmd((const uint8 *)"\xE2\x00\x01\x00\x00\x00", 6U, res);
     l = xcp_cmd((const uint8 *)"\xE1\xFF\x04\x00\x00\x00\x00\x10", 8U, res);
     CHECK("P9 WRITE_DAQ list1 (write_protected) -> ERR_WRITE_PROTECTED",
           (l == 2U) && (res[1] == XCP_ERR_WRITE_PROTECTED));
-    l = xcp_cmd((const uint8 *)"\xE0\x00\x00\x00\x01\x00\x01\x00", 8U, res); 
+    l = xcp_cmd((const uint8 *)"\xE0\x00\x00\x00\x01\x00\x01\x00", 8U, res);
     CHECK("P10 event_fixed list0 event change -> ERR_DAQ_CONFIG",
           (l == 2U) && (res[1] == XCP_ERR_DAQ_CONFIG));
-    l = xcp_cmd((const uint8 *)"\xE0\x02\x00\x00\x00\x00\x01\x00", 8U, res); 
+    l = xcp_cmd((const uint8 *)"\xE0\x02\x00\x00\x00\x00\x01\x00", 8U, res);
     CHECK("P11 event_fixed list0 STIM -> ERR_DAQ_CONFIG",
           (l == 2U) && (res[1] == XCP_ERR_DAQ_CONFIG));
-    l = xcp_cmd((const uint8 *)"\xE0\x10\x00\x00\x00\x00\x01\x00", 8U, res); 
+    l = xcp_cmd((const uint8 *)"\xE0\x10\x00\x00\x00\x00\x01\x00", 8U, res);
     CHECK("P12 event_fixed list0 same event + timestamp -> RES",
           (l == 1U) && (res[0] == XCP_PID_RES));
-    l = xcp_cmd((const uint8 *)"\xE0\x00\x01\x00\x01\x00\x01\x00", 8U, res); 
+    l = xcp_cmd((const uint8 *)"\xE0\x00\x01\x00\x01\x00\x01\x00", 8U, res);
     CHECK("P13 non-fixed list1 event change -> RES",
           (l == 1U) && (res[0] == XCP_PID_RES));
     l = xcp_cmd((const uint8 *)"\xE0\x04\x00\x00\x00\x00\x01\x00", 8U, res);
@@ -97,20 +97,20 @@ int main(void)
     CHECK("P16 GET-only RUNNING -> ERR_MODE_NOT_VALID",
           (l == 2U) && (res[1] == XCP_ERR_MODE_NOT_VALID));
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
-    l = xcp_cmd((const uint8 *)"\xE0\x80\x01\x00\x01\x00\x01\x00", 8U, res); 
+    l = xcp_cmd((const uint8 *)"\xE0\x80\x01\x00\x01\x00\x01\x00", 8U, res);
     CHECK("P17 SET_DAQ_LIST_MODE RESUME bit -> RES",
           (l == 1U) && (res[0] == XCP_PID_RES));
     l = xcp_cmd((const uint8 *)"\xDF\x00\x01\x00", 4U, res);
     CHECK("P18 GET_DAQ_LIST_MODE shows RESUME",
           (l == 8U) && ((res[1] & 0x80U) != 0U));
 #endif
-    l = xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);   
+    l = xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
     CHECK("P19 ALLOC_ODT predefined -> ERR_WRITE_PROTECTED",
           (l == 2U) && (res[1] == XCP_ERR_WRITE_PROTECTED));
-    l = xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res); 
+    l = xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
     CHECK("P20 ALLOC_ODT_ENTRY predefined -> ERR_WRITE_PROTECTED",
           (l == 2U) && (res[1] == XCP_ERR_WRITE_PROTECTED));
-    l = xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);       
+    l = xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
     CHECK("P21 ALLOC_DAQ 1 -> RES (3rd list dynamic)",
           (l == 1U) && (res[0] == XCP_PID_RES)
           && (g_xcp_channel.runtime_ptr->daq_count == (XCP_MIN_DAQ + 1U)));
@@ -120,20 +120,20 @@ int main(void)
           && (g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_CONFIGURED)
           && (g_xcp_channel.storage_ptr->daq_list[0].event_channel == 0U)
           && (g_xcp_channel.storage_ptr->daq_list[0].odt_count == 1U));
-    l = xcp_cmd((const uint8 *)"\xE3\x00\x02\x00", 4U, res);       
+    l = xcp_cmd((const uint8 *)"\xE3\x00\x02\x00", 4U, res);
     CHECK("P23 CLEAR_DAQ_LIST dynamic list2 -> FREE",
           (l == 1U) && (g_xcp_channel.storage_ptr->daq_list[2].state == XCP_DAQ_STATE_FREE));
     {
         uint32 lo = (uint32)(uintptr_t)&test_ram_var32;
         uint8 w[8] = {0xE1, 0xFF, 4, 0, (uint8)lo, (uint8)(lo >> 8), (uint8)(lo >> 16), (uint8)(lo >> 24)};
-        (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res); 
-        l = xcp_cmd(w, 8U, res);    
+        (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
+        l = xcp_cmd(w, 8U, res);
         CHECK("P24 WRITE_DAQ list0 entry0 var32 -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
-        l = xcp_cmd(w, 8U, res);    
+        l = xcp_cmd(w, 8U, res);
         CHECK("P25 WRITE_DAQ list0 entry1 -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
     }
     test_ram_var32 = 0xCAFEBABEUL;
-    (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);     
+    (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
     xcp_drain();
     Xcp_Event(0U);
     Xcp_CanIfTxConfirmation(0U, E_OK);
@@ -145,7 +145,7 @@ int main(void)
               && (dto[1] == 0xBEU) && (dto[2] == 0xBAU)
               && (dto[3] == 0xFEU) && (dto[4] == 0xCAU));
     }
-    (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);     
+    (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
     l = xcp_cmd((const uint8 *)"\xD6", 1U, res);
     CHECK("P27 FREE_DAQ -> RES, daq_count still XCP_MIN_DAQ",
           (l == 1U) && (res[0] == XCP_PID_RES)

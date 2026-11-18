@@ -141,10 +141,8 @@ BOOL_TOK = {"1": True, "0": False, "true": True, "false": False,
 LINKS = ("XcpOnCanEnabled", "XcpOnFlexRayEnabled", "XcpOnEthernetEnabled", "XcpOnCddEnabled")
 LINK_NAMES = ("CAN", "FLEXRAY", "ETHERNET", "CDD")
 
-
 class SchemaError(Exception):
     pass
-
 
 def _merge(dst, src):
     for k, v in src.items():
@@ -154,7 +152,6 @@ def _merge(dst, src):
             dst[k] = v
     return dst
 
-
 def _read_cfg_file(path):
     suf = path.suffix.lower()
     if suf == ".toml":
@@ -163,7 +160,6 @@ def _read_cfg_file(path):
     if suf == ".json":
         return json.loads(path.read_text(encoding="utf-8"))
     raise SchemaError(f"{path}: 配置须为 .toml 或 .json")
-
 
 def load_config(path, _seen=None):
     path = Path(path).resolve()
@@ -185,7 +181,6 @@ def load_config(path, _seen=None):
         raise SchemaError(f"{path}: [general] 须为表")
     return cfg
 
-
 def _toml_scalar(v):
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -194,7 +189,6 @@ def _toml_scalar(v):
     if isinstance(v, float):
         return str(v)
     return json.dumps(str(v), ensure_ascii=False)
-
 
 def dump_toml(cfg, prefix=()):
     lines, tables = [], []
@@ -218,7 +212,6 @@ def dump_toml(cfg, prefix=()):
             lines.extend(dump_toml(v, path).splitlines())
     return "\n".join(lines) + "\n"
 
-
 def flatten(cfg, prefix=""):
     out = {}
     for k, v in cfg.items():
@@ -232,10 +225,8 @@ def flatten(cfg, prefix=""):
             out[key] = v
     return out
 
-
 def profiles_dir():
     return Path(__file__).resolve().parents[2] / "Config" / "profiles"
-
 
 def resolve_profile(name):
     p = profiles_dir() / f"{name}.toml"
@@ -243,7 +234,6 @@ def resolve_profile(name):
         have = ", ".join(sorted(x.stem for x in profiles_dir().glob("*.toml")))
         raise SchemaError(f"未知 profile {name!r}; 可用: {have or '(无)'}")
     return p
-
 
 def coerce(name, raw, p):
     kind = p[1]
@@ -258,12 +248,10 @@ def coerce(name, raw, p):
             raise SchemaError(f"{name}: int 需整数, 得 {raw!r}")
     return raw                                 
 
-
 def check_range(name, v, p):
     lo, hi = p[3], p[4]
     if v < lo or (hi is not None and v > hi):
         raise SchemaError(f"{name}: {v} 越界 [{lo},{hi}]")
-
 
 def apply_link(vals, name):
     up = str(name).upper()
@@ -272,7 +260,6 @@ def apply_link(vals, name):
     i = LINK_NAMES.index(up)
     for j, lk in enumerate(LINKS):
         vals[lk] = (j == i)
-
 
 def normalize(cfg, sets):
     vals = {p[0]: p[2] for p in P}
@@ -380,12 +367,10 @@ def normalize(cfg, sets):
         raise SchemaError("\n".join(errs))
     return vals, t
 
-
 def mname(name):
     if name in MACRO_ALIASES:
         return MACRO_ALIASES[name]
     return "XCP_" + re.sub(r"(?<!^)(?=[A-Z])", "_", name)[4:].upper()
-
 
 def mval(name, v):
     p = SCHEMA[name]
@@ -401,7 +386,6 @@ def mval(name, v):
     if kind in ("func", "schm", "ident"):
         return v
     return f"({v}U)"
-
 
 def emit_h(vals, src="--config"):
     L = ["#ifndef XCP_CFG_H", "#define XCP_CFG_H", "",
@@ -483,10 +467,8 @@ def emit_h(vals, src="--config"):
           "", "#endif /* XCP_CFG_H */", ""]
     return "\n".join(L)
 
-
 def tok(v):
     return v if isinstance(v, str) else f"{v}U"
-
 
 def emit_c(vals, t, src="--config"):
     L = ['#include "Xcp.h"', '#include "Xcp_Internal.h"', "",
@@ -563,7 +545,6 @@ def emit_c(vals, t, src="--config"):
     L += ["};", ""]
     return "\n".join(L)
 
-
 def emit_memmap():
     return """/* @generated default MemMap — 集成方以同名文件覆盖为本项目段 pragma */
 #ifdef XCP_START_SEC_CONST_UNSPECIFIED
@@ -573,7 +554,6 @@ def emit_memmap():
 #undef XCP_STOP_SEC_CONST_UNSPECIFIED
 #endif
 """
-
 
 def emit_a2l(vals, t):
     L = ["/begin A2ML",
@@ -621,7 +601,6 @@ def emit_a2l(vals, t):
           "/end IF_DATA", ""]
     return "\n".join(L)
 
-
 def cmd_list_profiles():
     d = profiles_dir()
     rows = sorted(d.glob("*.toml")) if d.is_dir() else []
@@ -649,11 +628,9 @@ def cmd_list_profiles():
         print(f"{p.stem:10s} [{link:8s}] {doc}")
     return 0
 
-
 def cmd_show(cfg):
     print(dump_toml(cfg), end="")
     return 0
-
 
 def cmd_diff(cfg, other_name):
     other = (resolve_profile(other_name) if (profiles_dir() / f"{other_name}.toml").exists()
@@ -669,7 +646,6 @@ def cmd_diff(cfg, other_name):
     for k, va, vb in diffs:
         print(f"  {k}: {va} -> {vb}")
     return 0
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -714,7 +690,6 @@ def main():
     (out / "Xcp_IfData.a2l").write_text(emit_a2l(vals, tables))
     print(f"generated -> {out}/ (Xcp_Cfg.h/.c, Xcp_MemMap.h, Xcp_IfData.a2l)")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

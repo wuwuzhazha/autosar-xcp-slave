@@ -9,8 +9,6 @@
 
 static sint16 Xcp_DispatchUserCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-/* 命令分发表。resource 非零且该资源仍锁 => ERR_ACCESS_LOCKED，不进处理函数。
-   guard 只放可表格化的门控；各功能自身的序列/范围检查留在函数里。 */
 static const Xcp_CmdEntryType XCP_CMD_TABLE[] = {
     { XCP_CMD_CONNECT,              2U, 0U,                    XCP_GUARD_ALLOW_DISCONNECTED, Xcp_CmdConnect },
     { XCP_CMD_DISCONNECT,           1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdDisconnect },
@@ -86,7 +84,7 @@ static sint16 Xcp_DispatchUserCmd(const uint8 *cmd_data, uint8 cmd_length, Xcp_R
     {
         return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
     }
-    /* callout 已自行响应 */
+
     return 0;
 }
 
@@ -138,7 +136,6 @@ void Xcp_ProcessCommand(const uint8 *cmd_data, uint8 cmd_length)
         }
     }
 
-    /* 未连接：除 CONNECT 外静默 */
     if (man->runtime_ptr->connection_state != XCP_CONNECTED)
     {
         return;

@@ -5,4 +5,4 @@
 
 Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_ptr);
 
-#endif /* CANIF_H */
+#endif

@@ -142,9 +142,6 @@ typedef struct
     uint32 event_channel_counter[XCP_MAX_EVENT_CHANNEL];
 #endif
 
-    /* 一条 Tx PDU 上的发送管道。state 是总线令牌（同时只有一帧）。
-       parked 是等令牌的那一帧 CTO。dto_latch 不是令牌：DTO 确认后若改发
-       停放的 CTO，闩保持，看门狗继续计，直到排空、失败确认或超时。 */
     Xcp_TxPipe tx;
 
     uint32 timestamp;
@@ -211,7 +208,6 @@ typedef struct
 
 extern Xcp_Channel g_xcp_channel;
 
-/* 构造两字节 ERR 帧并返回 2。fr 即调用方收到的 res 缓冲（== cto_buffer）。 */
 static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)
 {
     fr[0] = XCP_PID_ERR;
@@ -219,7 +215,6 @@ static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)
     return 2;
 }
 
-/* 分发表 guard 列：未连接时仍可接收 CONNECT */
 #define XCP_GUARD_NONE                (0U)
 #define XCP_GUARD_ALLOW_DISCONNECTED  (1U)
 
@@ -231,7 +226,6 @@ typedef struct
     uint8      guard;
     Xcp_CmdFn  fn;
 } Xcp_CmdEntryType;
-
 
 void Xcp_SendPositiveResponse(uint8 length);
 

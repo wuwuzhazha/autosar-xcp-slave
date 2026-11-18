@@ -50,16 +50,13 @@ CONTAINERS = {
 }
 SIMPLE_TABLES = ("pdu", "fr")
 
-
 def load_gen():
     spec = importlib.util.spec_from_file_location("xcpgen", XCPGEN)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
-
 X = load_gen()
-
 
 def group_of(name):
     for title, pred in GROUPS:
@@ -67,21 +64,17 @@ def group_of(name):
             return title
     return "其它"
 
-
 def base_path():
     return X.profiles_dir().parent / f"{BASE_NAME}.toml"
 
-
 def base_config():
     return X.load_config(base_path())
-
 
 def base_effective(base=None):
     """基线 + schema 默认值后的生效 general, 供差异比较。"""
     b = base if base is not None else base_config()
     g = b.get("general", {})
     return {name: g.get(name, default) for name, _k, default, _lo, _hi, _m, _c in X.P}
-
 
 def field_specs(rows, skip=()):
     order, types = [], {}
@@ -93,7 +86,6 @@ def field_specs(rows, skip=()):
                 order.append(k)
                 types[k] = "int" if isinstance(v, int) and not isinstance(v, bool) else "str"
     return [{"name": k, "type": types[k]} for k in order]
-
 
 def schema_payload():
     base = base_config()
@@ -134,7 +126,6 @@ def schema_payload():
         "baseName": BASE_NAME,
     }
 
-
 def profile_list():
     out = []
     d = X.profiles_dir()
@@ -155,10 +146,8 @@ def profile_list():
         out.append({"name": p.stem, "doc": doc, "link": link})
     return out
 
-
 def _eq(a, b):
     return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
-
 
 def profile_delta(cfg, base, base_eff):
     """只保留与基线不同的部分, 用于最小化 profile 文件。"""
@@ -174,7 +163,6 @@ def profile_delta(cfg, base, base_eff):
         if key in cfg and not _eq(cfg[key], base.get(key, {})):
             delta[key] = cfg[key]
     return delta
-
 
 def emit_profile_text(cfg, base, doc="", base_eff=None):
     delta = profile_delta(cfg, base, base_eff if base_eff is not None
@@ -201,7 +189,6 @@ def emit_profile_text(cfg, base, doc="", base_eff=None):
         prev_blank = blank
     return "\n".join(out).strip("\n") + "\n"
 
-
 def diff_rows(cfg, base, base_eff=None):
     eff = base_eff if base_eff is not None else base_effective(base)
     ga = {**eff, **{k: v for k, v in base.get("general", {}).items() if k != "LinkType"}}
@@ -215,11 +202,9 @@ def diff_rows(cfg, base, base_eff=None):
             out.append({"key": k, "base": va, "cur": vb})
     return out
 
-
 def equivalent(cfg, other, base_eff):
     """cfg 与 other 在 schema 语义上等价 (忽略未显式列出的默认值)。"""
     return not diff_rows(cfg, other, base_eff)
-
 
 def coerce_config(raw):
     """前端传来的是字符串/布尔混合; 交给 xcpgen 做权威校验。"""
@@ -245,7 +230,6 @@ def coerce_config(raw):
         if key in raw:
             cfg[key] = raw[key]
     return cfg
-
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "xcpui"
@@ -300,7 +284,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "not found"}, 404)
         except X.SchemaError as e:
             return self._json({"error": str(e)}, 400)
-        except Exception as e:                                    # noqa: BLE001
+        except Exception as e:
             return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
 
     def do_POST(self):
@@ -363,9 +347,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "not found"}, 404)
         except X.SchemaError as e:
             return self._json({"ok": False, "errors": str(e).split("\n")}, 400)
-        except Exception as e:                                    # noqa: BLE001
+        except Exception as e:
             return self._json({"ok": False, "errors": [f"{type(e).__name__}: {e}"]}, 500)
-
 
 PAGE = r"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
@@ -836,7 +819,6 @@ boot();
 </script></body></html>
 """
 
-
 def main():
     ap = argparse.ArgumentParser(description="XCP 配置器 Web UI")
     ap.add_argument("--port", type=int, default=8765)
@@ -855,7 +837,6 @@ def main():
     finally:
         srv.server_close()
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

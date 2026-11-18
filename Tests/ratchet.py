@@ -44,27 +44,20 @@ FORBIDDEN_FILES = (
 )
 FORBIDDEN_HEADERS = ("CanIf.h", "FrIf.h", "SoAd.h", "Cdd.h")
 
-# 只数特性/配置开关：#if/#elif 测试 XCP_ 宏。
-# #ifndef 一律排除（XCP_*_H 文件守卫 + #ifndef XCP_CHECK_* 默认回填），它们不是裁剪。
 RE_PRE = re.compile(r"^\s*#\s*(if|elif|ifdef)\b.*\bXCP_", re.M)
 RE_CINC = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+\.c)[>"]', re.M)
-
 
 def sources():
     return sorted(p for p in XCP.rglob("*") if p.suffix in (".c", ".h") and p.is_file())
 
-
 def rel(path):
     return path.relative_to(ROOT).as_posix()
-
 
 def read(path):
     return path.read_text(encoding="utf-8", errors="replace")
 
-
 def count_ident(text, name):
     return len(re.findall(r"\b" + re.escape(name) + r"\b", text))
-
 
 def measure():
     files = {}
@@ -86,7 +79,6 @@ def measure():
             if re.search(r'^\s*#\s*include\s*[<"]' + re.escape(header) + r'[>"]', text, re.M):
                 forbidden.append(f"{rel(path)} -> {header}")
     return files, sorted(forbidden)
-
 
 def pack(files, forbidden):
     def by(field):
@@ -111,14 +103,12 @@ def pack(files, forbidden):
         "forbidden_includes": forbidden,
     }
 
-
 def load_baseline():
     base = json.loads(BASELINE.read_text(encoding="utf-8"))
-    # 迁移：旧基线用 g_xcp_manager 命名通道对象
+
     if "g_xcp_channel" not in base and "g_xcp_manager" in base:
         base["g_xcp_channel"] = base.pop("g_xcp_manager")
     return base
-
 
 def file_rises(current, baseline):
     rises = []
@@ -130,7 +120,6 @@ def file_rises(current, baseline):
             rises.append((key, was, now))
     return rises
 
-
 def loose_files(current, baseline):
     drops = []
     for key in sorted(set(current) | set(baseline)):
@@ -139,7 +128,6 @@ def loose_files(current, baseline):
         if now < was:
             drops.append((key, was, now))
     return drops
-
 
 def check_metric(name, current, baseline, errors, loose):
     """合计封顶。总合计上升才 fail（列上升文件）；下降则提示收紧。
@@ -155,14 +143,13 @@ def check_metric(name, current, baseline, errors, loose):
     elif current["total"] < baseline["total"]:
         loose.append(f"  {name} {baseline['total']} -> {current['total']}，基线偏松")
 
-
 def check(snapshot):
     base = load_baseline()
     errors = []
     loose = []
     for name in ("g_xcp_channel", "xcp_preprocessor"):
         check_metric(name, snapshot[name], base[name], errors, loose)
-    # 旧全局名不得复活
+
     if snapshot["g_xcp_manager"]["total"] > 0:
         errors.append("  g_xcp_manager 重新出现，应使用 g_xcp_channel")
     for name in TX_SYMBOLS:
@@ -187,10 +174,8 @@ def check(snapshot):
         loose.append("  传输层头文件包含减少: " + ", ".join(missing_forb))
     return errors, loose
 
-
 def norm(data):
     return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-
 
 def check_gen():
     errors = []
@@ -233,7 +218,6 @@ def check_gen():
                     errors.append(f"  Gen/{name}/{rel_name} 与重新生成不一致\n" + "\n".join(diff.splitlines()[:24]))
     return errors
 
-
 def report(snapshot):
     rows = [
         ("g_xcp_channel", snapshot["g_xcp_channel"]["total"]),
@@ -247,7 +231,6 @@ def report(snapshot):
     print("ratchet")
     for label, total in rows:
         print(f"  {label:<{width}}  {total}")
-
 
 def main():
     tighten = "--tighten" in sys.argv
@@ -290,7 +273,6 @@ def main():
         print(f"  gen  {n} profiles identical")
     print("ratchet ok")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

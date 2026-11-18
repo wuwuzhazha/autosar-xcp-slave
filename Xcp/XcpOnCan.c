@@ -2,8 +2,6 @@
 #include "Xcp_Internal.h"
 #include "Xcp_Types.h"
 
-/* CAN：报文即 XCP 帧，无链路头。 */
-
 #if (XCP_ON_CAN_ENABLED == STD_ON)
 #include "CanIf.h"
 

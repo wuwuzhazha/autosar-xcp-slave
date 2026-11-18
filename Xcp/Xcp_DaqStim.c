@@ -151,7 +151,7 @@ Std_ReturnType Xcp_ReceiveStimDto(const uint8 *dto_data, uint8 dto_length)
 
         if (is_bit != FALSE)
         {
-            /* 位级 STIM: 数据字节 bit0 写入 address 起第 bit_offset 位（LE） */
+
             uint8  byte_idx  = (uint8) (entry->bit_offset >> 3U);
             uint8  mask      = (uint8) (1U << (entry->bit_offset & 0x07U));
             uint32 byte_addr = entry->address + byte_idx;
@@ -174,7 +174,7 @@ Std_ReturnType Xcp_ReceiveStimDto(const uint8 *dto_data, uint8 dto_length)
         }
         else
         {
-            /* 写保护地址: 跳过数据 */
+
         }
 
         data_idx += elem_len;
