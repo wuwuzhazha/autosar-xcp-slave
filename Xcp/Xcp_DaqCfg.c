@@ -65,6 +65,7 @@ static void Xcp_LoadStaticDaqList(Xcp_Channel *ch, uint16 list_no)
     daq->event_fixed   = cfg->event_fixed;
     daq->direction     = cfg->direction;
     daq->odt_count     = cfg->odt_count;
+    daq->odt_max_count = cfg->odt_count;
     daq->mode          = 0U;
     daq->resume        = FALSE;
     daq->selected      = FALSE;
@@ -77,7 +78,8 @@ static void Xcp_LoadStaticDaqList(Xcp_Channel *ch, uint16 list_no)
         Xcp_OdtType *odt = &daq->odt[o];
         uint8 e;
 
-        odt->odt_entry_count = cfg->odt_entry_count;
+        odt->odt_entry_count     = cfg->odt_entry_count;
+        odt->odt_entry_max_count = cfg->odt_entry_count;
 
         if (cfg->entries != NULL_PTR)
         {
