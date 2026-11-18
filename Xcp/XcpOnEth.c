@@ -122,10 +122,7 @@ boolean Xcp_SoAdConnectionClosed(void)
     {
         return FALSE;
     }
-#if (XCP_DAQ_ENABLED == STD_ON)
-    Xcp_FreeDaqLists();
-#endif
-    g_xcp_manager.runtime_ptr->connection_state = XCP_DISCONNECTED;
+    Xcp_SessionClose();
     return TRUE;
 }
 

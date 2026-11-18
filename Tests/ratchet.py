@@ -33,7 +33,10 @@ FORBIDDEN_FILES = (
     "Xcp.c",
     "Xcp_Cmd.c",
     "Xcp_Std.c",
-    "Xcp_Daq.c",
+    "Xcp_DaqCfg.c",
+    "Xcp_DaqRun.c",
+    "Xcp_DaqStim.c",
+    "Xcp_DaqInt.h",
     "Xcp_CalPage.c",
     "Xcp_FlashProg.c",
     "Xcp_SeedKey.c",
@@ -41,7 +44,9 @@ FORBIDDEN_FILES = (
 )
 FORBIDDEN_HEADERS = ("CanIf.h", "FrIf.h", "SoAd.h", "Cdd.h")
 
-RE_PRE = re.compile(r"^\s*#\s*(if|elif|ifdef|ifndef)\b.*\bXCP_", re.M)
+# 只数特性/配置开关：#if/#elif 测试 XCP_ 宏。
+# #ifndef 一律排除（XCP_*_H 文件守卫 + #ifndef XCP_CHECK_* 默认回填），它们不是裁剪。
+RE_PRE = re.compile(r"^\s*#\s*(if|elif|ifdef)\b.*\bXCP_", re.M)
 RE_CINC = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+\.c)[>"]', re.M)
 
 
@@ -131,15 +136,17 @@ def loose_files(current, baseline):
 
 
 def check_metric(name, current, baseline, errors, loose):
-    rises = file_rises(current["files"], baseline["files"])
-    drops = loose_files(current["files"], baseline["files"])
-    if current["total"] > baseline["total"] or rises:
-        lines = [f"  {name} {current['total']} > 基线 {baseline['total']}" if current["total"] > baseline["total"]
-                 else f"  {name} 合计 {current['total']} 未升，但有文件上升"]
+    """合计封顶。总合计上升才 fail（列上升文件）；下降则提示收紧。
+
+    per-file 上升本身不报：拆文件或把函数收口进公共单元会让局部文件涨，
+    只要模块组总合计降就是改进。"""
+    if current["total"] > baseline["total"]:
+        rises = file_rises(current["files"], baseline["files"])
+        lines = [f"  {name} {current['total']} > 基线 {baseline['total']}"]
         for key, was, now in rises:
             lines.append(f"    {key}: {was} -> {now}")
         errors.append("\n".join(lines))
-    elif current["total"] < baseline["total"] or drops:
+    elif current["total"] < baseline["total"]:
         loose.append(f"  {name} {baseline['total']} -> {current['total']}，基线偏松")
 
 

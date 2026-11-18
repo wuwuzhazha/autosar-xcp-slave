@@ -273,7 +273,7 @@ sint16 Xcp_CmdProgramReset(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame
 
     g_xcp_manager.runtime_ptr->pgm_started = FALSE;
     g_xcp_manager.runtime_ptr->pgm_processor = XCP_PGM_STATUS_IDLE;
-    g_xcp_manager.runtime_ptr->connection_state = XCP_DISCONNECTED;
+    Xcp_SessionClose();
     Xcp_EcuReset_Callout();
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;

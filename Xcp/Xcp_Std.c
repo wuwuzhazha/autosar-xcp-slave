@@ -28,9 +28,7 @@ sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
     }
 
-    g_xcp_manager.runtime_ptr->connection_state = XCP_CONNECTED;
-
-    g_xcp_manager.runtime_ptr->session_status = 0U;
+    Xcp_SessionOpen();
 
 #if (XCP_DAQ_ENABLED == STD_ON)
     {
@@ -67,15 +65,6 @@ sint16 Xcp_CmdConnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res
     Xcp_ResetEventChannelCounters();
 #endif
 
-#if (XCP_SEED_KEY_ENABLED == STD_ON)
-
-    Xcp_InitProtection();
-#endif
-
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-    Xcp_InitBlockTransfer();
-#endif
-
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
 
     g_xcp_manager.storage_ptr->cto_buffer[1] = 0x00U;
@@ -108,15 +97,7 @@ sint16 Xcp_CmdDisconnect(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *
     (void) cmd_data;
     (void) cmd_length;
 
-#if (XCP_DAQ_ENABLED == STD_ON)
-
-    Xcp_FreeDaqLists();
-#endif
-
-    g_xcp_manager.runtime_ptr->tx.parked     = FALSE;
-    g_xcp_manager.runtime_ptr->tx.parked_len = 0U;
-
-    g_xcp_manager.runtime_ptr->connection_state = XCP_DISCONNECTED;
+    Xcp_SessionClose();
 
     g_xcp_manager.storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);

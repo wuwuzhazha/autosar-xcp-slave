@@ -19,7 +19,7 @@ GENCFG = "Config/xcp_base.toml"
 XCPGEN = "Tools/xcpgen/xcpgen.py"
 
 MODULE_SRC = [
-    "Xcp/Xcp.c", "Xcp/Xcp_Cmd.c", "Xcp/Xcp_Std.c", "Xcp/Xcp_Daq.c", "Xcp/Xcp_SeedKey.c",
+    "Xcp/Xcp.c", "Xcp/Xcp_Cmd.c", "Xcp/Xcp_Std.c", "Xcp/Xcp_DaqCfg.c", "Xcp/Xcp_DaqRun.c", "Xcp/Xcp_DaqStim.c", "Xcp/Xcp_SeedKey.c",
     "Xcp/Xcp_CalPage.c", "Xcp/Xcp_FlashProg.c", "Xcp/Xcp_Resume.c",
     "Xcp/XcpOnCan.c", "Xcp/XcpOnFr.c", "Xcp/XcpOnEth.c", "Xcp/XcpOnCdd.c",
 ]

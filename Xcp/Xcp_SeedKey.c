@@ -119,10 +119,7 @@ sint16 Xcp_CmdUnlock(const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
     {
 
         g_xcp_manager.runtime_ptr->seed_requested = FALSE;
-#if (XCP_DAQ_ENABLED == STD_ON)
-        Xcp_FreeDaqLists();
-#endif
-        g_xcp_manager.runtime_ptr->connection_state = XCP_DISCONNECTED;
+        Xcp_SessionClose();
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 }

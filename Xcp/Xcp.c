@@ -1,5 +1,6 @@
 #include "Xcp.h"
 #include "Xcp_Internal.h"
+#include "Xcp_Std.h"
 #include "Xcp_Daq.h"
 #include "Xcp_SeedKey.h"
 #include "Xcp_CalPage.h"
@@ -493,6 +494,35 @@ void Xcp_SendPendingCto(void)
             runtime->tx.parked     = TRUE;
         }
     }
+}
+
+void Xcp_SessionOpen(void)
+{
+    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+
+    runtime->connection_state = XCP_CONNECTED;
+    runtime->session_status = 0U;
+
+#if (XCP_SEED_KEY_ENABLED == STD_ON)
+    Xcp_InitProtection();
+#endif
+
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    Xcp_InitBlockTransfer();
+#endif
+}
+
+void Xcp_SessionClose(void)
+{
+    Xcp_RuntimeType *runtime = g_xcp_manager.runtime_ptr;
+
+#if (XCP_DAQ_ENABLED == STD_ON)
+    Xcp_FreeDaqLists();
+#endif
+
+    runtime->tx.parked     = FALSE;
+    runtime->tx.parked_len = 0U;
+    runtime->connection_state = XCP_DISCONNECTED;
 }
 
 uint32 Xcp_GetTimestamp(void)
