@@ -689,10 +689,12 @@ def main():
         src = path.relative_to(Path(__file__).resolve().parents[2]).as_posix()
     except ValueError:
         src = path.as_posix()
-    (out / "Xcp_Cfg.h").write_text(emit_h(vals, src))
-    (out / "Xcp_Cfg.c").write_text(emit_c(vals, tables, src))
-    (out / "Xcp_MemMap.h").write_text(emit_memmap())
-    (out / "Xcp_IfData.a2l").write_text(emit_a2l(vals, tables))
+    # Explicit UTF-8 + LF: the default is the locale encoding, which is cp1252
+    # on Windows runners, and the banner contains a non-ASCII character.
+    (out / "Xcp_Cfg.h").write_text(emit_h(vals, src), encoding="utf-8", newline="\n")
+    (out / "Xcp_Cfg.c").write_text(emit_c(vals, tables, src), encoding="utf-8", newline="\n")
+    (out / "Xcp_MemMap.h").write_text(emit_memmap(), encoding="utf-8", newline="\n")
+    (out / "Xcp_IfData.a2l").write_text(emit_a2l(vals, tables), encoding="utf-8", newline="\n")
     print(f"generated -> {out}/ (Xcp_Cfg.h/.c, Xcp_MemMap.h, Xcp_IfData.a2l)")
     return 0
 

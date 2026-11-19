@@ -21,6 +21,12 @@ import sys
 import tempfile
 from pathlib import Path
 
+# CI consoles are not always UTF-8 (cp1252 on Windows). Printing a diff must
+# not raise UnicodeEncodeError and hide the actual ratchet failure.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 ROOT = Path(__file__).resolve().parent.parent
 XCP = ROOT / "Xcp"
 BASELINE = Path(__file__).resolve().parent / "ratchet_baseline.json"
