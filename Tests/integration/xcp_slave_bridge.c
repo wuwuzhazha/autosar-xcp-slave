@@ -43,6 +43,11 @@ BRIDGE_API void bridge_tick(uint32 elapsed_ms)
     Xcp_MainFunction();
 }
 
+BRIDGE_API uint32 bridge_os_ticks(void)
+{
+    return test_os_ticks;
+}
+
 BRIDGE_API void bridge_rx(const uint8 *data, uint32 length)
 {
     PduInfoType pdu;

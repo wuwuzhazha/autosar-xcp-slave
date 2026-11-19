@@ -2,9 +2,17 @@
 """Performance envelope of the slave, measured through pyxcp.
 
 Two builds are exercised: the default classic-CAN profile (8-byte CTO/DTO)
-and a CAN-FD profile (64-byte CTO/DTO, 15 ODT entries). Every measurement
-uses the real pyxcp transport over a python-can ``virtual`` bus; the numbers
-therefore include pyxcp and the Python frame pump, not just the C core.
+and a CAN-FD profile (64-byte CTO/DTO, 15 ODT entries). Both transfer the
+same application byte count for UPLOAD/DOWNLOAD. Every measurement uses the
+real pyxcp transport over a python-can ``virtual`` bus; the numbers therefore
+include pyxcp and the Python frame pump, not just the C core.
+
+The virtual bus is a local memory queue: it does not model arbitration or
+CAN/CAN-FD bit timing. The FD advantage measured here is the payload-per-
+frame gain (fewer frames for the same bytes), not the FD data-phase bit rate.
+DAQ throughput is reported both as sampled entry bytes and as wire bytes
+(PID + padding included), and delivery is compared with the simulated OS
+ticks that actually scheduled the events.
 
 Report: Tests/integration/.build/perf.json plus a Markdown table on stdout.
 Full run takes roughly half a minute. ``XCP_PERF_SCALE`` scales the transfer
@@ -161,54 +169,69 @@ def stop_daq(xcp) -> None:
 
 
 def check_dto_frames(frames: list[bytes], entries: int) -> tuple[int, int, int]:
-    """Return (unique PIDs, mismatches, payload bytes)."""
+    """Return (unique PIDs, sample mismatches, wire bytes)."""
     seen = set()
     mismatches = 0
-    payload_bytes = 0
+    wire_bytes = 0
     for frame in frames:
         pid = frame[0]
         seen.add(pid)
-        payload_bytes += len(frame) - 1
+        wire_bytes += len(frame) - 1
         base = pid * entries
-        expected = struct.pack("<I", base)
-        if frame[1:5] != expected:
+        payload = frame[1 : 1 + 4 * entries]
+        if len(payload) != 4 * entries:
             mismatches += 1
-        elif entries > 1:
-            last = base + entries - 1
-            offset = 1 + 4 * (entries - 1)
-            if frame[offset : offset + 4] != struct.pack("<I", last):
+            continue
+        for entry in range(entries):
+            offset = 4 * entry
+            if payload[offset : offset + 4] != struct.pack("<I", base + entry):
                 mismatches += 1
-    return len(seen), mismatches, payload_bytes
+                break
+    return len(seen), mismatches, wire_bytes
 
 
 def daq_benchmark(xcp, link, tap_bus, addr: int, entries: int, event: int, seconds: float) -> dict:
     values, _ = configure_max_daq(xcp, link, addr, entries, event)
-    expected_per_event = 32
-    cycle = 0.010 if event == 0 else 0.001
-    expected = int(seconds / cycle) * expected_per_event
+    dtos_per_event = 32
+    cycle_ticks = 10 if event == 0 else 1
 
     h.drain(tap_bus)
     link.reset_dto_drop_count()
     start_daq(xcp)
+    ticks_before = link.os_ticks()
     frames = collect_dtos(tap_bus, seconds)
+    ticks_after = link.os_ticks()
     drops = link.dto_drop_count()
     stop_daq(xcp)
     h.drain(tap_bus)
 
-    unique, mismatches, payload_bytes = check_dto_frames(frames, entries)
+    unique, mismatches, wire_bytes = check_dto_frames(frames, entries)
+    simulated_ms = ticks_after - ticks_before
+    simulated_s = simulated_ms / 1000.0
+    scheduled_events = simulated_ms // cycle_ticks
+    expected_frames = scheduled_events * dtos_per_event
+    sample_bytes = len(frames) * entries * 4
     return {
         "entries_per_odt": entries,
         "event_channel": event,
         "values": values,
         "frames": len(frames),
         "frames_per_s": round(len(frames) / seconds, 1),
-        "payload_bytes": payload_bytes,
-        "payload_bytes_per_s": round(payload_bytes / seconds, 1),
+        # Configured entry bytes are the useful DAQ payload; wire bytes also
+        # include the PID and the DTO padding to XCP_MAX_DTO.
+        "sample_bytes": sample_bytes,
+        "sample_bytes_per_s": round(sample_bytes / seconds, 1),
+        "sample_bytes_per_simulated_s": round(sample_bytes / simulated_s, 1) if simulated_s else 0.0,
+        "wire_bytes": wire_bytes,
+        "wire_bytes_per_s": round(wire_bytes / seconds, 1),
+        "wire_bytes_per_simulated_s": round(wire_bytes / simulated_s, 1) if simulated_s else 0.0,
         "unique_pids": unique,
         "mismatches": mismatches,
-        "expected_frames": expected,
-        "events_observed": round(len(frames) / expected_per_event, 1),
-        "delivery_ratio": round(len(frames) / max(expected, 1), 3),
+        "simulated_ms": simulated_ms,
+        "scheduled_events": scheduled_events,
+        "expected_frames": expected_frames,
+        "events_observed": round(len(frames) / dtos_per_event, 1),
+        "delivery_ratio": round(len(frames) / max(expected_frames, 1), 3),
         "dto_drops": drops,
     }
 
@@ -365,7 +388,7 @@ def check(condition: bool, message: str) -> bool:
 def main() -> int:
     start = time.time()
     classic = run_variant(
-        "perf_can", ("XcpDtoQueueDepth=128",), fd=False, payload_size=4096
+        "perf_can", ("XcpDtoQueueDepth=128",), fd=False, payload_size=8192
     )
     fd = run_variant(
         "perf_fd",
@@ -400,7 +423,10 @@ def main() -> int:
         ("UPLOAD (B/s)", classic["upload"]["bytes_per_s"], fd["upload"]["bytes_per_s"]),
         ("DOWNLOAD (B/s)", classic["download"]["bytes_per_s"], fd["download"]["bytes_per_s"]),
         ("DAQ event0 (frames/s)", classic["daq_sustained"]["frames_per_s"], fd["daq_sustained"]["frames_per_s"]),
-        ("DAQ event0 (B/s)", classic["daq_sustained"]["payload_bytes_per_s"], fd["daq_sustained"]["payload_bytes_per_s"]),
+        ("DAQ event0 sample (B/s)", classic["daq_sustained"]["sample_bytes_per_s"], fd["daq_sustained"]["sample_bytes_per_s"]),
+        ("DAQ event0 sample (B/sim-s)", classic["daq_sustained"]["sample_bytes_per_simulated_s"], fd["daq_sustained"]["sample_bytes_per_simulated_s"]),
+        ("DAQ event0 wire (B/s)", classic["daq_sustained"]["wire_bytes_per_s"], fd["daq_sustained"]["wire_bytes_per_s"]),
+        ("DAQ event0 scheduled delivery", classic["daq_sustained"]["delivery_ratio"], fd["daq_sustained"]["delivery_ratio"]),
         ("DAQ event1 (frames/s)", classic["daq_peak"]["frames_per_s"], fd["daq_peak"]["frames_per_s"]),
         ("STIM (frames/s)", classic["stim"]["frames_per_s"], fd["stim"]["frames_per_s"]),
         ("STIM (B/s)", classic["stim"]["payload_bytes_per_s"], fd["stim"]["payload_bytes_per_s"]),
@@ -409,7 +435,12 @@ def main() -> int:
     ]
     for label, a, b in rows:
         print(f"| {label} | {a} | {b} |")
-    print(f"\nJSON report: {out}")
+    print(
+        "\nThe virtual bus does not model CAN/CAN-FD bit timing. The FD gain above "
+        "comes from carrying more entry bytes per frame (and fewer frames for the "
+        "same transfer), not from the FD data-phase bit rate."
+    )
+    print(f"JSON report: {out}")
 
     ok = True
     for label, variant in (("classic", classic), ("fd", fd)):
@@ -425,12 +456,11 @@ def main() -> int:
             variant["daq_sustained"]["mismatches"] == 0,
             f"{label}: DAQ samples match RAM",
         )
-        # The observation window and tick drift make the theoretical event
-        # count approximate; zero dropped DTOs is the stronger signal.
+        # Compared against the simulated ticks that actually fired, not the
+        # wall-clock ideal; anything near 1.0 means the queue kept up.
         ok &= check(
-            variant["daq_sustained"]["frames"] > 0
-            and variant["daq_sustained"]["delivery_ratio"] > 0.1,
-            f"{label}: sustained DAQ keeps producing DTOs",
+            variant["daq_sustained"]["delivery_ratio"] > 0.5,
+            f"{label}: sustained DAQ tracks the event scheduler",
         )
         ok &= check(variant["stim"]["integrity"], f"{label}: STIM contents match")
         ok &= check(variant["stim"]["frames_per_s"] > 100.0, f"{label}: STIM above 100 frames/s")
