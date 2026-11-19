@@ -42,6 +42,12 @@
 合法——默认生成的 `Xcp_Cfg.h` 允许所有访问；**量产版本必须对其进行限制**
 （RAM 边界、仅标定窗口等）。
 
+XCP 地址是 32 位。`ext == 0` 时核心通过 `XCP_MEM_PTR(addr)`（默认
+`(uint8 *)(uintptr_t)addr`）转成指针。如果 64 位宿主的对象位于 4 GiB 以上，
+必须在配置头中覆盖 `XCP_MEM_PTR(addr)` 与 `XCP_MEM_ADDR(ptr)`，把 32 位 XCP
+地址空间映射到真实指针（基址偏移或查表）。`XCP_MEM_ADDR` 是反方向，GET_ID
+用它发布 ID 字符串地址。
+
 `ext` 语义（单一 `Xcp_MemTranslate`）：
 - `ext == 0` → `addr` 是裸指针
 - `ext >> 4 == s`（s = 1..XCP_MAX_SEGMENT）→ `addr` 是当前激活 XCP 页下

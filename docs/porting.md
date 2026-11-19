@@ -42,6 +42,13 @@ physical pointer. Your `XCP_CHECK_{READ,WRITE}_ACCESS[_EX]` macros decide if a r
 is legal — by default the generated `Xcp_Cfg.h` allows everything; **production
 builds must gate them** (RAM bounds, cal-window only, etc.).
 
+XCP addresses are 32-bit. With `ext == 0` the core converts the address through
+`XCP_MEM_PTR(addr)` (default `(uint8 *)(uintptr_t)addr`). A 64-bit host whose
+objects live above 4 GiB must override `XCP_MEM_PTR(addr)` and `XCP_MEM_ADDR(ptr)`
+in its config header to map the 32-bit XCP address space to real pointers (base
+offset or lookup table). `XCP_MEM_ADDR` is the reverse direction; GET_ID uses it
+to publish the ID string address.
+
 `ext` semantics (single-`Xcp_MemTranslate`):
 - `ext == 0` → `addr` is a raw pointer
 - `ext >> 4 == s` (s = 1..XCP_MAX_SEGMENT) → `addr` is an **offset into segment

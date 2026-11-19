@@ -5,6 +5,17 @@
 #include "Xcp_Config.h"
 #include "Xcp_Types.h"
 
+/* XCP addresses are 32-bit. XCP_MEM_PTR turns an address into a dereferenceable
+   pointer; XCP_MEM_ADDR maps a pointer back (used by GET_ID). The defaults are
+   the identity cast for 32-bit targets; a 64-bit port overrides both in its
+   config header with a base offset or a lookup table. */
+#ifndef XCP_MEM_PTR
+#define XCP_MEM_PTR(addr) ((uint8 *)(uintptr_t)(addr))
+#endif
+#ifndef XCP_MEM_ADDR
+#define XCP_MEM_ADDR(ptr) ((uint32)(uintptr_t)(ptr))
+#endif
+
 #if (XCP_DEV_ERROR_DETECT == STD_ON)
 #include "Det.h"
 #define XCP_DET_REPORT_ERROR(sid, err) (void)Det_ReportError(XCP_MODULE_ID, 0U, (sid), (err))
@@ -285,7 +296,7 @@ static inline uint8 *Xcp_MemPtrRead(Xcp_Channel *ch, uint8 ext, uint32 addr, uin
     {
         return NULL_PTR;
     }
-    return (uint8 *) (uintptr_t) phys;
+    return XCP_MEM_PTR(phys);
 }
 
 static inline uint8 *Xcp_MemPtrWrite(Xcp_Channel *ch, uint8 ext, uint32 addr, uint32 size)
@@ -296,7 +307,7 @@ static inline uint8 *Xcp_MemPtrWrite(Xcp_Channel *ch, uint8 ext, uint32 addr, ui
     {
         return NULL_PTR;
     }
-    return (uint8 *) (uintptr_t) phys;
+    return XCP_MEM_PTR(phys);
 }
 
 #define XCP_GUARD_NONE                (0U)
