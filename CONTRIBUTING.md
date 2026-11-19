@@ -32,8 +32,14 @@ python3 Tests/build_matrix.py
 
 # End-to-end master/slave exchange (pyxcp over a python-can virtual bus)
 python3 -m pip install -r Tests/integration/requirements.txt
-python3 Tests/integration/test_pyxcp_master.py
+python3 Tests/integration/test_pyxcp_master.py        # smoke
+python3 Tests/integration/test_pyxcp_functional.py    # every service + negative paths
+python3 Tests/integration/test_pyxcp_variants.py      # feature-gated profiles
+python3 Tests/integration/test_pyxcp_perf.py          # latency/throughput envelope
 ```
+
+The performance suite honours `XCP_PERF_SCALE` (default `1.0`, CI uses `0.5`)
+and writes its JSON/Markdown report to `Tests/integration/.build/perf.json`.
 
 Required tools: `python3` (3.11+ recommended, uses `tomllib`), `gcc` (C99),
 `make`/`bash` for local test orchestration. No other dependencies — the host
