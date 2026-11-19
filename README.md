@@ -18,7 +18,7 @@ Single-channel, C99, no external dependencies beyond your integration hooks.
 >
 > This repository is an **experiment in autonomous AI code generation**. Every line of the
 > implementation, configuration generator, test harness, and documentation was produced
-> by an LLM agent (Claude) driven only by:
+> by an autonomous LLM agent driven only by:
 > - the public ASAM XCP Part 2 specification text,
 > - the AUTOSAR XCP R4.4.0 module requirements,
 > - an iterative self-test loop (write → build → run asserts → fix → repeat),

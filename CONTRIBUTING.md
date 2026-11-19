@@ -82,8 +82,8 @@ suite is independent of PIE, ASLR, and the host pointer width.
   identified by their section letter + index (e.g. `B3`, `E27`, `K12d`) — new
   checks get the next index in their section.
 - **Commits**: concise imperative subject in Chinese or English; one logical
-  change per commit. Add `Co-Authored-By` lines only if you are co-authoring
-  with another human or agent.
+  change per commit. Add `Co-Authored-By` lines only for human co-authors;
+  AI tools are not authors and must not receive co-author trailers.
 
 ## Reporting a bug
 
