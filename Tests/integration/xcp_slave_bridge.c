@@ -31,6 +31,7 @@ extern uint8 test_cal_rom[2][0x1000];
 
 /* RAM window the master can UPLOAD/DOWNLOAD; address is exposed to Python. */
 static uint8 bridge_ram[0x4000];
+static uint32 bridge_stim_frames;
 
 BRIDGE_API void bridge_init(void)
 {
@@ -52,6 +53,14 @@ BRIDGE_API void bridge_rx(const uint8 *data, uint32 length)
 {
     PduInfoType pdu;
 
+#if (XCP_DAQ_ENABLED == STD_ON)
+    /* The slave routes PIDs below PROGRAM_VERIFY to the STIM path. */
+    if ((length > 0U) && (data[0] < XCP_CMD_PROGRAM_VERIFY))
+    {
+        bridge_stim_frames++;
+    }
+#endif
+
     pdu.sdu_data_ptr  = (uint8 *)data;
     pdu.meta_data_ptr = NULL_PTR;
     pdu.sdu_length    = length;
@@ -72,6 +81,16 @@ BRIDGE_API void bridge_tx_confirm(void)
 BRIDGE_API void bridge_event(uint16 event_channel)
 {
     Xcp_Event(event_channel);
+}
+
+BRIDGE_API uint32 bridge_stim_frame_count(void)
+{
+    return bridge_stim_frames;
+}
+
+BRIDGE_API void bridge_stim_frame_reset(void)
+{
+    bridge_stim_frames = 0U;
 }
 
 BRIDGE_API uint32 bridge_dto_drop_count(void)

@@ -97,6 +97,8 @@ def load_bridge(path: Path) -> ctypes.CDLL:
     lib.bridge_tx_confirm.argtypes = []
     lib.bridge_event.argtypes = [ctypes.c_uint16]
     lib.bridge_os_ticks.restype = ctypes.c_uint32
+    lib.bridge_stim_frame_count.restype = ctypes.c_uint32
+    lib.bridge_stim_frame_reset.argtypes = []
     lib.bridge_dto_drop_count.restype = ctypes.c_uint32
     lib.bridge_dto_drop_reset.argtypes = []
     lib.bridge_ram_addr.restype = ctypes.c_uint32
@@ -195,6 +197,14 @@ class SlaveLink:
     def os_ticks(self) -> int:
         with self._lock:
             return int(self.lib.bridge_os_ticks())
+
+    def stim_frame_count(self) -> int:
+        with self._lock:
+            return int(self.lib.bridge_stim_frame_count())
+
+    def reset_stim_frame_count(self) -> None:
+        with self._lock:
+            self.lib.bridge_stim_frame_reset()
 
     def dto_drop_count(self) -> int:
         with self._lock:

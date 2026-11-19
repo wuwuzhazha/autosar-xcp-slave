@@ -236,62 +236,70 @@ def daq_benchmark(xcp, link, tap_bus, addr: int, entries: int, event: int, secon
     }
 
 
-def stim_throughput(xcp, link, master_bus, addr: int, entries: int, rounds: int) -> dict:
+def stim_throughput(xcp, link, addr: int, entries: int, frames_target: int) -> dict:
     lists, odts = 8, 4
     values = lists * odts * entries
+    xcp.stim.activate(True)
+    # pyxcp 0.30.5 hands the STIM payload to the frame sender as a list;
+    # block_request expects bytes.
+    xcp.stim.set_frame_sender(
+        lambda cmd, payload: xcp.transport.block_request(cmd, bytes(payload))
+    )
+
     xcp.freeDaq()
     xcp.allocDaq(lists)
     for daq_list in range(lists):
         xcp.allocOdt(daq_list, odts)
+        data = bytearray()
         for odt in range(odts):
             xcp.allocOdtEntry(daq_list, odt, entries)
             xcp.setDaqPtr(daq_list, odt, 0)
             for entry in range(entries):
                 index = (daq_list * odts + odt) * entries + entry
                 xcp.writeDaq(0xFF, 4, 0, addr + 4 * index)
+                data.extend(struct.pack("<I", index))
         xcp.setDaqListMode(0x02, daq_list, 0, 1, 0)
+        xcp.stim.setData(daq_list, bytes(data))
+    for daq_list in range(lists):
         xcp.startStopDaqList(1, daq_list)
+
+    expected = b"".join(struct.pack("<I", index) for index in range(values))
     link.ram_write(bytes(4 * values))
+    link.reset_stim_frame_count()
 
-    frames = 0
-    payload_bytes = 0
+    dtos_per_event = lists * odts
+    rounds = -(-frames_target // dtos_per_event)
+    frames = rounds * dtos_per_event
     t0 = time.perf_counter()
-    for round_index in range(rounds):
-        first = round_index * values
-        for pid in range(lists * odts):
-            data = bytearray()
-            for entry in range(entries):
-                data.extend(struct.pack("<I", first + pid * entries + entry))
-            master_bus.send(
-                h.can.Message(
-                    arbitration_id=h.MASTER_ID,
-                    is_extended_id=False,
-                    is_fd=entries > 1,
-                    data=bytes([pid]) + bytes(data),
-                )
-            )
-            frames += 1
-            payload_bytes += len(data)
+    for _ in range(rounds):
+        xcp.stim.triggerEvent(0)
 
-    last = (rounds - 1) * values
-    expected = b"".join(
-        struct.pack("<I", last + index) for index in range(values)
-    )
     deadline = time.perf_counter() + 10.0
-    while time.perf_counter() < deadline and link.ram_read(4 * values) != expected:
+    while time.perf_counter() < deadline:
+        if (
+            link.stim_frame_count() >= frames
+            and link.ram_read(4 * values) == expected
+        ):
+            break
         time.sleep(0.002)
     elapsed = time.perf_counter() - t0
+
+    received = link.stim_frame_count()
+    integrity = link.ram_read(4 * values) == expected
     for daq_list in range(lists):
         xcp.startStopDaqList(0, daq_list)
     xcp.freeDaq()
+    payload_bytes = frames * entries * 4
     return {
         "entries_per_odt": entries,
         "frames": frames,
+        "frames_received": received,
+        "delivery_ratio": round(received / frames, 3),
         "frames_per_s": round(frames / elapsed, 1),
         "payload_bytes": payload_bytes,
         "payload_bytes_per_s": round(payload_bytes / elapsed, 1),
         "seconds": round(elapsed, 3),
-        "integrity": link.ram_read(4 * values) == expected,
+        "integrity": integrity,
     }
 
 
@@ -360,7 +368,7 @@ def run_variant(name: str, profile_sets: tuple[str, ...], fd: bool, payload_size
             result["daq_sustained"] = daq_benchmark(xcp, link, tap_bus, addr, entries, 0, daq_window)
             result["daq_peak"] = daq_benchmark(xcp, link, tap_bus, addr, entries, 1, 1.0 * SCALE)
             result["stim"] = stim_throughput(
-                xcp, link, master_bus, addr, entries, max(5, int(20 * SCALE))
+                xcp, link, addr, entries, max(6400, int(12800 * SCALE))
             )
 
             # CTO latency while a sustained DAQ list set is running.
@@ -463,6 +471,10 @@ def main() -> int:
             f"{label}: sustained DAQ tracks the event scheduler",
         )
         ok &= check(variant["stim"]["integrity"], f"{label}: STIM contents match")
+        ok &= check(
+            variant["stim"]["delivery_ratio"] == 1.0,
+            f"{label}: every STIM frame reached the slave",
+        )
         ok &= check(variant["stim"]["frames_per_s"] > 100.0, f"{label}: STIM above 100 frames/s")
         ok &= check(variant["flash"]["integrity"], f"{label}: flash contents match")
         ok &= check(variant["flash"]["bytes_per_s"] > 100.0, f"{label}: flash above 100 B/s")
