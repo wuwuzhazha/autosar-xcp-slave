@@ -8,6 +8,7 @@ organized as an AUTOSAR Classic Platform BSW module (R4.4.0 API surface).
 
 Single-channel, C99, no external dependencies beyond your integration hooks.
 
+[![Release](https://img.shields.io/github/v/release/wuwuzhazha/xcp-slave.svg?label=Release&sort=semver)](https://github.com/wuwuzhazha/xcp-slave/releases)
 [![CI](https://github.com/wuwuzhazha/xcp-slave/workflows/ci/badge.svg)](https://github.com/wuwuzhazha/xcp-slave/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
