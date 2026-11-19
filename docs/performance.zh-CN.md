@@ -17,7 +17,9 @@
 
 UPLOAD/DOWNLOAD 在两种构建上传输相同的 8 KiB 应用数据。DAQ 使用最大动态
 配置：8 列表 × 4 ODT，事件通道 0（10 ms）用于持续负载，事件通道 1（1 ms）
-用于峰值测试。STIM 使用相同的 8 × 4 ODT 几何，并校验最终内存镜像。
+用于峰值测试。STIM 使用相同的 8 × 4 ODT 几何，通过 pyxcp 的
+`Stim.triggerEvent` 发送；每种构建发送 12 800 帧，桥接层统计每一帧是否
+到达 slave。
 
 ### 指标
 
@@ -36,26 +38,26 @@ UPLOAD/DOWNLOAD 在两种构建上传输相同的 8 KiB 应用数据。DAQ 使�
 ## 参考运行
 
 环境：Windows 10 x64、CPython 3.13.13、pyxcp 0.30.5、python-can 4.6.1、
-提交 `8920e38`、`XCP_PERF_SCALE=1.0`（运行约 22 秒）。
+提交 `890c7db`、`XCP_PERF_SCALE=1.0`（运行约 21 秒）。
 
 | 指标 | 经典 CAN | CAN-FD |
 |------|---------:|-------:|
-| CTO 延迟 p50 | 1.21 ms | 1.28 ms |
-| CTO 延迟 p99 | 2.23 ms | 2.30 ms |
-| CTO 速率 | 762 cmd/s | 746 cmd/s |
-| UPLOAD | 5.2 kB/s | 49.3 kB/s |
-| DOWNLOAD | 4.4 kB/s | 47.2 kB/s |
-| DAQ event0 帧率 | 2 177 /s | 2 337 /s |
-| DAQ event0 采样（墙钟） | 8.7 kB/s | 140.2 kB/s |
-| DAQ event0 采样（模拟时间） | 12.7 kB/s | 191.1 kB/s |
-| DAQ event0 线上字节 | 15.2 kB/s | 147.2 kB/s |
-| DAQ event0 投递 / 丢弃 | 1.00 / 0 | 1.00 / 0 |
-| DAQ event1 帧率 | 13 383 /s | 13 062 /s |
-| DAQ event1 采样（模拟时间） | 127.8 kB/s | 1 897.6 kB/s |
-| DAQ event1 丢弃 | 0 | 185 |
-| STIM 帧率 | 54 674 /s | 49 939 /s |
-| STIM 负载 | 219 kB/s | 2 996 kB/s |
-| Flash 编程 | 3.1 kB/s | 8.6 kB/s |
+| CTO 延迟 p50 | 1.23 ms | 1.15 ms |
+| CTO 延迟 p99 | 2.47 ms | 2.08 ms |
+| CTO 速率 | 755 cmd/s | 819 cmd/s |
+| UPLOAD | 5.5 kB/s | 52.0 kB/s |
+| DOWNLOAD | 4.7 kB/s | 49.1 kB/s |
+| DAQ event0 帧率 | 2 353 /s | 2 237 /s |
+| DAQ event0 采样（墙钟） | 9.4 kB/s | 134.2 kB/s |
+| DAQ event0 采样（模拟时间） | 12.7 kB/s | 192.2 kB/s |
+| DAQ event0 线上字节 | 16.5 kB/s | 140.9 kB/s |
+| DAQ event0 投递 / 丢弃 | 1.00 / 0 | 1.01 / 0 |
+| DAQ event1 帧率 | 15 502 /s | 14 235 /s |
+| DAQ event1 采样（模拟时间） | 128.4 kB/s | 1 919.3 kB/s |
+| DAQ event1 丢弃 | 0 | 0 |
+| STIM 帧率 | 48 770 /s | 42 203 /s |
+| STIM 负载 | 195 kB/s | 2 532 kB/s |
+| Flash 编程 | 3.2 kB/s | 8.0 kB/s |
 
 DAQ 采样在模拟时间下与配置精确吻合：
 
@@ -64,9 +66,9 @@ DAQ 采样在模拟时间下与配置精确吻合：
 CAN-FD: 32 DTO × 60 B / 10 ms = 192 kB/s
 ```
 
-在事件通道 1（1 ms）下，32 DTO 的突发超过本机 128 深队列，FD 构建报告
-185 次丢弃；经典构建仍在队列容量内。这是预期的队列深度限制，不是数据
-损坏（所有已投递采样均与 RAM 一致）。
+在事件通道 1（1 ms）下，如果主机来不及排空，32 DTO 的突发可能超过 128 深
+队列；早期运行曾报告 FD 丢弃（例如 185 次），本次运行为 0。这是预期的
+队列深度限制，不是数据损坏（所有已投递采样均与 RAM 一致）。
 
 ## 解读
 
@@ -84,6 +86,16 @@ FD 数据段、CRC 或收发器时序。因此：
   相对经典 CAN 的净吞吐提升通常在 3–7×，不是 15×。
 - **Flash 受命令数限制。** 每个 32 字节 prepare 块仍需 `PROGRAM_PREPARE`、
   `SET_MTA` 和一次或多次 `PROGRAM` 往返，因此实测只有约 2.8×。
+
+### 为什么 STIM 比 DOWNLOAD 和 DAQ 快很多
+
+STIM 是单向、无确认的注入路径：pyxcp 的 `Stim.triggerEvent` 构造帧后直接
+发送，不等待响应；slave 在接收路径里直接写内存，没有响应帧、DTO 调度器或
+发送队列。DOWNLOAD 每帧都要等一个 RES，DAQ 是事件驱动的 ECU 发送，所以
+三者测的是不同瓶颈。约 49 000 帧/s 是 Python/pyxcp 发送端加桥接层的容量，
+不是 CAN 总线能力：1 Mbit/s 下 8 字节经典帧占用总线约 130 µs，真实总线
+上限约 7–8 k 帧/s；2 Mbit/s 下 64 字节 FD 帧约 300 µs，上限约 3 k 帧/s。
+不要直接把 STIM 的帧率与 DAQ 或 DOWNLOAD 的帧率比较。
 
 ## 复现
 
