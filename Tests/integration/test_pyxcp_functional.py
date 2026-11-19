@@ -60,10 +60,6 @@ class Suite:
         self.check(name, False, f"expected {code or 'error'}, got {result!r}")
 
 
-def raw(xcp, command, *data) -> bytes:
-    return bytes(xcp.transport.request(command, *data))
-
-
 def u32(data: bytes, offset: int = 0) -> int:
     return struct.unpack_from("<I", data, offset)[0]
 
@@ -79,10 +75,9 @@ def main() -> int:
     try:
         with Master("can", h.make_app(channel, timeout=3.0), transport_layer_interface=master_bus) as xcp:
             xcp.connect()
-            for resource in (RES_CAL, RES_DAQ, RES_STIM, RES_PGM):
-                h.unlock(xcp, resource)
+            addr = link.ram_addr()
 
-            # ---------------- A. connection / identity ----------------
+            # ---------------- A. connection / protection ----------------
             print("-- A. connection, status, identity")
             comm = xcp.getCommModeInfo()
             suite.check(
@@ -94,6 +89,80 @@ def main() -> int:
                 and comm.xcpDriverVersionNumber == 0x10,
                 f"{comm}",
             )
+
+            status = xcp.getStatus()
+            suite.check(
+                "GET_STATUS: every resource protected before unlock",
+                status.sessionConfiguration == 0
+                and status.resourceProtectionStatus.calpag is True
+                and status.resourceProtectionStatus.daq is True
+                and status.resourceProtectionStatus.stim is True
+                and status.resourceProtectionStatus.pgm is True,
+                f"{status}",
+            )
+
+            locked_calls = [
+                ("DOWNLOAD while CAL locked", xcp.download, (b"\x00",)),
+                ("SHORT_DOWNLOAD while CAL locked", xcp.shortDownload, (addr + 4, 0, b"")),
+                ("MODIFY_BITS while CAL locked", xcp.modifyBits, (0, 0xFFFF, 0)),
+                ("SET_CAL_PAGE while CAL locked", xcp.setCalPage, (2, 0, 1)),
+                ("COPY_CAL_PAGE while CAL locked", xcp.copyCalPage, (0, 0, 0, 1)),
+                ("FREE_DAQ while DAQ locked", xcp.freeDaq, ()),
+                ("ALLOC_DAQ while DAQ locked", xcp.allocDaq, (1,)),
+                ("ALLOC_ODT while DAQ locked", xcp.allocOdt, (0, 1)),
+                ("ALLOC_ODT_ENTRY while DAQ locked", xcp.allocOdtEntry, (0, 0, 1)),
+                ("WRITE_DAQ while DAQ locked", xcp.writeDaq, (0xFF, 4, 0, addr)),
+                ("SET_DAQ_LIST_MODE while DAQ locked", xcp.setDaqListMode, (0, 0, 0, 1, 0)),
+                ("START_STOP_DAQ_LIST while DAQ locked", xcp.startStopDaqList, (1, 0)),
+                ("START_STOP_SYNCH while DAQ locked", xcp.startStopSynch, (1,)),
+                ("CLEAR_DAQ_LIST while DAQ locked", xcp.clearDaqList, (0,)),
+                ("PROGRAM_START while PGM locked", xcp.programStart, ()),
+                ("PROGRAM_PREPARE while PGM locked", xcp.programPrepare, (16,)),
+                ("PROGRAM_CLEAR while PGM locked", xcp.programClear, (0, 0x100)),
+                ("PROGRAM while PGM locked", xcp.program, (b"\x00", 1, True)),
+                ("PROGRAM_VERIFY while PGM locked", xcp.programVerify, (0, 0, 0)),
+                ("PROGRAM_RESET while PGM locked", xcp.programReset, (False,)),
+            ]
+            for label, fn, args in locked_calls:
+                suite.error(f"{label} -> ERR_ACCESS_LOCKED", fn, *args, code="ERR_ACCESS_LOCKED")
+
+            suite.error(
+                "GET_SEED mode 2 -> ERR_MODE_NOT_VALID",
+                xcp.getSeed, 2, RES_CAL, code="ERR_MODE_NOT_VALID",
+            )
+            suite.error(
+                "GET_SEED invalid resource -> ERR_OUT_OF_RANGE",
+                xcp.getSeed, 0, 0x02, code="ERR_OUT_OF_RANGE",
+            )
+            suite.error(
+                "GET_SEED continuation without seed -> ERR_SEQUENCE",
+                xcp.getSeed, 1, RES_CAL, code="ERR_SEQUENCE",
+            )
+
+            for resource, field in (
+                (RES_CAL, "calpag"),
+                (RES_DAQ, "daq"),
+                (RES_STIM, "stim"),
+                (RES_PGM, "pgm"),
+            ):
+                seed = xcp.getSeed(0, resource)
+                suite.check(
+                    f"GET_SEED pattern for resource 0x{resource:02X}",
+                    seed.length == 4
+                    and seed.seed[0] == resource
+                    and seed.seed[1] == (resource ^ 0x5A)
+                    and seed.seed[2] == (resource ^ 0xA5)
+                    and seed.seed[3] == 0x42,
+                    f"{seed}",
+                )
+                key = bytes(value ^ 0xFF for value in seed.seed)
+                xcp.unlock(len(key), key)
+                status = xcp.getStatus()
+                suite.check(
+                    f"UNLOCK clears the {field} protection bit",
+                    getattr(status.resourceProtectionStatus, field) is False,
+                    f"{status}",
+                )
 
             status = xcp.getStatus()
             suite.check(
@@ -113,8 +182,13 @@ def main() -> int:
                 ident.length == 17 and ident_data == b"AUTOSAR XCP Slave",
                 f"len={ident.length} data={ident_data!r}",
             )
-            empty = xcp.getId(9)
-            suite.check("GET_ID mode 9 -> length 0", empty.length == 0, f"{empty}")
+            suite.check(
+                "GET_ID modes 1..9 return length 0",
+                all(xcp.getId(mode).length == 0 for mode in range(1, 10)),
+            )
+
+            synch = xcp.synch()
+            suite.check("SYNCH returns ERR_CMD_SYNCH", synch == b"\x00", f"{synch!r}")
 
             slave_id = xcp.transportLayerCmd(0xFF)
             suite.check("TL_CMD GET_SLAVE_ID -> 'XCP'", slave_id[-3:] == b"XCP", f"{slave_id!r}")
@@ -125,9 +199,22 @@ def main() -> int:
 
             # ---------------- B. memory access ----------------
             print("-- B. memory access")
-            addr = link.ram_addr()
             pattern = bytes(range(256))
             link.ram_write(pattern)
+
+            suite.error(
+                "DOWNLOAD_NEXT without an active block -> ERR_SEQUENCE",
+                xcp.downloadNext, b"\x00", 1, True, code="ERR_SEQUENCE",
+            )
+            suite.error(
+                "DOWNLOAD declared payload beyond CTO -> ERR_OUT_OF_RANGE",
+                xcp.transport.request, t.Command.DOWNLOAD, 5, 1, 2,
+                code="ERR_OUT_OF_RANGE",
+            )
+            suite.error(
+                "short UPLOAD from denied address -> ERR_ACCESS_DENIED",
+                xcp.shortUpload, 4, 0xDEAD0000, code="ERR_ACCESS_DENIED",
+            )
 
             xcp.setMta(addr)
             suite.check("SET_MTA + UPLOAD 4B", xcp.upload(4) == pattern[:4])
@@ -261,8 +348,40 @@ def main() -> int:
                 "SET_CAL_PAGE bad segment -> ERR_SEGMENT_NOT_VALID",
                 xcp.setCalPage, 0x02, 9, 0, code="ERR_SEGMENT_NOT_VALID",
             )
-            suite.check("SET_SEGMENT_MODE", xcp.setSegmentMode(0, 0) == b"")
-            suite.check("GET_SEGMENT_MODE", xcp.getSegmentMode(0) == 0)
+            suite.error(
+                "GET_PAGE_INFO bad page -> ERR_PAGE_NOT_VALID",
+                xcp.getPageInfo, 0, 2, code="ERR_PAGE_NOT_VALID",
+            )
+            suite.error(
+                "GET_CAL_PAGE mode 3 -> ERR_MODE_NOT_VALID",
+                xcp.getCalPage, 3, 0, code="ERR_MODE_NOT_VALID",
+            )
+            suite.error(
+                "SET_CAL_PAGE mode 0 -> ERR_MODE_NOT_VALID",
+                xcp.setCalPage, 0, 0, 1, code="ERR_MODE_NOT_VALID",
+            )
+
+            # mode 0x83 applies the page to both access paths of every segment.
+            xcp.setCalPage(0x83, 0, 1)
+            suite.check(
+                "SET_CAL_PAGE ALL sets ECU and XCP pages on both segments",
+                xcp.getCalPage(1, 0) == 1
+                and xcp.getCalPage(2, 0) == 1
+                and xcp.getCalPage(1, 1) == 1
+                and xcp.getCalPage(2, 1) == 1,
+            )
+            xcp.setCalPage(0x83, 0, 0)
+
+            suite.error(
+                "SET_SEGMENT_MODE freeze unsupported -> ERR_MODE_NOT_VALID",
+                xcp.setSegmentMode, 1, 0, code="ERR_MODE_NOT_VALID",
+            )
+            suite.check("SET_SEGMENT_MODE normal mode", xcp.setSegmentMode(0, 0) == b"")
+            suite.check("GET_SEGMENT_MODE returns 0", xcp.getSegmentMode(0) == 0)
+            suite.error(
+                "GET_SEGMENT_MODE bad segment -> ERR_SEGMENT_NOT_VALID",
+                xcp.getSegmentMode, 9, code="ERR_SEGMENT_NOT_VALID",
+            )
 
             cal_pattern = bytes([0x5A]) * 0x1000
             link.cal_rom_write(0, cal_pattern)
@@ -270,6 +389,18 @@ def main() -> int:
             suite.check(
                 "COPY_CAL_PAGE copies ROM page0 to RAM page1",
                 link.cal_read(1, 0x1000) == cal_pattern,
+            )
+            suite.error(
+                "COPY_CAL_PAGE into reference page -> ERR_WRITE_PROTECTED",
+                xcp.copyCalPage, 0, 0, 0, 0, code="ERR_WRITE_PROTECTED",
+            )
+            suite.error(
+                "COPY_CAL_PAGE bad page -> ERR_PAGE_NOT_VALID",
+                xcp.copyCalPage, 0, 0, 0, 9, code="ERR_PAGE_NOT_VALID",
+            )
+            suite.error(
+                "COPY_CAL_PAGE bad segment -> ERR_SEGMENT_NOT_VALID",
+                xcp.copyCalPage, 9, 0, 0, 1, code="ERR_SEGMENT_NOT_VALID",
             )
 
             # ---------------- D. DAQ ----------------
@@ -417,6 +548,75 @@ def main() -> int:
             xcp.startStopDaqList(0, 0)
             xcp.freeDaq()
 
+            xcp.allocDaq(1)
+            suite.error(
+                "START_STOP_DAQ_LIST mode 3 -> ERR_MODE_NOT_VALID",
+                xcp.startStopDaqList, 3, 0, code="ERR_MODE_NOT_VALID",
+            )
+            xcp.freeDaq()
+            suite.error(
+                "CLEAR_DAQ_LIST out of range -> ERR_OUT_OF_RANGE",
+                xcp.clearDaqList, 9, code="ERR_OUT_OF_RANGE",
+            )
+            suite.error(
+                "SET_DAQ_PTR out of range -> ERR_OUT_OF_RANGE",
+                xcp.setDaqPtr, 9, 0, 0, code="ERR_OUT_OF_RANGE",
+            )
+
+            xcp.freeDaq()
+            xcp.allocDaq(1)
+            xcp.allocOdt(0, 1)
+            xcp.allocOdtEntry(0, 0, 1)
+            xcp.setDaqPtr(0, 0, 0)
+            xcp.writeDaq(0xFF, 4, 0, addr)
+            xcp.setDaqListMode(0x80, 0, 0, 1, 0)
+            mode = xcp.getDaqListMode(0)
+            suite.check(
+                "SET/GET_DAQ_LIST_MODE carries the resume bit",
+                mode.currentMode.resume is True,
+                f"{mode}",
+            )
+            xcp.freeDaq()
+
+            # Two lists started and stopped through START_STOP_SYNCH.
+            xcp.allocDaq(2)
+            for daq_list in range(2):
+                xcp.allocOdt(daq_list, 1)
+                xcp.allocOdtEntry(daq_list, 0, 1)
+                xcp.setDaqPtr(daq_list, 0, 0)
+                xcp.writeDaq(0xFF, 4, 0, addr + 4 * daq_list)
+                xcp.setDaqListMode(0, daq_list, 1, 1, 0)
+            sync_ram = bytearray(16)
+            struct.pack_into("<II", sync_ram, 0, 0x11223344, 0x55667788)
+            link.ram_write(bytes(sync_ram))
+            h.drain(tap_bus)
+
+            xcp.startStopDaqList(2, 0)
+            xcp.startStopDaqList(2, 1)
+            xcp.startStopSynch(1)
+            seen = {}
+            deadline = time.time() + 1.0
+            while time.time() < deadline and len(seen) < 2:
+                frame = tap_bus.recv(timeout=0.05)
+                if frame is not None and len(frame.data) >= 5 and frame.data[0] < 0xFC:
+                    seen[frame.data[0]] = bytes(frame.data[1:5])
+            suite.check(
+                "START_STOP_SYNCH starts both selected lists",
+                seen.get(0) == b"\x44\x33\x22\x11" and seen.get(1) == b"\x88\x77\x66\x55",
+                f"{seen}",
+            )
+            # START_STOP_SYNCH mode 1 consumes the selection; re-select before
+            # stopping through the selected-lists path.
+            xcp.startStopDaqList(2, 0)
+            xcp.startStopDaqList(2, 1)
+            xcp.startStopSynch(2)
+            time.sleep(0.05)
+            h.drain(tap_bus)
+            stopped = xcp.getDaqListMode(0).currentMode.running is False
+            stopped = stopped and xcp.getDaqListMode(1).currentMode.running is False
+            suite.check("START_STOP_SYNCH stops both lists", stopped)
+            xcp.freeDaq()
+
             # ---------------- E. STIM ----------------
             print("-- E. STIM")
             xcp.freeDaq()
@@ -426,6 +626,19 @@ def main() -> int:
             xcp.setDaqPtr(0, 0, 0)
             xcp.writeDaq(0xFF, 4, 0, addr + 220)
             xcp.setDaqListMode(0x02, 0, 0, 1, 0)
+            info = xcp.getDaqListInfo(0)
+            stim_mode = xcp.getDaqListMode(0)
+            suite.check(
+                # Dynamic lists advertise both directions; the current
+                # direction is reported by GET_DAQ_LIST_MODE.
+                "GET_DAQ_LIST_INFO / MODE report the STIM direction",
+                info.daqListProperties.stim is True
+                and info.daqListProperties.daq is True
+                and info.maxOdt == 4
+                and info.maxOdtEntries == 7
+                and str(stim_mode.currentMode.direction) == "STIM",
+                f"{info} {stim_mode}",
+            )
             link.ram_write(bytes([0, 0, 0, 0]))
             xcp.startStopDaqList(1, 0)
             # Absolute PID 0 for list0/ODT0; send a raw STIM frame on the CMD ID.
@@ -467,8 +680,39 @@ def main() -> int:
                 xcp.getSectorInfo, 0, 9, code="ERR_OUT_OF_RANGE",
             )
 
+            suite.error(
+                "PROGRAM_PREPARE before PROGRAM_START -> ERR_SEQUENCE",
+                xcp.programPrepare, 16, code="ERR_SEQUENCE",
+            )
+            suite.error(
+                "PROGRAM_CLEAR before PROGRAM_START -> ERR_SEQUENCE",
+                xcp.programClear, 0, 0x100, code="ERR_SEQUENCE",
+            )
+            suite.error(
+                "PROGRAM_RESET before PROGRAM_START -> ERR_SEQUENCE",
+                xcp.programReset, False, code="ERR_SEQUENCE",
+            )
+
             xcp.programStart()
+            suite.error(
+                "PROGRAM_PREPARE over 32 bytes -> ERR_OUT_OF_RANGE",
+                xcp.programPrepare, 33, code="ERR_OUT_OF_RANGE",
+            )
             xcp.programPrepare(16)
+            xcp.programFormat(0, 0, 1, 0)
+            suite.check("PROGRAM_FORMAT accepts absolute programming", True)
+            suite.error(
+                "PROGRAM_FORMAT with compression -> ERR_OUT_OF_RANGE",
+                xcp.programFormat, 1, 0, 1, 0, code="ERR_OUT_OF_RANGE",
+            )
+            suite.error(
+                "PROGRAM_FORMAT with relative mode -> ERR_MODE_NOT_VALID",
+                xcp.programFormat, 0, 0, 0, 0, code="ERR_MODE_NOT_VALID",
+            )
+            suite.error(
+                "PROGRAM_FORMAT with bad access method -> ERR_MODE_NOT_VALID",
+                xcp.programFormat, 0, 0, 1, 2, code="ERR_MODE_NOT_VALID",
+            )
             xcp.setMta(0x08000000)
             xcp.programClear(0, 0x4000)
             suite.check(
@@ -487,6 +731,14 @@ def main() -> int:
             )
             xcp.programVerify(0, 0, 0)
             suite.check("PROGRAM_VERIFY succeeds", True)
+            suite.error(
+                "PROGRAM_VERIFY with a wrong value -> ERR_VERIFY",
+                xcp.programVerify, 0, 0, 1, code="ERR_VERIFY",
+            )
+            suite.error(
+                "PROGRAM_MAX without payload -> ERR_OUT_OF_RANGE",
+                xcp.programMax, b"", code="ERR_OUT_OF_RANGE",
+            )
 
             xcp.setMta(0x08020000)
             suite.error(
@@ -500,6 +752,13 @@ def main() -> int:
             xcp.connect()
             for resource in (RES_CAL, RES_DAQ, RES_STIM, RES_PGM):
                 h.unlock(xcp, resource)
+            xcp.setRequest(0x01, 0)
+            status = xcp.getStatus()
+            suite.check(
+                "SET_REQUEST STORE_CAL sets storeCalRequest",
+                status.sessionStatus.storeCalRequest is True,
+                f"{status}",
+            )
             xcp.setRequest(0x04, 0)
             status = xcp.getStatus()
             suite.check(
@@ -519,6 +778,25 @@ def main() -> int:
 
             # ---------------- H. negative / disconnect paths ----------------
             print("-- H. negative paths")
+            suite.error(
+                "truncated CONNECT -> ERR_CMD_SYNTAX",
+                xcp.transport.request, t.Command.CONNECT, code="ERR_CMD_SYNTAX",
+            )
+            suite.error(
+                "truncated SET_MTA -> ERR_CMD_SYNTAX",
+                xcp.transport.request, t.Command.SET_MTA, 0, 0, 0,
+                code="ERR_CMD_SYNTAX",
+            )
+            suite.error(
+                "truncated UPLOAD -> ERR_CMD_SYNTAX",
+                xcp.transport.request, t.Command.UPLOAD, code="ERR_CMD_SYNTAX",
+            )
+            suite.error(
+                "truncated GET_SEED -> ERR_CMD_SYNTAX",
+                xcp.transport.request, t.Command.GET_SEED, 0,
+                code="ERR_CMD_SYNTAX",
+            )
+
             user = xcp.userCmd(0xAA, b"\x11\x22")
             suite.check(
                 "USER_CMD echoes the payload",

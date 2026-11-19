@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "Xcp.h"
+#include "Xcp_Internal.h"
 #include "Xcp_Callback.h"
 #include "Xcp_Types.h"
 #include "ComStack_Types.h"
@@ -29,7 +30,7 @@ extern uint8 test_cal_ram[2][0x1000];
 extern uint8 test_cal_rom[2][0x1000];
 
 /* RAM window the master can UPLOAD/DOWNLOAD; address is exposed to Python. */
-static uint8 bridge_ram[256];
+static uint8 bridge_ram[0x4000];
 
 BRIDGE_API void bridge_init(void)
 {
@@ -66,6 +67,22 @@ BRIDGE_API void bridge_tx_confirm(void)
 BRIDGE_API void bridge_event(uint16 event_channel)
 {
     Xcp_Event(event_channel);
+}
+
+BRIDGE_API uint32 bridge_dto_drop_count(void)
+{
+#if (XCP_DAQ_ENABLED == STD_ON) && (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
+    return g_xcp_channel.storage_ptr->dropped_dto_counter;
+#else
+    return 0U;
+#endif
+}
+
+BRIDGE_API void bridge_dto_drop_reset(void)
+{
+#if (XCP_DAQ_ENABLED == STD_ON) && (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
+    g_xcp_channel.storage_ptr->dropped_dto_counter = 0U;
+#endif
 }
 
 BRIDGE_API uint32 bridge_ram_addr(void)

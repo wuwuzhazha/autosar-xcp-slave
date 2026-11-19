@@ -96,6 +96,8 @@ def load_bridge(path: Path) -> ctypes.CDLL:
     lib.bridge_tx_pop.restype = ctypes.c_uint32
     lib.bridge_tx_confirm.argtypes = []
     lib.bridge_event.argtypes = [ctypes.c_uint16]
+    lib.bridge_dto_drop_count.restype = ctypes.c_uint32
+    lib.bridge_dto_drop_reset.argtypes = []
     lib.bridge_ram_addr.restype = ctypes.c_uint32
     lib.bridge_ram_read.argtypes = [u8p, ctypes.c_uint32]
     lib.bridge_ram_write.argtypes = [u8p, ctypes.c_uint32]
@@ -188,6 +190,14 @@ class SlaveLink:
     def event(self, channel: int) -> None:
         with self._lock:
             self.lib.bridge_event(channel)
+
+    def dto_drop_count(self) -> int:
+        with self._lock:
+            return int(self.lib.bridge_dto_drop_count())
+
+    def reset_dto_drop_count(self) -> None:
+        with self._lock:
+            self.lib.bridge_dto_drop_reset()
 
     def ram_addr(self) -> int:
         return int(self.lib.bridge_ram_addr())
