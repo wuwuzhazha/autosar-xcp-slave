@@ -18,9 +18,15 @@
 #define BRIDGE_RX_PDU_ID (0U)
 #define BRIDGE_TX_PDU_ID (1U)
 
+#define TEST_FLASH_BASE (0x08000000UL)
+#define TEST_FLASH_SIZE (0x20000UL)
+
 extern const Xcp_ConfigType xcp_config;
 extern uint32 test_os_ticks;
 extern uint32 test_tx_pop(uint8 *out, uint32 *len);
+extern uint8 test_flash_mem[TEST_FLASH_SIZE];
+extern uint8 test_cal_ram[2][0x1000];
+extern uint8 test_cal_rom[2][0x1000];
 
 /* RAM window the master can UPLOAD/DOWNLOAD; address is exposed to Python. */
 static uint8 bridge_ram[256];
@@ -57,6 +63,11 @@ BRIDGE_API void bridge_tx_confirm(void)
     Xcp_CanIfTxConfirmation(BRIDGE_TX_PDU_ID, E_OK);
 }
 
+BRIDGE_API void bridge_event(uint16 event_channel)
+{
+    Xcp_Event(event_channel);
+}
+
 BRIDGE_API uint32 bridge_ram_addr(void)
 {
     return test_mem_register(bridge_ram, (uint32)sizeof(bridge_ram));
@@ -78,4 +89,47 @@ BRIDGE_API void bridge_ram_write(const uint8 *in, uint32 length)
         length = (uint32)sizeof(bridge_ram);
     }
     memcpy(bridge_ram, in, length);
+}
+
+BRIDGE_API uint32 bridge_flash_read(uint32 address, uint8 *out, uint32 length)
+{
+    uint32 offset;
+
+    if (address < TEST_FLASH_BASE)
+    {
+        return 0U;
+    }
+    offset = address - TEST_FLASH_BASE;
+    if ((offset > TEST_FLASH_SIZE) || (length > (TEST_FLASH_SIZE - offset)))
+    {
+        return 0U;
+    }
+    memcpy(out, &test_flash_mem[offset], length);
+    return length;
+}
+
+BRIDGE_API uint32 bridge_cal_read(uint8 page, uint8 *out, uint32 length)
+{
+    if ((page > 1U) || (length > 0x1000U))
+    {
+        return 0U;
+    }
+    memcpy(out, test_cal_ram[page], length);
+    return length;
+}
+
+BRIDGE_API void bridge_cal_write(uint8 page, const uint8 *in, uint32 length)
+{
+    if ((page <= 1U) && (length <= 0x1000U))
+    {
+        memcpy(test_cal_ram[page], in, length);
+    }
+}
+
+BRIDGE_API void bridge_cal_rom_write(uint8 page, const uint8 *in, uint32 length)
+{
+    if ((page <= 1U) && (length <= 0x1000U))
+    {
+        memcpy(test_cal_rom[page], in, length);
+    }
 }
