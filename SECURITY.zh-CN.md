@@ -15,7 +15,7 @@ XCP 是一种调试/标定协议——从站实现中若存在内存安全漏洞
 
 ## 报告漏洞
 
-**首选方式**：[GitHub 私密漏洞报告](https://github.com/wuwuzhazha/xcp-slave/security/advisories/new)
+**首选方式**：[GitHub 私密漏洞报告](https://github.com/wuwuzhazha/autosar-xcp-slave/security/advisories/new)
 （如果仓库在 GitHub 上是公开的）——提交私密 advisory；维护者会在漏洞披露前看到它。
 
 **其他方式**：提交一个常规 issue，但**不要**包含漏洞细节，并在其中请求一个私密联系渠道；维护者会跟进处理。

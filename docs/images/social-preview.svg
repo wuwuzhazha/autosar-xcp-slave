@@ -45,7 +45,7 @@
   </g>
 
   <!-- title -->
-  <text x="80" y="180" font-family="Consolas,'SF Mono',Menlo,monospace" font-size="72" font-weight="700" fill="#e6edf3" letter-spacing="2">xcp-slave</text>
+  <text x="80" y="180" font-family="Consolas,'SF Mono',Menlo,monospace" font-size="72" font-weight="700" fill="#e6edf3" letter-spacing="2">autosar-xcp-slave</text>
   <text x="80" y="235" font-family="Consolas,'SF Mono',Menlo,monospace" font-size="26" fill="#8b949e" letter-spacing="4">ASAM XCP PART 2 v1.1  ·  AUTOSAR R4.4.0</text>
 
   <!-- subtitle -->

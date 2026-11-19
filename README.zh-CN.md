@@ -2,15 +2,15 @@
 
 # XCP 从站协议栈
 
-![xcp-slave — ASAM XCP Part 2 v1.1 从站](docs/images/social-preview.png)
+![autosar-xcp-slave — ASAM XCP Part 2 v1.1 从站](docs/images/social-preview.png)
 
 一个独立、可移植的 **ASAM XCP Part 2 v1.1** 从站（目标设备）协议实现，
 按 AUTOSAR Classic Platform BSW 模块（R4.4.0 API 接口）的形式组织。
 
 单通道，C99，除你的集成钩子外无外部依赖。
 
-[![Release](https://img.shields.io/github/v/release/wuwuzhazha/xcp-slave.svg?label=Release&sort=semver)](https://github.com/wuwuzhazha/xcp-slave/releases)
-[![CI](https://github.com/wuwuzhazha/xcp-slave/workflows/ci/badge.svg)](https://github.com/wuwuzhazha/xcp-slave/actions)
+[![Release](https://img.shields.io/github/v/release/wuwuzhazha/autosar-xcp-slave.svg?label=Release&sort=semver)](https://github.com/wuwuzhazha/autosar-xcp-slave/releases)
+[![CI](https://github.com/wuwuzhazha/autosar-xcp-slave/workflows/ci/badge.svg)](https://github.com/wuwuzhazha/autosar-xcp-slave/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---

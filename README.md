@@ -1,15 +1,15 @@
 # XCP Slave Stack
 > **中文**: [README.zh-CN.md](README.zh-CN.md)
 
-![xcp-slave — ASAM XCP Part 2 v1.1 slave](docs/images/social-preview.png)
+![autosar-xcp-slave — ASAM XCP Part 2 v1.1 slave](docs/images/social-preview.png)
 
 An independent, portable implementation of the **ASAM XCP Part 2 v1.1** slave (target device) protocol,
 organized as an AUTOSAR Classic Platform BSW module (R4.4.0 API surface).
 
 Single-channel, C99, no external dependencies beyond your integration hooks.
 
-[![Release](https://img.shields.io/github/v/release/wuwuzhazha/xcp-slave.svg?label=Release&sort=semver)](https://github.com/wuwuzhazha/xcp-slave/releases)
-[![CI](https://github.com/wuwuzhazha/xcp-slave/workflows/ci/badge.svg)](https://github.com/wuwuzhazha/xcp-slave/actions)
+[![Release](https://img.shields.io/github/v/release/wuwuzhazha/autosar-xcp-slave.svg?label=Release&sort=semver)](https://github.com/wuwuzhazha/autosar-xcp-slave/releases)
+[![CI](https://github.com/wuwuzhazha/autosar-xcp-slave/workflows/ci/badge.svg)](https://github.com/wuwuzhazha/autosar-xcp-slave/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
