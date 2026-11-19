@@ -53,16 +53,22 @@ class Suite:
         self.check(label, False, f"expected {code}, got {result!r}")
 
 
-def run_variant(name: str, profile: str | None, sets: tuple[str, ...], body) -> tuple[int, int]:
+def run_variant(
+    name: str,
+    profile: str | None,
+    sets: tuple[str, ...],
+    body,
+    fd: bool = False,
+) -> tuple[int, int]:
     print(f"== {name} ==")
     lib = h.load_bridge(h.build_bridge(name, profile=profile, sets=sets))
     channel = f"xcp-var-{name}-{id(object())}"
     master_bus, rx_bus, tx_bus, tap_bus = h.open_buses(channel)
-    link = h.SlaveLink(lib, rx_bus, tx_bus)
+    link = h.SlaveLink(lib, rx_bus, tx_bus, fd=fd)
     link.start()
     suite = Suite(name)
     try:
-        with Master("can", h.make_app(channel, timeout=3.0), transport_layer_interface=master_bus) as xcp:
+        with Master("can", h.make_app(channel, fd=fd, timeout=3.0), transport_layer_interface=master_bus) as xcp:
             xcp.connect()
             body(suite, xcp, link, link.ram_addr())
     finally:
@@ -219,6 +225,45 @@ def interleaved(suite: Suite, xcp, link, addr: int) -> None:
     suite.check("status still works", xcp.getStatus().sessionConfiguration == 0)
 
 
+def fd_limits(suite: Suite, xcp, link, addr: int) -> None:
+    unlock_all(xcp)
+    suite.check(
+        "CONNECT negotiates 64-byte CTO and DTO",
+        xcp.slaveProperties.maxCto == 64 and xcp.slaveProperties.maxDto == 64,
+        f"maxCto={xcp.slaveProperties.maxCto} maxDto={xcp.slaveProperties.maxDto}",
+    )
+
+    # Payload-carrying SHORT_DOWNLOAD only fits when the CTO exceeds 8 bytes.
+    xcp.shortDownload(addr + 36, 0, b"\x11\x22\x33\x44")
+    suite.check(
+        "SHORT_DOWNLOAD carries a payload on CAN-FD",
+        link.ram_read(64)[36:40] == b"\x11\x22\x33\x44",
+        f"got {link.ram_read(64)[36:40]!r}",
+    )
+
+    link.ram_write(bytes(range(128)))
+    suite.check(
+        "SHORT_UPLOAD returns 60 bytes in one CTO",
+        xcp.shortUpload(60, addr) == bytes(range(60)),
+    )
+
+    payload = bytes(range(62))
+    xcp.setMta(addr + 64)
+    xcp.download(payload)
+    suite.check(
+        "DOWNLOAD accepts a 62-byte payload",
+        link.ram_read(128)[64:126] == payload,
+    )
+    xcp.setMta(addr + 64)
+    suite.check("UPLOAD returns 62 bytes", xcp.upload(62) == payload)
+
+    xcp.setMta(addr)
+    suite.check(
+        "BUILD_CHECKSUM covers 60 bytes",
+        xcp.buildChecksum(60).checksum == sum(range(60)),
+    )
+
+
 VARIANTS = [
     (
         "minimal",
@@ -235,19 +280,27 @@ VARIANTS = [
             "XcpVersionInfoApi=0",
         ),
         minimal,
+        False,
     ),
-    ("seedkey_off", None, ("XcpSeedKeyEnabled=0",), seedkey_off),
-    ("daq_static", "static", (), static_daq),
-    ("daq_predef", "predef", (), predef_daq),
-    ("interleaved", None, ("XcpInterleavedModeEnabled=1",), interleaved),
+    ("seedkey_off", None, ("XcpSeedKeyEnabled=0",), seedkey_off, False),
+    ("daq_static", "static", (), static_daq, False),
+    ("daq_predef", "predef", (), predef_daq, False),
+    ("interleaved", None, ("XcpInterleavedModeEnabled=1",), interleaved, False),
+    (
+        "can_fd",
+        None,
+        ("XcpMaxCto=64", "XcpMaxDto=64", "XcpOdtEntriesCount=15"),
+        fd_limits,
+        True,
+    ),
 ]
 
 
 def main() -> int:
     total_passed = 0
     total_failed = 0
-    for name, profile, sets, body in VARIANTS:
-        passed, failed = run_variant(name, profile, sets, body)
+    for name, profile, sets, body, fd in VARIANTS:
+        passed, failed = run_variant(name, profile, sets, body, fd=fd)
         total_passed += passed
         total_failed += failed
     print(f"================ pyxcp variants: {total_passed} passed, {total_failed} failed ================")
