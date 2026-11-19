@@ -4,6 +4,7 @@
 #include "Xcp_Internal.h"
 #include "Xcp_Types.h"
 #include "Xcp_Callback.h"
+#include "test_stubs.h"
 
 /* Feature-adaptive functional test: each section is #if-guarded, so trimmed
    variants only test enabled features. The build matrix uses it in place of
@@ -67,6 +68,7 @@ int main(void)
     uint32 l;
     uint8  cmd[16];
 
+    (void)TEST_ADDR(ram_var);
     Xcp_Init(NULL_PTR);
 
     l = do_cmd((const uint8 *)"\xFF\x00", 2U, res);
@@ -111,7 +113,7 @@ int main(void)
 
     /* SET_MTA -> ram_var */
     cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
-    (void)memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)ram_var}, 4U);
+    (void)memcpy(&cmd[4], &(uint32){TEST_ADDR(ram_var)}, 4U);
     l = do_cmd(cmd, 8U, res);
     CHECK("set_mta", (l == 1U) && (res[0] == XCP_PID_RES));
 
@@ -130,7 +132,7 @@ int main(void)
 
     /* SET_MTA again to read back the address just written */
     cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
-    (void)memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)ram_var}, 4U);
+    (void)memcpy(&cmd[4], &(uint32){TEST_ADDR(ram_var)}, 4U);
     (void)do_cmd(cmd, 8U, res);
     cmd[0] = 0xF5; cmd[1] = 4;
     l = do_cmd(cmd, 2U, res);

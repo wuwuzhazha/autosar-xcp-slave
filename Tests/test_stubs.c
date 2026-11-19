@@ -1,5 +1,8 @@
 #include "Cdd.h"
 
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "StandardTypes.h"
 #include "ComStack_Types.h"
@@ -10,6 +13,7 @@
 #include "Xcp_Resume.h"
 #include "Xcp_Internal.h"
 #include "Os.h"
+#include "test_stubs.h"
 
 #define TEST_TX_RING 64
 
@@ -250,8 +254,17 @@ void test_checksum_override_len(uint8 v) { test_checksum_len_override = v; }
 Std_ReturnType Xcp_BuildChecksum_Callout(uint32 addr, uint32 len, uint32 *checksum, uint8 *checksumLen)
 {
     uint32 sum = 0U;
-    const uint8 *p = (const uint8 *)(uintptr_t)addr;
+    const uint8 *p = NULL;
     uint32 i;
+
+    if (len > 0U)
+    {
+        p = test_mem_ptr(addr);
+        if (p == NULL)
+        {
+            return E_NOT_OK;
+        }
+    }
     for (i = 0U; i < len; i++)
     {
         sum += p[i];
@@ -337,4 +350,132 @@ void SchM_Exit_Xcp(uint8 exclusive_area)
 {
     (void)exclusive_area;
     test_schm_exit_count++;
+}
+
+/* The test address map: XCP addresses are 32-bit, so host objects are exposed
+   at stable fake addresses instead of truncating 64-bit pointers. The table is
+   populated on demand through TEST_ADDR() (test_stubs.h). */
+#define TEST_MEM_BLOCKS 32
+
+typedef struct
+{
+    uint32 base;
+    uint32 size;
+    uint8 *host;
+} TestMemBlock;
+
+static TestMemBlock test_mem_blocks[TEST_MEM_BLOCKS];
+static uint32 test_mem_count = 0U;
+static uint32 test_mem_next  = 0x10000000UL;
+
+unsigned int test_mem_register(void *ptr, unsigned int size)
+{
+    uintptr_t host = (uintptr_t)ptr;
+    uint32 i;
+
+    for (i = 0U; i < test_mem_count; i++)
+    {
+        uintptr_t block_host = (uintptr_t)test_mem_blocks[i].host;
+        if ((host >= block_host) && ((host - block_host) < test_mem_blocks[i].size))
+        {
+            uint32 offset = (uint32)(host - block_host);
+
+            /* Scopes may reuse a stack slot; grow the block so a larger object
+               registered at the same address keeps its full extent accessible. */
+            if (size > (test_mem_blocks[i].size - offset))
+            {
+                test_mem_blocks[i].size = offset + size;
+            }
+            return (unsigned int)(test_mem_blocks[i].base + offset);
+        }
+    }
+
+    if ((size == 0U) || (test_mem_count >= TEST_MEM_BLOCKS))
+    {
+        return 0U;
+    }
+
+    test_mem_blocks[test_mem_count].base = test_mem_next;
+    test_mem_blocks[test_mem_count].size = size;
+    test_mem_blocks[test_mem_count].host = (uint8 *)ptr;
+    test_mem_count++;
+    test_mem_next += (size + 0xFFFU) & ~0xFFFUL;
+
+    return (unsigned int)test_mem_blocks[test_mem_count - 1U].base;
+}
+
+unsigned char *test_mem_ptr(unsigned int addr)
+{
+    uint32 i;
+
+    for (i = 0U; i < test_mem_count; i++)
+    {
+        if ((addr >= test_mem_blocks[i].base) &&
+            ((addr - test_mem_blocks[i].base) < test_mem_blocks[i].size))
+        {
+            return (unsigned char *)(test_mem_blocks[i].host + (addr - test_mem_blocks[i].base));
+        }
+    }
+    return NULL;
+}
+
+unsigned int test_mem_addr(const void *ptr)
+{
+    uintptr_t host = (uintptr_t)ptr;
+    uint32 i;
+
+    for (i = 0U; i < test_mem_count; i++)
+    {
+        uintptr_t block_host = (uintptr_t)test_mem_blocks[i].host;
+        if ((host >= block_host) && ((host - block_host) < test_mem_blocks[i].size))
+        {
+            return (unsigned int)(test_mem_blocks[i].base + (uint32)(host - block_host));
+        }
+    }
+
+    /* The only core caller is GET_ID with XCP_ID_TEXT. String literals in
+       different translation units need not be merged by the linker, so register
+       this copy on first use; tests register their own objects with TEST_ADDR. */
+    if (ptr != NULL)
+    {
+        const char *s = (const char *)ptr;
+        uint32 len = 0U;
+
+        while ((len < 256U) && (s[len] != '\0'))
+        {
+            len++;
+        }
+        if (len < 256U)
+        {
+            return test_mem_register((void *)ptr, len + 1U);
+        }
+    }
+    return 0U;
+}
+
+unsigned int test_mem_range_ok(unsigned int addr, unsigned int size)
+{
+    uint32 i;
+
+    if (size == 0U)
+    {
+        return 1U;
+    }
+
+    for (i = 0U; i < test_mem_count; i++)
+    {
+        uint32 offset;
+
+        if (addr < test_mem_blocks[i].base)
+        {
+            continue;
+        }
+        offset = addr - test_mem_blocks[i].base;
+        if ((offset <= test_mem_blocks[i].size) &&
+            (size <= (test_mem_blocks[i].size - offset)))
+        {
+            return 1U;
+        }
+    }
+    return 0U;
 }

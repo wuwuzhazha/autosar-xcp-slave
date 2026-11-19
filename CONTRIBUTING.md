@@ -35,6 +35,10 @@ Required tools: `python3` (3.11+ recommended, uses `tomllib`), `gcc` (C99),
 `make`/`bash` for local test orchestration. No other dependencies — the host
 harness uses stubs under `Tests/stubs/`.
 
+Host tests do not treat raw host pointers as XCP addresses: test objects are
+registered in a mapped 32-bit address space (`Tests/test_stubs.c`), so the
+suite is independent of PIE, ASLR, and the host pointer width.
+
 ## Workflow
 
 1. Pick an issue or open one describing what you're doing.

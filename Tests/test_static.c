@@ -9,6 +9,7 @@
 #include "NvM.h"
 #include "Os.h"
 #include "Xcp_Callback.h"
+#include "test_stubs.h"
 extern uint32 test_tx_count;
 extern uint32 test_schm_enter_count;
 extern uint32 test_schm_exit_count;
@@ -56,7 +57,7 @@ static void test_patch_static_addrs(void)
             for (e = 0U; e < g_xcp_channel.storage_ptr->daq_list[li].odt[o].odt_entry_count; e++)
             {
                 g_xcp_channel.storage_ptr->daq_list[li].odt[o].odt_entry[e].address =
-                    (uint32)(uintptr_t)&test_ram_var32;
+                    TEST_ADDR(test_ram_var32);
             }
         }
     }
@@ -67,6 +68,7 @@ int main(void)
 {
     uint8 res[64];
     uint32 l;
+    (void)TEST_ADDR(test_ram_var32);
     printf("================ XCP static DAQ test ================\n");
     Xcp_Init(NULL_PTR);
     test_patch_static_addrs();
@@ -80,7 +82,7 @@ int main(void)
           && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry_count == 2U));
     CHECK("S3 list0 entries from config (patched addr, size4 / size2)",
           (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[0].address
-              == (uint32)(uintptr_t)&test_ram_var32)
+              == TEST_ADDR(test_ram_var32))
           && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[0].size == 4U)
           && (g_xcp_channel.storage_ptr->daq_list[0].odt[0].odt_entry[1].size == 2U));
     CHECK("S4 list0 event_fixed=1 from config",
@@ -114,7 +116,7 @@ int main(void)
     /* WRITE_DAQ still allowed into the static list's existing entries */
     (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
     {
-        uint32 lo = (uint32)(uintptr_t)&test_ram_var32;
+        uint32 lo = TEST_ADDR(test_ram_var32);
         uint8 w[8] = {0xE1, 0xFF, 4, 0, (uint8)lo, (uint8)(lo >> 8), (uint8)(lo >> 16), (uint8)(lo >> 24)};
         l = xcp_cmd(w, 8U, res);
         CHECK("S11 WRITE_DAQ list0 entry0 var32 -> RES", (l == 1U) && (res[0] == XCP_PID_RES));

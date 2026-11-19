@@ -9,6 +9,7 @@
 #include "NvM.h"
 #include "Os.h"
 #include "Xcp_Callback.h"
+#include "test_stubs.h"
 extern uint32 test_tx_count;
 extern uint32 test_schm_enter_count;
 extern uint32 test_schm_exit_count;
@@ -43,6 +44,7 @@ int main(void)
 {
     uint8 res[64];
     uint32 l;
+    (void)TEST_ADDR(test_ram_var32);
     printf("================ XCP predef DAQ test ================\n");
     Xcp_Init(NULL_PTR);
     CHECK("P1 daq_count == XCP_MIN_DAQ at init",
@@ -127,7 +129,7 @@ int main(void)
     CHECK("P23 CLEAR_DAQ_LIST dynamic list2 -> FREE",
           (l == 1U) && (g_xcp_channel.storage_ptr->daq_list[2].state == XCP_DAQ_STATE_FREE));
     {
-        uint32 lo = (uint32)(uintptr_t)&test_ram_var32;
+        uint32 lo = TEST_ADDR(test_ram_var32);
         uint8 w[8] = {0xE1, 0xFF, 4, 0, (uint8)lo, (uint8)(lo >> 8), (uint8)(lo >> 16), (uint8)(lo >> 24)};
         (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
         l = xcp_cmd(w, 8U, res);

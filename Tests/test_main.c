@@ -10,6 +10,7 @@
 #include "Xcp_Std.h"
 #include "Xcp_Callback.h"
 #include "Xcp_FlashProg.h"
+#include "test_stubs.h"
 
 extern uint8  test_tx_buf[64][64];
 extern uint32 test_tx_len[64];
@@ -343,7 +344,7 @@ static uint8  test_ram[256];
 static uint32 test_ram_var32;
 static uint8  test_ram_var8;
 
-#define RAM_ADDR ((uint32)(uintptr_t)test_ram)
+#define RAM_ADDR (TEST_ADDR(test_ram))
 
 int main(void)
 {
@@ -352,6 +353,9 @@ int main(void)
     uint8  cmd[16];
     Std_VersionInfoType ver;
 
+    (void)TEST_ADDR(test_ram);
+    (void)TEST_ADDR(test_ram_var32);
+    (void)TEST_ADDR(test_ram_var8);
     printf("================ XCP module test ================\n");
 
     printf("-- A. DET uninit checks\n");
@@ -790,7 +794,7 @@ int main(void)
     l = xcp_cmd(cmd, 6U, res);
     CHECK("E10 SET_DAQ_PTR -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
     cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-    memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
     l = xcp_cmd(cmd, 8U, res);
     CHECK("E11 WRITE_DAQ var32 -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
 
@@ -823,7 +827,7 @@ int main(void)
     (void)xcp_cmd(cmd, 6U, res);
     l = xcp_cmd((const uint8 *)"\xDB", 1U, res);
     {
-        uint32 a = (uint32)(uintptr_t)&test_ram_var32;
+        uint32 a = TEST_ADDR(test_ram_var32);
 
         CHECK("E17 READ_DAQ bytes: BIT_OFFSET=FF SIZE=4 EXT=0 ADDRESS=&var32",
               frame_is(res, l, (const uint8[]){ 0xFF, 0xFF, 0x04, 0x00, (uint8)a, (uint8)(a >> 8U),
@@ -955,7 +959,7 @@ int main(void)
     cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
     cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
     cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-    memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
     (void)xcp_cmd(cmd, 8U, res);
 
     cmd[0] = 0xE0; cmd[1] = 0x02; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
@@ -998,7 +1002,7 @@ int main(void)
     cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
     cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
     cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-    memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
     (void)xcp_cmd(cmd, 8U, res);
     cmd[0] = 0xE0; cmd[1] = 0x02; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
     (void)xcp_cmd(cmd, 8U, res);
@@ -1007,7 +1011,7 @@ int main(void)
     cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
     cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
     cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-    memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
     (void)xcp_cmd(cmd, 8U, res);
     cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 1; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
     (void)xcp_cmd(cmd, 8U, res);
@@ -1137,7 +1141,7 @@ int main(void)
     (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
     (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
     cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-    memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
     (void)xcp_cmd(cmd, 8U, res);
     (void)xcp_cmd((const uint8 *)"\xE0\x00\x00\x00\x02\x00\x01\x00", 8U, res);
     (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
@@ -1373,7 +1377,7 @@ int main(void)
         (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
         (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
         (void)xcp_cmd(cmd, 8U, res);
@@ -1510,7 +1514,7 @@ int main(void)
         cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
         (void)xcp_cmd(cmd, 8U, res);
@@ -1554,7 +1558,7 @@ int main(void)
         cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         cmd[0] = 0xE0; cmd[1] = 0x02; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
         (void)xcp_cmd(cmd, 8U, res);
@@ -1686,7 +1690,7 @@ int main(void)
         cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
         (void)xcp_cmd(cmd, 8U, res);
@@ -1821,7 +1825,7 @@ int main(void)
     {
 
         cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
 
         g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_CAL_PAG;
@@ -2067,7 +2071,7 @@ int main(void)
     {
 
         cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)test_ram}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
 
         l = xcp_cmd((const uint8 *)"\xF5\x08", 2U, res);
@@ -2088,20 +2092,20 @@ int main(void)
         }
 
         cmd[0] = 0xF4; cmd[1] = 0x08; cmd[2] = 0; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)test_ram}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram)}, 4U);
         l = xcp_cmd(cmd, 8U, res);
         CHECK("K16d SHORT_UPLOAD 8 -> ERR_OUT_OF_RANGE",
               (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
         cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)test_ram}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         l = xcp_cmd((const uint8 *)"\xF0\x06\xAA\xBB", 4U, res);
         CHECK("K16e DOWNLOAD declared > payload -> ERR_OUT_OF_RANGE",
               (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
         cmd[0] = 0xED; cmd[1] = 0x06; cmd[2] = 0; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)test_ram}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram)}, 4U);
         l = xcp_cmd(cmd, 8U, res);
         CHECK("K16f SHORT_DOWNLOAD declared > payload -> ERR_OUT_OF_RANGE",
               (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
@@ -2164,7 +2168,7 @@ int main(void)
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0;
         (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         CHECK("K17g WRITE_DAQ while RUNNING -> ERR_DAQ_ACTIVE",
               xcp_cmd_has_err(cmd, 8U, XCP_ERR_DAQ_ACTIVE));
 
@@ -2181,12 +2185,12 @@ int main(void)
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
 
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         CHECK("K18a WRITE_DAQ advances entry ptr",
               g_xcp_channel.runtime_ptr->odt_entry_ptr == 1U);
 
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var8}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var8)}, 4U);
         cmd[2] = 1;
         l = xcp_cmd(cmd, 8U, res);
         CHECK("K18b WRITE_DAQ entry1 -> RES",
@@ -2298,7 +2302,7 @@ int main(void)
         cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 1; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
         (void)xcp_cmd(cmd, 8U, res);
@@ -2395,14 +2399,14 @@ int main(void)
         cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
 
         g_xcp_channel.runtime_ptr->odt_entry_ptr = 0U;
         l = xcp_cmd((const uint8 *)"\xDB", 1U, res);
         CHECK("K23a READ_DAQ returns written entry",
               (l == 8U) && (res[0] == XCP_PID_RES) && (res[1] == 0xFFU) && (res[2] == 4U)
-              && (res[3] == 0U) && (Xcp_LeRead32(&res[4]) == (uint32)(uintptr_t)&test_ram_var32));
+              && (res[3] == 0U) && (Xcp_LeRead32(&res[4]) == TEST_ADDR(test_ram_var32)));
 
         cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 2; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
         (void)xcp_cmd(cmd, 8U, res);
@@ -2417,7 +2421,7 @@ int main(void)
         (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
         (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
         cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
 
         (void)xcp_cmd((const uint8 *)"\xE0\x10\x00\x00\x00\x00\x01\x00", 8U, res);
@@ -2450,7 +2454,7 @@ int main(void)
             (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
             (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
             cmd[0] = 0xE1; cmd[1] = 3U; cmd[2] = 1; cmd[3] = 0;
-            memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&bit_var}, 4U);
+            memcpy(&cmd[4], &(uint32){TEST_ADDR(bit_var)}, 4U);
             (void)xcp_cmd(cmd, 8U, res);
             (void)xcp_cmd((const uint8 *)"\xE0\x00\x00\x00\x00\x00\x01\x00", 8U, res);
             (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
@@ -2511,7 +2515,7 @@ int main(void)
             (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x02", 6U, res);
             (void)xcp_cmd((const uint8 *)"\xE2\x00\x00\x00\x00\x00", 6U, res);
             cmd[0] = 0xE1; cmd[1] = 0x20U; cmd[2] = 1; cmd[3] = 0;
-            memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&bit_var32}, 4U);
+            memcpy(&cmd[4], &(uint32){TEST_ADDR(bit_var32)}, 4U);
             l = xcp_cmd(cmd, 8U, res);
             CHECK("K6k WRITE_DAQ bit_offset 0x20 -> ERR_OUT_OF_RANGE",
                   (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
@@ -2816,7 +2820,7 @@ int main(void)
 
             cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
             cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
-            memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+            memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
             (void)xcp_cmd(cmd, 8U, res);
 
             cmd[0] = 0xE0; cmd[1] = 0x02; cmd[2] = 1; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
@@ -2842,7 +2846,7 @@ int main(void)
 
                 cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
                 cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
-                memcpy(&cmd[4], &(uint32){(uint32)(uintptr_t)&test_ram_var32}, 4U);
+                memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
                 (void)xcp_cmd(cmd, 8U, res);
                 cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
                 (void)xcp_cmd(cmd, 8U, res);
