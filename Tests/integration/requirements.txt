@@ -1,0 +1,2 @@
+pyxcp==0.30.5
+python-can==4.6.1

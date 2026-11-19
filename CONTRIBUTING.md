@@ -29,6 +29,10 @@ Tests\run_all_tests.bat
 
 # Linux/macOS equivalent
 python3 Tests/build_matrix.py
+
+# End-to-end master/slave exchange (pyxcp over a python-can virtual bus)
+python3 -m pip install -r Tests/integration/requirements.txt
+python3 Tests/integration/test_pyxcp_master.py
 ```
 
 Required tools: `python3` (3.11+ recommended, uses `tomllib`), `gcc` (C99),

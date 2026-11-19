@@ -66,6 +66,11 @@ jobs:
       - name: xcpgen unit tests
         run: python Tests/test_xcpgen.py
 
+      - name: pyxcp master integration
+        run: |
+          python -m pip install --quiet -r Tests/integration/requirements.txt
+          python Tests/integration/test_pyxcp_master.py
+
       - name: Build + run matrix (Windows)
         if: matrix.os == 'windows-latest'
         run: python Tests/build_matrix.py
