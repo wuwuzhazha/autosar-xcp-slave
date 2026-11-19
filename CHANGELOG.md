@@ -8,12 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-20
+
 ### Added
 - Open-source readiness: MIT LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT,
   SECURITY, .github CI + templates, .editorconfig, .gitattributes,
   .clang-format, CHANGELOG
 - `docs/` — architecture, porting guide, feature matrix (English)
 - `examples/minimal/` — host-buildable bring-up example
+- Portability hooks `XCP_MEM_PTR`/`XCP_MEM_ADDR`; host tests now register
+  objects in a mapped 32-bit address space, independent of PIE, ASLR and the
+  host pointer width
+- pyxcp end-to-end harness in `Tests/integration/` — the slave is built as a
+  shared library and exchanges real XCPonCAN frames over a `python-can`
+  virtual bus
+- Functional suite covering the full command surface, the pre-unlock
+  protection matrix, seed/key for every resource, calibration pages, dynamic
+  DAQ/STIM, flash sequencing and negative paths
+- Feature-variant suite for minimal, seed-key-off, static, predefined,
+  interleaved and 64-byte CAN-FD profiles
+- Performance suite for CTO latency, bulk upload/download, maximum DAQ/STIM
+  configurations and flash programming, with a JSON report
+- `docs/testing.md` and `docs/performance.md`, with Chinese mirrors
+- CI runs the pyxcp smoke, functional and variant suites on Ubuntu and
+  Windows and uploads the performance report as an artifact
 - `XCP_DTO_QUEUE_DEPTH` config knob (decoupled from `XCP_MAX_ODT`)
 - `Xcp_ExtValid` for `SET_MTA` address-extension validation
 - `Xcp_EventChannelIdx` — event_channel_number → config index lookup

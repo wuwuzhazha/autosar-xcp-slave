@@ -9,12 +9,27 @@
 
 ## [未发布]
 
+## [0.2.0] — 2026-11-20
+
 ### 新增
 - 开源就绪：MIT LICENSE、README、CONTRIBUTING、CODE_OF_CONDUCT、
   SECURITY、.github CI + 模板、.editorconfig、.gitattributes、
   .clang-format、CHANGELOG
 - `docs/` — 架构、移植指南、特性矩阵（英文）
 - `examples/minimal/` — 主机可构建的最小 bring-up 示例
+- 可移植钩子 `XCP_MEM_PTR`/`XCP_MEM_ADDR`；主机测试通过映射后的 32 位
+  地址空间注册对象，不再依赖 PIE、ASLR 或宿主指针宽度
+- `Tests/integration/` 中的 pyxcp 端到端脚手架：slave 编译为共享库，
+  通过 `python-can` 虚拟总线交换真实 XCPonCAN 帧
+- 功能套件：完整命令面、解锁前保护矩阵、逐资源 seed/key、标定页、
+  动态 DAQ/STIM、Flash 时序与负向路径
+- 特性变体套件：minimal、seed-key-off、static、predefined、interleaved
+  以及 64 字节 CAN-FD profile
+- 性能套件：CTO 延迟、批量上下传、最大 DAQ/STIM 配置、Flash 编程，
+  并输出 JSON 报告
+- `docs/testing.md` 与 `docs/performance.md`，含中文镜像
+- CI 在 Ubuntu 和 Windows 上运行 pyxcp 冒烟、功能与变体套件，并将性能
+  报告作为构建产物上传
 - `XCP_DTO_QUEUE_DEPTH` 配置项（与 `XCP_MAX_ODT` 解耦）
 - `Xcp_ExtValid` 用于 `SET_MTA` 地址扩展合法性校验
 - `Xcp_EventChannelIdx` — event_channel_number → 配置表索引 查找
