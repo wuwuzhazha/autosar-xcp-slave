@@ -482,10 +482,10 @@ int main(void)
     l = xcp_cmd((const uint8 *)"\xff", 1U, res);
     CHECK("B17 CONNECT len1 -> ERR_CMD_SYNTAX",
           (l == 2U) && (res[1] == XCP_ERR_CMD_SYNTAX));
-    l = xcp_cmd((const uint8 *)"\xf6   \xaa\xbb\xcc", 7U, res);
+    l = xcp_cmd((const uint8 *)"\xf6\x00\x00\x00\xaa\xbb\xcc", 7U, res);
     CHECK("B18 SET_MTA len7 -> ERR_CMD_SYNTAX",
           (l == 2U) && (res[1] == XCP_ERR_CMD_SYNTAX));
-    l = xcp_cmd((const uint8 *)"\xe1  \xaa\xbb\xcc", 7U, res);
+    l = xcp_cmd((const uint8 *)"\xe1\x00\x04\x00\xaa\xbb\xcc", 7U, res);
     CHECK("B19 WRITE_DAQ len7 -> ERR_CMD_SYNTAX",
           (l == 2U) && (res[1] == XCP_ERR_CMD_SYNTAX));
     l = xcp_cmd((const uint8 *)"\xd1\x00\x00\xaa\xbb\xcc\xdd", 7U, res);
