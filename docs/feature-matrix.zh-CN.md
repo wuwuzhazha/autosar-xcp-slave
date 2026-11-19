@@ -2,8 +2,10 @@
 
 # XCP 功能矩阵
 
-对照 ASAM XCP Part 2 v1.1 命令集的覆盖情况。`✓` = 已实现且被测试套件覆盖
+对照 ASAM XCP Part 2 v1.1 命令集的覆盖情况。`✓` = 已实现且被主机测试套件覆盖
 （`Tests/test_main.c`、`Tests/test_matrix_func.c`、`Tests/test_predef.c`）。
+通过真实 XCP 传输（pyxcp）的端到端覆盖见
+[docs/testing.zh-CN.md](testing.zh-CN.md)。
 
 ## 标准命令（STD）
 

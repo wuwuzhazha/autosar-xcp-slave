@@ -145,6 +145,8 @@ callout contract.
 
 ## Tests
 
+Host-side:
+
 - `Tests/test_main.c` — ~317 asserts/variant covering every implemented command +
   error paths (built per functional variant)
 - `Tests/test_matrix_func.c` — feature-adaptive smoke (103 profile/feature combos)
@@ -152,6 +154,20 @@ callout contract.
 - `Tests/test_xcpgen.py` — config generator unit tests
 - `Tests/ratchet.py` — architecture ratchet (forbids regressions on global-symbol
   use, preprocessor complexity, generated-file drift)
+
+End-to-end, with pyxcp over a `python-can` virtual bus:
+
+- `Tests/integration/test_pyxcp_master.py` — connection/memory/DAQ smoke test
+- `Tests/integration/test_pyxcp_functional.py` — full command surface, protection
+  matrix and negative paths
+- `Tests/integration/test_pyxcp_variants.py` — feature-gated profiles and CAN-FD
+  wire limits
+- `Tests/integration/test_pyxcp_perf.py` — latency/throughput envelope
+
+See [docs/testing.md](docs/testing.md) for the test layers and coverage, and
+[docs/performance.md](docs/performance.md) for the benchmark method and reference
+numbers. CI is the authoritative pass/fail source: the badge above runs the host
+matrix plus all pyxcp suites on Linux and Windows.
 
 ## Porting / integration
 

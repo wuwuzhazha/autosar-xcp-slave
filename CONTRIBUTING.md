@@ -40,6 +40,9 @@ python3 Tests/integration/test_pyxcp_perf.py          # latency/throughput envel
 
 The performance suite honours `XCP_PERF_SCALE` (default `1.0`, CI uses `0.5`)
 and writes its JSON/Markdown report to `Tests/integration/.build/perf.json`.
+See [docs/testing.md](docs/testing.md) for what each layer covers and
+[docs/performance.md](docs/performance.md) for the benchmark methodology and
+reference numbers.
 
 Required tools: `python3` (3.11+ recommended, uses `tomllib`), `gcc` (C99),
 `make`/`bash` for local test orchestration. No other dependencies — the host

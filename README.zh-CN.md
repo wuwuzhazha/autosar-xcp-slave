@@ -141,6 +141,8 @@ int main(void)
 
 ## 测试
 
+主机侧：
+
 - `Tests/test_main.c` — 每个变体约 317 条断言，覆盖每条已实现命令 +
   错误路径（按功能变体构建）
 - `Tests/test_matrix_func.c` — 特性自适应冒烟测试（103 种 profile/特性组合）
@@ -148,6 +150,18 @@ int main(void)
 - `Tests/test_xcpgen.py` — 配置生成器单元测试
 - `Tests/ratchet.py` — 架构棘轮（禁止全局符号使用、
   预处理器复杂度、生成文件漂移方面的回退）
+
+端到端测试（pyxcp + `python-can` 虚拟总线）：
+
+- `Tests/integration/test_pyxcp_master.py` — 连接/内存/DAQ 冒烟
+- `Tests/integration/test_pyxcp_functional.py` — 完整命令面、保护矩阵与负向路径
+- `Tests/integration/test_pyxcp_variants.py` — 特性裁剪 profile 与 CAN-FD 线上边界
+- `Tests/integration/test_pyxcp_perf.py` — 延迟/吞吐包络
+
+测试分层与覆盖见 [docs/testing.zh-CN.md](docs/testing.zh-CN.md)，基准方法与
+参考数据见 [docs/performance.zh-CN.md](docs/performance.zh-CN.md)。CI 是
+pass/fail 的权威来源：上方徽章会在 Linux 与 Windows 上运行主机矩阵和全部
+pyxcp 套件。
 
 ## 移植 / 集成
 

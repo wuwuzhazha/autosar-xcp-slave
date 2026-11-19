@@ -2,7 +2,9 @@
 > **中文**: [docs/feature-matrix.zh-CN.md](feature-matrix.zh-CN.md)
 
 Coverage against ASAM XCP Part 2 v1.1 commands. `✓` = implemented + covered by the
-test suite (`Tests/test_main.c`, `Tests/test_matrix_func.c`, `Tests/test_predef.c`).
+host test suite (`Tests/test_main.c`, `Tests/test_matrix_func.c`,
+`Tests/test_predef.c`). End-to-end coverage over a real XCP transport (pyxcp) is
+described in [docs/testing.md](testing.md).
 
 ## Standard (STD)
 
