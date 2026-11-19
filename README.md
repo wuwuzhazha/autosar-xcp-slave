@@ -1,6 +1,8 @@
 # XCP Slave Stack
 > **中文**: [README.zh-CN.md](README.zh-CN.md)
 
+![xcp-slave — ASAM XCP Part 2 v1.1 slave](docs/images/social-preview.png)
+
 An independent, portable implementation of the **ASAM XCP Part 2 v1.1** slave (target device) protocol,
 organized as an AUTOSAR Classic Platform BSW module (R4.4.0 API surface).
 

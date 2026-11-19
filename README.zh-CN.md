@@ -2,6 +2,8 @@
 
 # XCP 从站协议栈
 
+![xcp-slave — ASAM XCP Part 2 v1.1 从站](docs/images/social-preview.png)
+
 一个独立、可移植的 **ASAM XCP Part 2 v1.1** 从站（目标设备）协议实现，
 按 AUTOSAR Classic Platform BSW 模块（R4.4.0 API 接口）的形式组织。
 
