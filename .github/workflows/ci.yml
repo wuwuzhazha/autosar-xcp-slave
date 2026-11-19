@@ -78,6 +78,14 @@ jobs:
           XCP_PERF_SCALE: "0.5"
         run: python Tests/integration/test_pyxcp_perf.py
 
+      - name: Upload pyxcp performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyxcp-perf-${{ matrix.os }}
+          path: Tests/integration/.build/perf.json
+          if-no-files-found: ignore
+
       - name: Build + run matrix (Windows)
         if: matrix.os == 'windows-latest'
         run: python Tests/build_matrix.py
