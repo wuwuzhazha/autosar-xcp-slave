@@ -482,60 +482,68 @@ Std_ReturnType Xcp_SendResponse(const uint8 *res_data, uint8 res_length)
         return E_NOT_OK;
     }
 
+    XCP_DTO_ENTER_CRITICAL();
+
     if (runtime->tx.state == XCP_TX_IDLE)
     {
         runtime->tx.state = XCP_TX_CTO;
+        XCP_DTO_EXIT_CRITICAL();
+
         ret_val = Xcp_Tl_SendCto(res_data, res_length);
 
         if (ret_val != E_OK)
         {
+            XCP_DTO_ENTER_CRITICAL();
             runtime->tx.state = XCP_TX_IDLE;
+            XCP_DTO_EXIT_CRITICAL();
         }
 
         return ret_val;
     }
 
-    if (runtime->tx.parked != FALSE)
+    if (runtime->tx.parked == FALSE)
     {
-        return E_NOT_OK;
+        (void)memcpy(runtime->tx.parked_data, res_data, res_length);
+        runtime->tx.parked_len = res_length;
+        runtime->tx.parked     = TRUE;
+        XCP_DTO_EXIT_CRITICAL();
+        return E_OK;
     }
 
-    XCP_DTO_ENTER_CRITICAL();
-    (void)memcpy(runtime->tx.parked_data, res_data, res_length);
-    runtime->tx.parked_len = res_length;
-    runtime->tx.parked     = TRUE;
     XCP_DTO_EXIT_CRITICAL();
-    return E_OK;
+    return E_NOT_OK;
 }
 
 void Xcp_SendPendingCto(void)
 {
     Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    uint8            pend_copy[XCP_MAX_CTO];
+    uint8            pend_len;
 
-    if ((runtime->tx.parked == FALSE) || (runtime->tx_mode != XCP_TX_ON))
+    XCP_DTO_ENTER_CRITICAL();
+
+    if ((runtime->tx.parked == FALSE) || (runtime->tx_mode != XCP_TX_ON)
+        || (runtime->tx.state != XCP_TX_IDLE))
     {
+        XCP_DTO_EXIT_CRITICAL();
         return;
     }
 
-    if (runtime->tx.state == XCP_TX_IDLE)
+    pend_len = runtime->tx.parked_len;
+    (void)memcpy(pend_copy, runtime->tx.parked_data, pend_len);
+    runtime->tx.parked = FALSE;
+    runtime->tx.state  = XCP_TX_CTO;
+
+    XCP_DTO_EXIT_CRITICAL();
+
+    if (Xcp_Tl_SendCto(pend_copy, pend_len) != E_OK)
     {
-
-        uint8 pend_copy[XCP_MAX_CTO];
-        uint8 pend_len = runtime->tx.parked_len;
-
-        (void)memcpy(pend_copy, runtime->tx.parked_data, pend_len);
-        runtime->tx.parked = FALSE;
-
-        runtime->tx.state = XCP_TX_CTO;
-
-        if (Xcp_Tl_SendCto(pend_copy, pend_len) != E_OK)
-        {
-            runtime->tx.state = XCP_TX_IDLE;
-
-            (void)memcpy(runtime->tx.parked_data, pend_copy, pend_len);
-            runtime->tx.parked_len = pend_len;
-            runtime->tx.parked     = TRUE;
-        }
+        XCP_DTO_ENTER_CRITICAL();
+        runtime->tx.state = XCP_TX_IDLE;
+        (void)memcpy(runtime->tx.parked_data, pend_copy, pend_len);
+        runtime->tx.parked_len = pend_len;
+        runtime->tx.parked     = TRUE;
+        XCP_DTO_EXIT_CRITICAL();
     }
 }
 

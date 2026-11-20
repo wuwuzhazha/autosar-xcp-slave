@@ -280,6 +280,10 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
     uint16           i;
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
+    uint8            dto_copy[XCP_MAX_DTO];
+    uint8            tail = 0U;
+    boolean          send_parked = FALSE;
+    boolean          send_dto = FALSE;
 
     XCP_DTO_ENTER_CRITICAL();
 
@@ -306,35 +310,43 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
         storage->dto_busy_watchdog_cnt = 0U;
     }
 
-    if ((runtime->tx_mode == XCP_TX_ON) &&
-        (runtime->tx.parked != FALSE) && (runtime->tx.state == XCP_TX_IDLE))
+    if ((runtime->tx_mode == XCP_TX_ON) && (runtime->tx.state == XCP_TX_IDLE))
     {
-        Xcp_SendPendingCto();
-    }
-
-    if ((runtime->tx_mode == XCP_TX_ON) &&
-        (runtime->tx.state == XCP_TX_IDLE) && (storage->dto_queue_count > 0U))
-    {
-        uint8 tail = storage->dto_queue_tail;
-        uint8 dto_copy[XCP_MAX_DTO];
-
-        (void)memcpy(dto_copy, storage->dto_queue[tail], (uint8) XCP_MAX_DTO);
-        storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
-        storage->dto_queue_count--;
-
-        runtime->tx.dto_latch = TRUE;
-        runtime->tx.state     = XCP_TX_DTO;
-
-        if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) != E_OK)
+        if (runtime->tx.parked != FALSE)
         {
-            runtime->tx.dto_latch = FALSE;
-            runtime->tx.state     = XCP_TX_IDLE;
-            storage->dto_queue_tail = tail;
-            storage->dto_queue_count++;
+            send_parked = TRUE;
+        }
+        else if (storage->dto_queue_count > 0U)
+        {
+            tail = storage->dto_queue_tail;
+            (void)memcpy(dto_copy, storage->dto_queue[tail], (uint8) XCP_MAX_DTO);
+            storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
+            storage->dto_queue_count--;
+
+            runtime->tx.dto_latch = TRUE;
+            runtime->tx.state     = XCP_TX_DTO;
+            send_dto = TRUE;
         }
     }
 
     XCP_DTO_EXIT_CRITICAL();
+
+    if (send_parked != FALSE)
+    {
+        Xcp_SendPendingCto();
+    }
+    else if (send_dto != FALSE)
+    {
+        if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) != E_OK)
+        {
+            XCP_DTO_ENTER_CRITICAL();
+            runtime->tx.dto_latch = FALSE;
+            runtime->tx.state     = XCP_TX_IDLE;
+            storage->dto_queue_tail = tail;
+            storage->dto_queue_count++;
+            XCP_DTO_EXIT_CRITICAL();
+        }
+    }
 
     if (storage->overload_ev_cooldown > 0U)
     {
