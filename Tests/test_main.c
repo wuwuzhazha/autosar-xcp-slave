@@ -709,78 +709,90 @@ int main(void)
           (test_ram[32] == 0xDEU) && (test_ram[33] == 0xADU)
           && (test_ram[34] == 0xBEU) && (test_ram[35] == 0xEFU));
 
+    /* DOWNLOAD_MAX is a single-frame transfer: it must not arm a block. */
     cmd[0] = 0xEE; cmd[1] = 0; cmd[2] = 0x11; cmd[3] = 0x22; cmd[4] = 0x33; cmd[5] = 0x44;
     cmd[6] = 0x55; cmd[7] = 0x66;
     l = xcp_cmd(cmd, 8U, res);
     CHECK("C8 DOWNLOAD_MAX -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
+    CHECK("C8a DOWNLOAD_MAX leaves no block armed",
+          g_xcp_channel.runtime_ptr->block_transfer_active == FALSE);
 
     cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0xC0; cmd[3] = 0xDE;
     l = xcp_cmd(cmd, 4U, res);
-    CHECK("C8a DOWNLOAD_NEXT -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
-    CHECK("C8b DOWNLOAD_NEXT wrote C0 DE at +43",
-          (test_ram[43] == 0xC0U) && (test_ram[44] == 0xDEU));
+    CHECK("C8b DOWNLOAD_NEXT after MAX -> ERR_SEQUENCE",
+          (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
 
-    /* UPLOAD cancels the armed download block; DOWNLOAD_MAX alone must re-arm
-       it so a following DOWNLOAD_NEXT is accepted (issue #9 item 1). */
+    /* Block mode: byte 1 of DOWNLOAD is the total block length, so the
+       payload may be shorter. Intermediate frames are answered only by the
+       frame that exhausts the declared length (issue #11 items 1 and 3). */
+    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){RAM_ADDR + 112U}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    cmd[0] = 0xF0; cmd[1] = 6U; cmd[2] = 0x01; cmd[3] = 0x02; cmd[4] = 0x03; cmd[5] = 0x04;
+    l = xcp_cmd(cmd, 6U, res);
+    CHECK("C8c block DOWNLOAD (declared 6 > payload 4) -> no response", l == 0U);
+    CHECK("C8d block DOWNLOAD armed with remaining 2",
+          (g_xcp_channel.runtime_ptr->block_transfer_active == TRUE)
+          && (g_xcp_channel.runtime_ptr->block_transfer_remaining == 2U));
+    CHECK("C8e block DOWNLOAD wrote the first 4 elements",
+          (test_ram[112] == 0x01U) && (test_ram[115] == 0x04U));
+
+    cmd[0] = 0xEF; cmd[1] = 4U; cmd[2] = 0xAA; cmd[3] = 0xBB;
+    l = xcp_cmd(cmd, 4U, res);
+    CHECK("C8f NEXT overrunning the declared block -> ERR_SEQUENCE",
+          (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+    CHECK("C8g overrunning NEXT wrote nothing and kept the budget",
+          (test_ram[116] != 0xAAU)
+          && (g_xcp_channel.runtime_ptr->block_transfer_remaining == 2U));
+
+    cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0x05; cmd[3] = 0x06;
+    l = xcp_cmd(cmd, 4U, res);
+    CHECK("C8h final NEXT -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
+    CHECK("C8i block closed after the declared length",
+          g_xcp_channel.runtime_ptr->block_transfer_active == FALSE);
+    CHECK("C8j block wrote all 6 elements",
+          (test_ram[112] == 0x01U) && (test_ram[113] == 0x02U)
+          && (test_ram[114] == 0x03U) && (test_ram[115] == 0x04U)
+          && (test_ram[116] == 0x05U) && (test_ram[117] == 0x06U));
+
+    cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0x07; cmd[3] = 0x08;
+    l = xcp_cmd(cmd, 4U, res);
+    CHECK("C8k NEXT after block completion -> ERR_SEQUENCE",
+          (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+
+    /* Bytes beyond the declared count are transport padding (CAN-FD DLC). */
+    test_ram[124] = 0xEEU; test_ram[125] = 0xEEU;
+    test_ram[126] = 0xEEU; test_ram[127] = 0xEEU;
+    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){RAM_ADDR + 124U}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    l = xcp_cmd((const uint8 *)"\xF0\x02\x01\x02\x03\x04", 6U, res);
+    CHECK("C8l DOWNLOAD ignores padding beyond the declared count",
+          (l == 1U) && (res[0] == XCP_PID_RES)
+          && (test_ram[124] == 0x01U) && (test_ram[125] == 0x02U)
+          && (test_ram[126] == 0xEEU) && (test_ram[127] == 0xEEU));
+
+    /* Any other command abandons an armed block. */
+    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){RAM_ADDR + 120U}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    cmd[0] = 0xF0; cmd[1] = 6U; cmd[2] = 0x01; cmd[3] = 0x02; cmd[4] = 0x03; cmd[5] = 0x04;
+    (void)xcp_cmd(cmd, 6U, res);
     cmd[0] = 0xF4; cmd[1] = 1U; cmd[2] = 0; cmd[3] = 0;
     memcpy(&cmd[4], &(uint32){RAM_ADDR + 80U}, 4U);
     l = xcp_cmd(cmd, 8U, res);
-    CHECK("C8d UPLOAD cancels download block", (l >= 1U) && (res[0] == XCP_PID_RES));
-
-    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
-    memcpy(&cmd[4], &(uint32){RAM_ADDR + 84U}, 4U);
-    (void)xcp_cmd(cmd, 8U, res);
-    cmd[0] = 0xEE; cmd[1] = 0xA1; cmd[2] = 0xA2; cmd[3] = 0xA3; cmd[4] = 0xA4;
-    cmd[5] = 0xA5; cmd[6] = 0xA6; cmd[7] = 0xA7;
-    l = xcp_cmd(cmd, 8U, res);
-    CHECK("C8e DOWNLOAD_MAX after cancel -> RES",
-          (l == 1U) && (res[0] == XCP_PID_RES)
-          && (test_ram[84] == 0xA1U) && (test_ram[90] == 0xA7U));
+    CHECK("C8m UPLOAD cancels the armed block", (l >= 1U) && (res[0] == XCP_PID_RES));
+    CHECK("C8n block inactive after cancel",
+          g_xcp_channel.runtime_ptr->block_transfer_active == FALSE);
     cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0xB1; cmd[3] = 0xB2;
     l = xcp_cmd(cmd, 4U, res);
-    CHECK("C8f DOWNLOAD_NEXT after MAX alone -> RES",
-          (l == 1U) && (res[0] == XCP_PID_RES)
-          && (test_ram[91] == 0xB1U) && (test_ram[92] == 0xB2U));
-
-    /* DOWNLOAD_NEXT only decrements the block bound; it must not re-arm it
-       (issue #9 item 1b). */
-    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
-    memcpy(&cmd[4], &(uint32){RAM_ADDR + 100U}, 4U);
-    (void)xcp_cmd(cmd, 8U, res);
-    cmd[0] = 0xF0; cmd[1] = 2U; cmd[2] = 0x11; cmd[3] = 0x22;
-    (void)xcp_cmd(cmd, 4U, res);
-    {
-        uint32 before = g_xcp_channel.runtime_ptr->block_transfer_remaining;
-        cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0x33; cmd[3] = 0x44;
-        l = xcp_cmd(cmd, 4U, res);
-        CHECK("C8g DOWNLOAD_NEXT decrements the block bound, no re-arm",
-              (l == 1U) && (res[0] == XCP_PID_RES)
-              && (g_xcp_channel.runtime_ptr->block_transfer_remaining
-                  == (before - 2U)));
-    }
-
-    /* Byte 1 is the element count: a count that does not fit the frame is
-       rejected instead of silently truncating, and the rejected frame must
-       not consume block budget (issue #9 item 2). */
-    {
-        uint32 before = g_xcp_channel.runtime_ptr->block_transfer_remaining;
-        CHECK("C8h DOWNLOAD_NEXT count beyond frame -> ERR_OUT_OF_RANGE",
-              xcp_cmd_has_err((const uint8 *)"\xEF\x07\x01\x02\x03\x04\x05\x06", 8U,
-                              XCP_ERR_OUT_OF_RANGE));
-        CHECK("C8h2 rejected frame leaves the block bound untouched",
-              g_xcp_channel.runtime_ptr->block_transfer_remaining == before);
-    }
-    cmd[0] = 0xEF; cmd[1] = 6U; cmd[2] = 0x51; cmd[3] = 0x52; cmd[4] = 0x53;
-    cmd[5] = 0x54; cmd[6] = 0x55; cmd[7] = 0x56;
-    l = xcp_cmd(cmd, 8U, res);
-    CHECK("C8i DOWNLOAD_NEXT count == frame payload -> RES",
-          (l == 1U) && (res[0] == XCP_PID_RES)
-          && (test_ram[104] == 0x51U) && (test_ram[109] == 0x56U));
+    CHECK("C8o NEXT after cancel -> ERR_SEQUENCE",
+          (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
 
     cmd[0] = 0xED; cmd[1] = 1U; cmd[2] = 0; cmd[3] = 0;
     memcpy(&cmd[4], &(uint32){RAM_ADDR + 60U}, 4U);
     l = xcp_cmd(cmd, 8U, res);
-    CHECK("C8c SHORT_DOWNLOAD over CTO -> ERR_OUT_OF_RANGE",
+    CHECK("C8p SHORT_DOWNLOAD over CTO -> ERR_OUT_OF_RANGE",
           (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
     memset(&test_ram[40], 0xFF, 4U);
@@ -1148,6 +1160,7 @@ int main(void)
         CHECK("E29 STIM timeout -> EV_STIM_TIMEOUT", found);
     }
 
+    (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
     (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
     cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 2; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
 
@@ -1208,7 +1221,7 @@ int main(void)
 
     CHECK("F1 PROGRAM_START bytes",
           frame_is(res, l, (const uint8[]){ 0xFF, 0x00, TST_COMM_OPT, XCP_MAX_CTO,
-                                            0x00, 0x00, TST_QUEUE_SIZE }, 7U));
+                                            XCP_MAX_BS, XCP_MIN_ST, TST_QUEUE_SIZE }, 7U));
 
     l = xcp_cmd((const uint8 *)"\xD2", 1U, res);
     CHECK("F2 PROGRAM_START again -> ERR_PGM_ACTIVE",
@@ -2362,8 +2375,10 @@ int main(void)
         memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
         l = xcp_cmd((const uint8 *)"\xF0\x06\xAA\xBB", 4U, res);
-        CHECK("K16e DOWNLOAD declared > payload -> ERR_OUT_OF_RANGE",
-              (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+        CHECK("K16e DOWNLOAD declared > payload -> silent block, remaining 4",
+              (l == 0U)
+              && (g_xcp_channel.runtime_ptr->block_transfer_active == TRUE)
+              && (g_xcp_channel.runtime_ptr->block_transfer_remaining == 4U));
 
         cmd[0] = 0xED; cmd[1] = 0x06; cmd[2] = 0; cmd[3] = 0;
         memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram)}, 4U);
@@ -3137,6 +3152,7 @@ int main(void)
                       g_xcp_channel.storage_ptr->dto_queue_count > 0U);
                 g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
                 g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+                (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
                 (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
                 CHECK("K26f2 FREE_DAQ clears queued DTOs",
                       g_xcp_channel.storage_ptr->dto_queue_count == 0U);
@@ -3196,6 +3212,11 @@ int main(void)
 
         if (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED)
         {
+            /* A fuzz-started/resumed list may still be emitting DTOs; stop
+               them and confirm the in-flight frame before reconnecting, so
+               the CONNECT response is not parked behind it. */
+            (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
+            xcp_settle();
             l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
 
             CHECK("K27 final reconnect",
@@ -3265,6 +3286,79 @@ int main(void)
         Xcp_Init(NULL_PTR);
         (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
         xcp_drain_tx();
+    }
+#endif
+
+#if (XCP_DAQ_ENABLED == STD_ON) && (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
+    printf("-- K28. DAQ configuration is frozen while a list runs (issue #11 item 5)\n");
+    {
+        uint8  dto[64];
+        uint32 dl;
+        uint16 pid_before = 0U;
+        uint16 pid_after = 0U;
+
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x02\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x02", 5U, res);
+        (void)xcp_cmd((const uint8 *)"\xD4\x00\x01\x00\x02", 5U, res);
+        cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0;
+        (void)xcp_cmd(cmd, 6U, res);
+        cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
+        (void)xcp_cmd(cmd, 8U, res);
+        cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 1; cmd[3] = 0; cmd[4] = 2;
+        cmd[5] = 0; cmd[6] = 0; cmd[7] = 0;
+        l = xcp_cmd(cmd, 8U, res);
+        CHECK("K28a SET_DAQ_LIST_MODE list1 evt2 -> RES",
+              (l == 1U) && (res[0] == XCP_PID_RES));
+        l = xcp_cmd((const uint8 *)"\xDE\x01\x01\x00", 4U, res);
+        CHECK("K28b START list1 -> RES first_pid 2",
+              (l == 2U) && (res[0] == XCP_PID_RES) && (res[1] == 2U));
+
+        xcp_drain_tx();
+        Xcp_Event(2U);
+        if (test_tx_pop(dto, &dl) > 0U)
+        {
+            pid_before = dto[0];
+        }
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        xcp_drain_tx();
+        CHECK("K28c running list1 emits abs_pid 2", pid_before == 2U);
+
+        l = xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
+        CHECK("K28d ALLOC_ODT lower list while running -> ERR_DAQ_ACTIVE",
+              (l == 2U) && (res[1] == XCP_ERR_DAQ_ACTIVE));
+
+        xcp_drain_tx();
+        Xcp_Event(2U);
+        if (test_tx_pop(dto, &dl) > 0U)
+        {
+            pid_after = dto[0];
+        }
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        xcp_drain_tx();
+        CHECK("K28e abs_pid unchanged after rejected reallocation",
+              pid_after == pid_before);
+
+        l = xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        CHECK("K28f FREE_DAQ while running -> ERR_DAQ_ACTIVE",
+              (l == 2U) && (res[1] == XCP_ERR_DAQ_ACTIVE));
+        CHECK("K28g list1 still RUNNING after rejected FREE_DAQ",
+              g_xcp_channel.storage_ptr->daq_list[1].state
+              == (uint8)XCP_DAQ_STATE_RUNNING);
+
+        (void)xcp_cmd((const uint8 *)"\xDE\x00\x01\x00", 4U, res);
+        l = xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
+        CHECK("K28h ALLOC_ODT after STOP -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
+        l = xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        CHECK("K28i FREE_DAQ after STOP -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
+
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x02\x00", 4U, res);
+        l = xcp_cmd((const uint8 *)"\xDE\x01\x01\x00", 4U, res);
+        CHECK("K28j START unconfigured list -> ERR_DAQ_CONFIG",
+              (l == 2U) && (res[1] == XCP_ERR_DAQ_CONFIG));
+        xcp_settle();
     }
 #endif
 

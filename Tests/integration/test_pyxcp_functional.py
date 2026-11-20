@@ -85,11 +85,12 @@ def main() -> int:
             print("-- A. connection, status, identity")
             comm = xcp.getCommModeInfo()
             suite.check(
-                "GET_COMM_MODE_INFO: single-command CAN, driver v1.0",
-                comm.maxBs == 0
-                and comm.minSt == 0
+                "GET_COMM_MODE_INFO: master block mode, maxBs 4, minSt 1ms, driver v1.0",
+                comm.maxBs == 4
+                and comm.minSt == 10
                 and comm.queueSize == 0
                 and comm.commModeOptional.interleavedMode is False
+                and comm.commModeOptional.masterBlockMode is True
                 and comm.xcpDriverVersionNumber == 0x10,
                 f"{comm}",
             )
@@ -210,10 +211,11 @@ def main() -> int:
                 "DOWNLOAD_NEXT without an active block -> ERR_SEQUENCE",
                 xcp.downloadNext, b"\x00", 1, True, code="ERR_SEQUENCE",
             )
-            suite.error(
-                "DOWNLOAD declared payload beyond CTO -> ERR_OUT_OF_RANGE",
-                xcp.transport.request, t.Command.DOWNLOAD, 5, 1, 2,
-                code="ERR_OUT_OF_RANGE",
+            xcp.setMta(addr + 200)
+            xcp.transport.request(t.Command.DOWNLOAD, 1, 0x5A, 0x00)
+            suite.check(
+                "DOWNLOAD ignores padding beyond the declared count",
+                link.ram_read(256)[200:202] == b"\x5a" + pattern[201:202],
             )
             suite.error(
                 "short UPLOAD from denied address -> ERR_ACCESS_DENIED",
@@ -262,13 +264,41 @@ def main() -> int:
                 1, 0, 0, *struct.pack("<I", addr + 36), code="ERR_OUT_OF_RANGE",
             )
 
-            # Block download: DOWNLOAD arms block mode, DOWNLOAD_NEXT continues it.
+            # Block download: byte 1 of DOWNLOAD is the total block length,
+            # byte 1 of DOWNLOAD_NEXT the remaining length; only the frame
+            # that exhausts the block is answered. Block frames are paced by
+            # the advertised MIN_ST (1 ms) so the main loop can drain them.
             xcp.setMta(addr + 40)
-            xcp.download(b"\x01\x02\x03\x04")
+            xcp.download(b"\x01\x02\x03\x04", block_mode_length=6)
+            time.sleep(0.002)
             xcp.downloadNext(b"\xc0\xde", 2, last=True)
             suite.check(
                 "DOWNLOAD + DOWNLOAD_NEXT block sequence",
                 link.ram_read(64)[40:46] == b"\x01\x02\x03\x04\xc0\xde",
+            )
+            suite.error(
+                "DOWNLOAD_NEXT without an armed block -> ERR_SEQUENCE",
+                xcp.downloadNext, b"\xc0\xde", 2, True, code="ERR_SEQUENCE",
+            )
+            xcp.setMta(addr + 40)
+            xcp.download(b"\x01\x02\x03\x04", block_mode_length=6)
+            time.sleep(0.002)
+            suite.error(
+                "DOWNLOAD_NEXT overrunning the declared block -> ERR_SEQUENCE",
+                xcp.downloadNext, b"\x01\x02", 4, True, code="ERR_SEQUENCE",
+            )
+            # Close the block so later commands start clean.
+            xcp.setMta(addr + 40)
+            xcp.download(b"\x01\x02\x03\x04", block_mode_length=6)
+            time.sleep(0.002)
+            xcp.downloadNext(b"\xc0\xde", 2, last=True)
+
+            # pyxcp's generalized downloader: multi-block transfer driven by
+            # the advertised MAX_BS (issue #11 items 1-3).
+            xcp.push(addr + 128, 0, bytes(range(40)))
+            suite.check(
+                "push() transfers 40 bytes through block mode",
+                link.ram_read(200)[128:168] == bytes(range(40)),
             )
             xcp.setMta(addr + 48)
             xcp.downloadMax(b"\x10\x20\x30\x40")

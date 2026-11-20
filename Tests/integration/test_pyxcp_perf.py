@@ -196,7 +196,7 @@ def start_daq(xcp) -> None:
 
 
 def stop_daq(xcp) -> None:
-    xcp.startStopSynch(2)
+    xcp.startStopSynch(0)
 
 
 def check_dto_frames(frames: list[bytes], entries: int) -> tuple[int, int, int]:
