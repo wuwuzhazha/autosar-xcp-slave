@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Block-UPLOAD performance benchmark: 252 elements per request, `upload_block`
   JSON results and a check that it uses fewer requests than plain UPLOAD
 - pyxcp coverage for block UPLOAD while DAQ is running
+- Advisory MISRA report from cppcheck in `Tests/quality.sh`; CI uploads it as
+  an artifact. It is not a compliance gate.
 
 ### Fixed
 - Starting a block UPLOAD now cancels any block transfer left active by a
