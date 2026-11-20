@@ -67,6 +67,12 @@
 | 0xD4 | ALLOC_ODT | ✓ |
 | 0xD3 | ALLOC_ODT_ENTRY | ✓ |
 
+**DAQ 配置冻结。** 任一 DAQ 列表处于 `RUNNING` 时，`FREE_DAQ`、`ALLOC_DAQ`、
+`ALLOC_ODT`、`ALLOC_ODT_ENTRY`、`CLEAR_DAQ_LIST` 返回 `ERR_DAQ_ACTIVE`，
+启动无 ODT 的列表返回 `ERR_DAQ_CONFIG`——运行中采集的绝对 PID 布局不可变。
+对运行中的列表，`SET_DAQ_LIST_MODE` 允许调整 prescaler/模式位，但把列表
+迁到其他事件通道或翻转方向会返回 `ERR_DAQ_ACTIVE`。
+
 ## Flash 编程（PGM）
 
 | 代码 | 命令 | 状态 |

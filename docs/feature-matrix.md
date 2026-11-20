@@ -66,6 +66,14 @@ described in [docs/testing.md](testing.md).
 | 0xD4 | ALLOC_ODT | ✓ |
 | 0xD3 | ALLOC_ODT_ENTRY | ✓ |
 
+**DAQ configuration freeze.** While any DAQ list is `RUNNING`,
+`FREE_DAQ`, `ALLOC_DAQ`, `ALLOC_ODT`, `ALLOC_ODT_ENTRY` and
+`CLEAR_DAQ_LIST` return `ERR_DAQ_ACTIVE`, and starting a list without
+ODTs returns `ERR_DAQ_CONFIG` — the absolute-PID layout cannot change
+under a running acquisition. `SET_DAQ_LIST_MODE` on a live list accepts
+prescaler/mode-bit updates but rejects moving the list to another event
+channel or flipping its direction with `ERR_DAQ_ACTIVE`.
+
 ## Flash programming (PGM)
 
 | Code | Command | Status |
