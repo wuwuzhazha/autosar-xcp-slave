@@ -19,6 +19,7 @@ what each layer covers and how to reproduce it.
 | pyxcp functional | `Tests/integration/test_pyxcp_functional.py` | Full command surface, protection matrix, negative paths |
 | pyxcp variants | `Tests/integration/test_pyxcp_variants.py` | Disabled-feature behaviour, static/predefined DAQ, interleaved mode, CAN-FD limits |
 | pyxcp performance | `Tests/integration/test_pyxcp_perf.py` | CTO latency, bulk transfer, DAQ/STIM throughput, flash |
+| Quality gates | `Tests/quality.sh` | clang, ASan/UBSan, coverage, ARM cross-compile, cppcheck |
 
 ## Host suite
 
@@ -90,12 +91,54 @@ transfer.
 | `interleaved` | `XcpInterleavedModeEnabled=1` | interleaved mode advertised and command channel still usable |
 | `can_fd` | 64-byte CTO/DTO, 15 ODT entries | payload `SHORT_DOWNLOAD`, 60/62-byte transfers and checksum |
 
+### What the virtual bus does not cover
+
+pyxcp validates the master side of the wire protocol. The `python-can`
+`virtual` bus does not model the ECU or the physical network, so these remain
+outside the suite:
+
+- **CAN controller and transceiver**: arbitration, bit timing, ACK, error
+  frames, bus-off, CAN-FD phase switching and bus load
+- **Target execution**: interrupt latency, preemption, memory barriers, stack
+  depth, compiler optimisation and 32-bit alignment; the ARM gate is
+  compile-only
+- **Flash / NvM / lifecycle**: erase and program timing, write granularity,
+  brownout, power-loss recovery, reset, watchdog and bootloader interaction
+- **Commercial master quirks**: CANape/INCA optional commands, timing
+  expectations and seed/key flows; pyxcp is one master implementation
+- **Physical layer**: termination, cable length, ground offset, EMC,
+  sleep/wake and supply voltage
+- **FlexRay / Ethernet**: TDMA schedule, switch/TSN behaviour and socket
+  buffering
+
+Those require hardware-in-the-loop or a target emulator with peripheral
+models; a green pyxcp run is protocol evidence, not ECU validation.
+
 ### Performance
 
 The performance suite runs a classic-CAN build and a CAN-FD build and reports
 latency, bulk throughput, maximum DAQ/STIM configurations, and flash
 programming. The virtual bus does not model CAN bit timing; method, reference
 numbers and interpretation are in [docs/performance.md](performance.md).
+
+## Quality gates
+
+`Tests/quality.sh` is the Linux quality-gate runner used by the `quality` CI
+job. It builds the full host suite, not the pyxcp bridge, so coverage describes
+the default CAN profile's C paths.
+
+| Gate | Command | What it proves |
+|------|---------|----------------|
+| clang host + matrix | `Tests/quality.sh host`, `matrix` | C99 builds and all 103 variants compile without GCC-only assumptions |
+| ASan/UBSan | `Tests/quality.sh sanitize` | the full host suite has no detected memory or undefined-behaviour errors |
+| Coverage | `Tests/quality.sh coverage` | line ≥80% and functions ≥90% for `Xcp/`; XML/HTML under `Tests/integration/.build/coverage` |
+| ARM cross-compile | `Tests/quality.sh arm` | Cortex-M0 and Cortex-M4 32-bit builds compile with `-Werror` |
+| Static analysis | `Tests/quality.sh cppcheck` | cppcheck warning/performance/portability gate |
+
+`Tests/quality.sh all` runs every gate. It requires `clang`, `gcc`, `gcovr`,
+`arm-none-eabi-gcc` and `cppcheck`; CI installs them explicitly. MISRA is not
+claimed: cppcheck's MISRA addon and a reviewed deviation list are a separate
+compliance track, not a switch that this runner can honestly flip.
 
 ## CI
 
@@ -106,6 +149,8 @@ numbers and interpretation are in [docs/performance.md](performance.md).
 - pyxcp smoke, functional and feature-variant suites
 - pyxcp performance at `XCP_PERF_SCALE=0.5`; the JSON report is uploaded as a
   build artifact
+- an Ubuntu `quality` job: clang host + variant matrix, ASan/UBSan, coverage
+  gates, Cortex-M0/M4 cross-compile and cppcheck
 
 Live status is the CI badge in the README. Pass counts and timings are
 deliberately not pinned in documentation because they change with every

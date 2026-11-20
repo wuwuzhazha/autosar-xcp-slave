@@ -89,3 +89,31 @@ jobs:
       - name: Build + run matrix (Windows)
         if: matrix.os == 'windows-latest'
         run: python Tests/build_matrix.py
+
+  quality:
+    name: quality (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install quality tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang gcc-arm-none-eabi libnewlib-arm-none-eabi cppcheck
+          python -m pip install --quiet gcovr
+
+      - name: Quality gates
+        run: Tests/quality.sh all
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            Tests/integration/.build/coverage/coverage.xml
+            Tests/integration/.build/coverage/coverage*.html
+          if-no-files-found: error
