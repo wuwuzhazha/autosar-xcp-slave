@@ -7,6 +7,28 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [Unreleased]
+
+### 新增
+- 为以下每项修复增加主机回归断言；均已在未修复源码上确认会失败
+
+### 修复
+- `DOWNLOAD_MAX` 现在会武装下载块，`DOWNLOAD_MAX` → `DOWNLOAD_NEXT`
+  不再返回 `ERR_SEQUENCE`
+- `DOWNLOAD_NEXT` 不再重入 `DOWNLOAD`（此前每次续传都把块计数重置为
+  `0xFFFFFFFF`）；声明元素数超过帧载荷的请求在扣减块预算之前即被拒绝
+- `MODIFY_BITS` 改为逐字节完成 32 位读改写，非对齐 `mta` 不再在
+  Cortex-M0/M0+ 或启用 `UNALIGN_TRP` 的构建上触发异常；废弃的只读
+  指针校验合并进唯一的写访问校验
+- `Xcp_DtoSendNext` 在出队时进入 DTO 临界区，消除与
+  `Xcp_DtoSendOrQueue` 的跨上下文竞争
+- `Xcp_Init` 播种 `os_last_tick`，首个时间戳不再包含整个 uptime
+- 事件周期短于主函数周期时，调度器将 `event_channel_counter`
+  限制在周期以内，不再无界增长
+- `Xcp_Init` 重置标定页选择（`Xcp_InitCalPage` 原为空实现）
+- 出厂事件通道配置只声明 ODT 一致性；此前声明了未实现的
+  DAQ/EVENT 一致性
+
 ## [0.3.2] — 2026-11-20
 
 ### 新增

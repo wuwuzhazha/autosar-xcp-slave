@@ -11,8 +11,8 @@ static const Xcp_EventChannelType xcp_event_channels[XCP_MAX_EVENT_CHANNEL] =
 {
     { 0U, 0U, 255U, 10U, XCP_TIMESTAMP_UNIT_1MS, 0x0C, 0x00 },
     { 1U, 1U, 255U, 1U, XCP_TIMESTAMP_UNIT_1MS, 0x0C, 0x00 },
-    { 2U, 2U, 255U, 100U, XCP_TIMESTAMP_UNIT_1MS, 0x04, 0x01 },
-    { 3U, 3U, 255U, 0U, XCP_TIMESTAMP_UNIT_1MS, 0x08, 0x02 },
+    { 2U, 2U, 255U, 100U, XCP_TIMESTAMP_UNIT_1MS, 0x04, 0x00 },
+    { 3U, 3U, 255U, 0U, XCP_TIMESTAMP_UNIT_1MS, 0x08, 0x00 },
 };
 
 static const Xcp_SegmentConfigType xcp_segment_config[XCP_MAX_SEGMENT] =

@@ -382,17 +382,10 @@ sint16 Xcp_CmdShortUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
     return (sint16)(1U + num_elements);
 }
 
-sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+static sint16 Xcp_WriteDownloadPayload(Xcp_Channel *ch, const uint8 *cmd_data,
+                                       uint8 num_elements, Xcp_ResFrame *res)
 {
-    uint8  num_elements;
     uint8 *dst_ptr;
-
-    num_elements = cmd_data[1];
-
-    if ((2U + num_elements) > cmd_length)
-    {
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
-    }
 
     dst_ptr = Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements);
 
@@ -412,33 +405,68 @@ sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
 
     ch->runtime_ptr->mta += num_elements;
 
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-
-    ch->runtime_ptr->block_transfer_active = TRUE;
-    ch->runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
-    ch->runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
-#endif
-
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
 
+static void Xcp_ArmDownloadBlock(Xcp_Channel *ch)
+{
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    ch->runtime_ptr->block_transfer_active    = TRUE;
+    ch->runtime_ptr->block_transfer_type      = XCP_BLOCK_TYPE_DOWNLOAD;
+    ch->runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
+#else
+    (void)ch;
+#endif
+}
+
+sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+{
+    uint8  num_elements;
+    sint16 ret;
+
+    num_elements = cmd_data[1];
+
+    if ((2U + num_elements) > cmd_length)
+    {
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+    }
+
+    ret = Xcp_WriteDownloadPayload(ch, cmd_data, num_elements, res);
+
+    if (ret != (sint16)(1U))
+    {
+        return ret;
+    }
+
+    Xcp_ArmDownloadBlock(ch);
+    return ret;
+}
+
 sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
-
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    uint8 num_elements;
+
+    num_elements = cmd_data[1];
+
+    if ((2U + num_elements) > cmd_length)
+    {
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+    }
+
     if ((ch->runtime_ptr->block_transfer_active == FALSE)
         || (ch->runtime_ptr->block_transfer_type != XCP_BLOCK_TYPE_DOWNLOAD))
     {
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
-    if (Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, cmd_data[1]) != E_OK)
+    if (Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, num_elements) != E_OK)
     {
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
-    return Xcp_CmdDownload(ch, cmd_data, cmd_length, res);
+    return Xcp_WriteDownloadPayload(ch, cmd_data, num_elements, res);
 #else
     (void)ch; (void)cmd_data; (void)cmd_length;
     return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
@@ -514,6 +542,8 @@ sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
 
     ch->runtime_ptr->mta += num_elements;
 
+    Xcp_ArmDownloadBlock(ch);
+
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
 }
@@ -582,7 +612,7 @@ sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
     uint16  xor_mask;
     uint32  old_value;
     uint32  new_value;
-    uint32 *target_ptr;
+    uint8  *target_ptr;
 
     (void) cmd_length;
 
@@ -595,14 +625,7 @@ sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
         return Xcp_ResErr(res, XCP_ERR_CMD_SYNTAX);
     }
 
-    target_ptr = (uint32 *) Xcp_MemPtrRead(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U);
-
-    if (target_ptr == NULL_PTR)
-    {
-        return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
-    }
-
-    target_ptr = (uint32 *) Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U);
+    target_ptr = Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, 4U);
 
     if (target_ptr == NULL_PTR)
     {
@@ -615,12 +638,12 @@ sint16 Xcp_CmdModifyBits(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
         return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
     }
 #endif
-    old_value = *target_ptr;
+    (void) memcpy(&old_value, target_ptr, 4U);
 
     new_value = (old_value & ~(((uint32) 0xFFFFU) << shift_value)) | (((uint32) and_mask) << shift_value);
     new_value ^= ((uint32) xor_mask << shift_value);
 
-    *target_ptr = new_value;
+    (void) memcpy(target_ptr, &new_value, 4U);
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);

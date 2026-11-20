@@ -7,4 +7,7 @@ unsigned int test_mem_register(void *ptr, unsigned int size);
 
 #define TEST_ADDR(obj) test_mem_register((void *)&(obj), (unsigned int)sizeof(obj))
 
+extern uint32 test_schm_enter_count;
+extern uint32 test_schm_exit_count;
+
 #endif

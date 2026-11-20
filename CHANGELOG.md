@@ -6,6 +6,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Host regression checks for every fix below; each was confirmed to fail
+  against the unfixed sources
+
+### Fixed
+- `DOWNLOAD_MAX` now arms the download block, so `DOWNLOAD_MAX` →
+  `DOWNLOAD_NEXT` no longer returns `ERR_SEQUENCE`
+- `DOWNLOAD_NEXT` no longer re-enters `DOWNLOAD`, which reset the block
+  bound to `0xFFFFFFFF` on every continuation; a frame whose declared
+  element count exceeds its payload is rejected before the block budget
+  is touched
+- `MODIFY_BITS` performs the 32-bit read-modify-write byte-wise, so an
+  unaligned `mta` no longer faults on Cortex-M0/M0+ or `UNALIGN_TRP`
+  builds; the discarded read-pointer check is folded into the single
+  write-access check
+- `Xcp_DtoSendNext` takes the DTO critical section around the dequeue,
+  closing a cross-context race with `Xcp_DtoSendOrQueue`
+- `Xcp_Init` primes `os_last_tick`, so the first timestamp no longer
+  carries the full uptime
+- The event scheduler keeps `event_channel_counter` below the cycle
+  instead of growing without bound when the cycle is shorter than the
+  main-function period
+- `Xcp_Init` resets the calibration-page selection (`Xcp_InitCalPage`
+  was an empty stub)
+- The shipped event-channel configuration reports ODT consistency only;
+  DAQ/EVENT consistency was advertised without being implemented
+
 ## [0.3.2] — 2026-11-20
 
 ### Added

@@ -387,7 +387,15 @@ const Xcp_SegmentConfigType * Xcp_GetSegmentConfig(uint8 segment_number)
 
 void Xcp_InitCalPage(Xcp_Channel *ch)
 {
+    uint8 i;
+
     (void)ch;
+
+    for (i = 0U; i < XCP_MAX_SEGMENT; i++)
+    {
+        Xcp_SegmentRuntime[i].active_page_ecu = 0U;
+        Xcp_SegmentRuntime[i].active_page_xcp = 0U;
+    }
 }
 
 #endif

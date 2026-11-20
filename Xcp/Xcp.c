@@ -9,6 +9,16 @@
 
 #if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP) && (XCP_TIMESTAMP_SOURCE_OS == STD_ON)
 #include "Os.h"
+
+static void Xcp_PrimeOsTick(Xcp_RuntimeType *runtime)
+{
+    (void)GetCounterValue(XCP_OS_COUNTER, &runtime->os_last_tick);
+}
+#else
+static void Xcp_PrimeOsTick(Xcp_RuntimeType *runtime)
+{
+    (void)runtime;
+}
 #endif
 
 #include <string.h>
@@ -141,6 +151,8 @@ void Xcp_Init(const Xcp_ConfigType *Xcp_ConfigPtr)
 
     g_xcp_channel.runtime_ptr->tx_mode  = XCP_TX_ON;
     g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+
+    Xcp_PrimeOsTick(&g_xcp_runtime);
 
 #if (XCP_ON_CAN_ENABLED == STD_ON) && (XCP_DEV_ERROR_DETECT == STD_ON)
 
@@ -411,7 +423,7 @@ void Xcp_MainFunction(void)
             {
                 Xcp_Event(event_cfg->event_channel_number);
 
-                g_xcp_channel.runtime_ptr->event_channel_counter[i] -= cycle_ms;
+                g_xcp_channel.runtime_ptr->event_channel_counter[i] %= cycle_ms;
             }
         }
     }
