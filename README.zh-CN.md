@@ -64,7 +64,8 @@
 - **RESUME 模式** — DAQ 配置持久化到 NvM，初始化时自动恢复，EV_RESUME_MODE
 - **传输层** — CAN、FlexRay、Ethernet（SoAd）、通用 CDD；单个 `Xcp_LinkType`
   开关选择其一
-- **阻塞 + 交错** — DOWNLOAD_NEXT 块传输，交错命令队列
+- **阻塞 + 交错** — 主站块下载（`DOWNLOAD_NEXT`）与从站块上传（`UPLOAD`），
+  以及交错命令队列
 
 ## 传输链路
 

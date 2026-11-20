@@ -61,9 +61,9 @@ python3 Tests/integration/test_pyxcp_perf.py        # 性能包络
   `TL_CMD` 与 `USER_CMD`
 - 解锁前 CAL/DAQ/STIM/PGM 的保护矩阵（`ERR_ACCESS_LOCKED`），随后逐资源
   校验 seed 模式与解锁位
-- 内存访问：`SET_MTA`、`UPLOAD`、`SHORT_UPLOAD`、`DOWNLOAD`、
-  `DOWNLOAD_NEXT`、`DOWNLOAD_MAX`、`SHORT_DOWNLOAD`、`MODIFY_BITS`、
-  `BUILD_CHECKSUM`，以及拒绝访问、越界和截断 CTO
+- 内存访问：`SET_MTA`、`UPLOAD`（含多帧读取的从站块上传）、`SHORT_UPLOAD`、
+  `DOWNLOAD`、`DOWNLOAD_NEXT`、`DOWNLOAD_MAX`、`SHORT_DOWNLOAD`、
+  `MODIFY_BITS`、`BUILD_CHECKSUM`，以及拒绝访问、越界和截断 CTO
 - 标定页：processor/segment/page 信息、页访问模式、segment mode、页复制
   与非法页/段
 - 动态 DAQ：最大分配、事件通道、预分频、时间戳、resume、同步启停、
@@ -79,12 +79,12 @@ python3 Tests/integration/test_pyxcp_perf.py        # 性能包络
 
 | 变体 | 构建 | 断言 |
 |------|------|------|
-| `minimal` | 关闭 DAQ、seed/key、CAL、PGM、块传输与 resume | 禁用命令返回 `ERR_CMD_UNKNOWN`；普通内存、ID、SYNCH 仍可用 |
+| `minimal` | 关闭 DAQ、seed/key、CAL、PGM、块传输与 resume | 禁用命令返回 `ERR_CMD_UNKNOWN`；不声明 `SLAVE_BLOCK_MODE`；普通内存、ID、SYNCH 仍可用 |
 | `seedkey_off` | `XcpSeedKeyEnabled=0` | 资源无保护；CAL/DAQ/PGM 无需解锁 |
 | `daq_static` | `XcpDaqConfigType=DAQ_STATIC`、`XcpMinDaq=1` | 无需分配即可见静态列表；`ALLOC_DAQ`/`ALLOC_ODT` 被拒绝 |
 | `daq_predef` | `XcpMinDaq=2` | 预定义列表、写保护、池溢出、启停 |
 | `interleaved` | `XcpInterleavedModeEnabled=1` | 声明交错模式且命令通道仍可用 |
-| `can_fd` | 64 字节 CTO/DTO、15 个 ODT entry | 带负载 `SHORT_DOWNLOAD`、60/62 字节传输与校验和 |
+| `can_fd` | 64 字节 CTO/DTO、15 个 ODT entry | 带负载 `SHORT_DOWNLOAD`、从站块上传、60/62 字节传输与校验和 |
 
 ### 虚拟总线覆盖不到什么
 

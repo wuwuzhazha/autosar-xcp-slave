@@ -64,9 +64,10 @@ python3 Tests/integration/test_pyxcp_perf.py        # performance envelope
 - the pre-unlock protection matrix for CAL, DAQ, STIM and PGM, including
   `ERR_ACCESS_LOCKED`, then seed/key patterns and unlock bits for every
   resource
-- memory access: `SET_MTA`, `UPLOAD`, `SHORT_UPLOAD`, `DOWNLOAD`,
-  `DOWNLOAD_NEXT`, `DOWNLOAD_MAX`, `SHORT_DOWNLOAD`, `MODIFY_BITS`,
-  `BUILD_CHECKSUM`, access-denied, out-of-range and truncated CTO frames
+- memory access: `SET_MTA`, `UPLOAD` (including slave block upload for
+  multi-frame reads), `SHORT_UPLOAD`, `DOWNLOAD`, `DOWNLOAD_NEXT`,
+  `DOWNLOAD_MAX`, `SHORT_DOWNLOAD`, `MODIFY_BITS`, `BUILD_CHECKSUM`,
+  access-denied, out-of-range and truncated CTO frames
 - calibration pages: processor/segment/page info, page access modes, segment
   mode, page copy and invalid page/segment paths
 - dynamic DAQ: maximum allocation, event channels, prescaler, timestamp,
@@ -84,12 +85,12 @@ transfer.
 
 | Variant | Build | Asserts |
 |---------|-------|---------|
-| `minimal` | DAQ, seed/key, CAL, PGM, block transfer and resume off | disabled commands return `ERR_CMD_UNKNOWN`; plain memory, ID and SYNCH still work |
+| `minimal` | DAQ, seed/key, CAL, PGM, block transfer and resume off | disabled commands return `ERR_CMD_UNKNOWN`; no `SLAVE_BLOCK_MODE`; plain memory, ID and SYNCH still work |
 | `seedkey_off` | `XcpSeedKeyEnabled=0` | resources are unprotected; CAL/DAQ/PGM commands work without unlock |
 | `daq_static` | `XcpDaqConfigType=DAQ_STATIC`, `XcpMinDaq=1` | static list visible without allocation; `ALLOC_DAQ`/`ALLOC_ODT` rejected |
 | `daq_predef` | `XcpMinDaq=2` | predefined lists, write protection, pool overflow, start/stop |
 | `interleaved` | `XcpInterleavedModeEnabled=1` | interleaved mode advertised and command channel still usable |
-| `can_fd` | 64-byte CTO/DTO, 15 ODT entries | payload `SHORT_DOWNLOAD`, 60/62-byte transfers and checksum |
+| `can_fd` | 64-byte CTO/DTO, 15 ODT entries | payload `SHORT_DOWNLOAD`, slave block upload, 60/62-byte transfers and checksum |
 
 ### What the virtual bus does not cover
 

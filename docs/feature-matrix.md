@@ -20,7 +20,7 @@ described in [docs/testing.md](testing.md).
 | 0xF8 | GET_SEED (mode 0 first / mode 1 continue) | ✓ |
 | 0xF7 | UNLOCK | ✓ |
 | 0xF6 | SET_MTA | ✓ |
-| 0xF5 | UPLOAD | ✓ |
+| 0xF5 | UPLOAD (slave block upload when block transfer is enabled) | ✓ |
 | 0xF4 | SHORT_UPLOAD | ✓ |
 | 0xF3 | BUILD_CHECKSUM | ✓ |
 | 0xF2 | TRANSPORT_LAYER_CMD (CAN GET_SLAVE_ID) | ✓ |
@@ -108,11 +108,18 @@ described in [docs/testing.md](testing.md).
 `ERR_MEMORY_OVERFLOW`, `ERR_GENERIC`, `ERR_VERIFY`,
 `ERR_RESOURCE_TEMP_NOT_ACC`, `ERR_WRITE_PROTECTED`.
 
+## Block transfer
+
+`XcpBlockTransferEnabled=1` enables both directions:
+
+- **Master block download** — `DOWNLOAD_NEXT` / `DOWNLOAD_MAX`
+- **Slave block upload** — one `UPLOAD` with more than `MAX_CTO-1` elements
+  streams multiple `RES` packets; CONNECT advertises `SLAVE_BLOCK_MODE`.
+  `GET_COMM_MODE_INFO` advertises `MASTER_BLOCK_MODE` and the configured
+  `MAX_BS` / `MIN_ST`.
+
 ## Declared non-goals
 
-- **Slave block upload** (multi-frame `UPLOAD` continuation) — not implemented;
-  CONNECT advertises `SLAVE_BLOCK_MODE = 0`. `GET_COMM_MODE_INFO` advertises
-  `MASTER_BLOCK_MODE = 1` (download path only).
 - **Multi-channel** — single `Xcp_Channel` by design.
 - **A2L generation at runtime** — `Tools/xcpgen` emits `Gen/<profile>/Xcp_IfData.a2l`
   at generation time (offline, not on the wire).

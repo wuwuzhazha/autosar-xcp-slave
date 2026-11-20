@@ -1,9 +1,9 @@
 {
   "version": 1,
   "g_xcp_channel": {
-    "total": 177,
+    "total": 172,
     "files": {
-      "Xcp/Xcp.c": 98,
+      "Xcp/Xcp.c": 99,
       "Xcp/XcpOnCan.c": 2,
       "Xcp/XcpOnCdd.c": 2,
       "Xcp/XcpOnEth.c": 7,
@@ -16,7 +16,7 @@
       "Xcp/Xcp_FlashProg.c": 13,
       "Xcp/Xcp_Internal.h": 7,
       "Xcp/Xcp_Resume.c": 3,
-      "Xcp/Xcp_Std.c": 13
+      "Xcp/Xcp_Std.c": 7
     }
   },
   "g_xcp_manager": {
@@ -24,9 +24,9 @@
     "files": {}
   },
   "xcp_preprocessor": {
-    "total": 171,
+    "total": 167,
     "files": {
-      "Xcp/Xcp.c": 28,
+      "Xcp/Xcp.c": 27,
       "Xcp/Xcp.h": 3,
       "Xcp/XcpOnCan.c": 1,
       "Xcp/XcpOnCdd.c": 1,
@@ -43,16 +43,12 @@
       "Xcp/Xcp_DaqStim.c": 4,
       "Xcp/Xcp_FlashProg.c": 12,
       "Xcp/Xcp_FlashProg.h": 1,
-      "Xcp/Xcp_Internal.h": 17,
+      "Xcp/Xcp_Internal.h": 16,
       "Xcp/Xcp_Resume.c": 7,
       "Xcp/Xcp_Resume.h": 1,
       "Xcp/Xcp_SeedKey.c": 3,
       "Xcp/Xcp_SeedKey.h": 1,
-      "Xcp/Xcp_Std.c": 20,
-      "Xcp/Xcp_Std.h": 1,
-      "Xcp/Xcp_Callouts.c": 0,
-      "Xcp/Xcp_Config.h": 0,
-      "Xcp/Xcp_Types.h": 0
+      "Xcp/Xcp_Std.c": 19
     }
   },
   "c_includes": [],

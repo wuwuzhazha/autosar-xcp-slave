@@ -80,6 +80,16 @@ void Xcp_ProcessCommandQueue(void)
         return;
     }
 
+    {
+        Xcp_Channel *ch = &g_xcp_channel;
+
+        if ((ch->runtime_ptr->cmd_pending == TRUE)
+            && (Xcp_IsBlockUploadActive(ch) != FALSE))
+        {
+            Xcp_CancelBlockTransfer(ch);
+        }
+    }
+
     if (g_xcp_channel.runtime_ptr->cmd_pending == TRUE)
     {
         if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
@@ -207,7 +217,8 @@ void Xcp_GetVersionInfo(Std_VersionInfoType *versioninfo)
 
 void Xcp_HandleTxConfirmation(Std_ReturnType result)
 {
-    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    Xcp_Channel     *ch = &g_xcp_channel;
+    Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
     if (runtime->tx.state == XCP_TX_DTO)
     {
@@ -220,7 +231,8 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
             {
                 Xcp_SendPendingCto();
             }
-            else
+            else if ((runtime->cmd_pending != FALSE)
+                     || (Xcp_ContinueBlockUpload(ch) == FALSE))
             {
 #if (XCP_DAQ_ENABLED == STD_ON)
                 Xcp_DtoSendNext(&g_xcp_channel);
@@ -234,6 +246,10 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
             if (runtime->tx.parked != FALSE)
             {
                 Xcp_SendPendingCto();
+            }
+            else if (runtime->cmd_pending == FALSE)
+            {
+                (void)Xcp_ContinueBlockUpload(ch);
             }
         }
 
@@ -251,6 +267,13 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         else
         {
             runtime->tx.last_error = 1U;
+            Xcp_CancelBlockTransfer(ch);
+        }
+
+        if ((runtime->cmd_pending == FALSE)
+            && (Xcp_ContinueBlockUpload(ch) != FALSE))
+        {
+            return;
         }
 
         if (runtime->tx.parked != FALSE)
@@ -305,7 +328,9 @@ void Xcp_HandleRxIndication(const PduInfoType *pdu_info_ptr)
 
 void Xcp_MainFunction(void)
 {
-    if ((g_xcp_channel.runtime_ptr == NULL) || (g_xcp_channel.runtime_ptr->state == XCP_UNINIT))
+    Xcp_Channel *ch = &g_xcp_channel;
+
+    if ((ch->runtime_ptr == NULL) || (ch->runtime_ptr->state == XCP_UNINIT))
     {
         return;
     }
@@ -315,6 +340,8 @@ void Xcp_MainFunction(void)
 #endif
 
     Xcp_ProcessCommandQueue();
+
+    Xcp_ContinueBlockUpload(ch);
 
 #if (XCP_RESUME_MODE_ENABLED == STD_ON)
 
@@ -503,9 +530,7 @@ void Xcp_SessionOpen(void)
     Xcp_InitProtection(&g_xcp_channel);
 #endif
 
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
     Xcp_InitBlockTransfer(&g_xcp_channel);
-#endif
 }
 
 void Xcp_SessionClose(void)
@@ -518,6 +543,7 @@ void Xcp_SessionClose(void)
 
     runtime->tx.parked     = FALSE;
     runtime->tx.parked_len = 0U;
+    Xcp_CancelBlockTransfer(&g_xcp_channel);
     runtime->connection_state = XCP_DISCONNECTED;
 
     runtime->mta            = 0U;

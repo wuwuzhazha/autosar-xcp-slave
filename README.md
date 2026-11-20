@@ -67,7 +67,8 @@ Single-channel, C99, no external dependencies beyond your integration hooks.
 - **RESUME mode** — DAQ config persist to NvM, auto-restore on init, EV_RESUME_MODE
 - **Transport layers** — CAN, FlexRay, Ethernet (SoAd), generic CDD; single `Xcp_LinkType`
   switch selects one
-- **Blocking + interleaved** — DOWNLOAD_NEXT block transfer, interleaved command queue
+- **Blocking + interleaved** — master block download (`DOWNLOAD_NEXT`) and slave
+  block upload (`UPLOAD`), plus an interleaved command queue
 
 ## Transport link
 

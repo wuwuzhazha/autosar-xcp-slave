@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and cppcheck static analysis
 - CI `quality` job runs the full gate set on Ubuntu; coverage XML/HTML is
   uploaded as an artifact
+- Slave block upload: one `UPLOAD` with more than `MAX_CTO-1` elements streams
+  multiple `RES` packets when block transfer is enabled; CONNECT advertises
+  `SLAVE_BLOCK_MODE`
 
 ## [0.2.0] — 2026-11-20
 
