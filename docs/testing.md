@@ -156,6 +156,9 @@ of candidate findings, not as a pass/fail gate.
 - an Ubuntu `quality` job: clang host + variant matrix, ASan/UBSan, coverage
   gates, Cortex-M0/M4 cross-compile and cppcheck; the advisory MISRA report is
   uploaded as an artifact
+- quality-tool installation retries apt downloads and bounds network and lock
+  waits, so a stalled mirror fails the step within 10 minutes instead of
+  hanging
 
 Live status is the CI badge in the README. Pass counts and timings are
 deliberately not pinned in documentation because they change with every

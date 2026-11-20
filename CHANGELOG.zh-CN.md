@@ -7,6 +7,12 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [未发布]
+
+### 变更
+- CI 质量工具安装增加 apt 重试、网络与锁等待上限，并在 10 分钟内失败，
+  不再无限挂起
+
 ## [0.3.1] — 2026-11-20
 
 ### 新增
