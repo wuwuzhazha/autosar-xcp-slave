@@ -45,6 +45,7 @@ FUNC_TESTS = {
     "fr/default":       "Tests/test_matrix_func.c",
     "eth/default":      "Tests/test_matrix_func.c",
     "cdd/default":      "Tests/test_matrix_func.c",
+    "can/block_off":    "Tests/test_matrix_func.c",
 }
 
 CFLAGS = [

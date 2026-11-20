@@ -1,7 +1,7 @@
 {
   "version": 1,
   "g_xcp_channel": {
-    "total": 172,
+    "total": 171,
     "files": {
       "Xcp/Xcp.c": 99,
       "Xcp/XcpOnCan.c": 2,
@@ -16,7 +16,7 @@
       "Xcp/Xcp_FlashProg.c": 13,
       "Xcp/Xcp_Internal.h": 7,
       "Xcp/Xcp_Resume.c": 3,
-      "Xcp/Xcp_Std.c": 7
+      "Xcp/Xcp_Std.c": 6
     }
   },
   "g_xcp_manager": {
