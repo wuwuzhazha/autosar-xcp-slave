@@ -235,37 +235,43 @@ void Xcp_DtoSendNext(Xcp_Channel *ch)
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
+    uint8  dto_copy[XCP_MAX_DTO];
+    uint8  tail = 0U;
+    boolean send_now = FALSE;
+
+    XCP_DTO_ENTER_CRITICAL();
+
     runtime->tx.dto_latch = FALSE;
 
-    if (runtime->tx_mode == XCP_TX_OFF)
+    if ((runtime->tx_mode == XCP_TX_ON)
+        && (runtime->tx.state == XCP_TX_IDLE)
+        && (storage->dto_queue_count > 0U))
     {
-        return;
-    }
-
-    if (runtime->tx.state != XCP_TX_IDLE)
-    {
-        return;
-    }
-
-    if (storage->dto_queue_count > 0U)
-    {
-        uint8 tail = storage->dto_queue_tail;
-        uint8 dto_copy[XCP_MAX_DTO];
-
+        tail = storage->dto_queue_tail;
         (void)memcpy(dto_copy, storage->dto_queue[tail], (uint8) XCP_MAX_DTO);
         storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
         storage->dto_queue_count--;
 
         runtime->tx.dto_latch = TRUE;
         runtime->tx.state     = XCP_TX_DTO;
+        send_now = TRUE;
+    }
 
-        if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) != E_OK)
+    XCP_DTO_EXIT_CRITICAL();
+
+    if (send_now != FALSE)
+    {
+        if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) == E_OK)
         {
-            runtime->tx.dto_latch = FALSE;
-            runtime->tx.state     = XCP_TX_IDLE;
-            storage->dto_queue_tail = tail;
-            storage->dto_queue_count++;
+            return;
         }
+
+        XCP_DTO_ENTER_CRITICAL();
+        runtime->tx.dto_latch = FALSE;
+        runtime->tx.state     = XCP_TX_IDLE;
+        storage->dto_queue_tail = tail;
+        storage->dto_queue_count++;
+        XCP_DTO_EXIT_CRITICAL();
     }
 }
 
