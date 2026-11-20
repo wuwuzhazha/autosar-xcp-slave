@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] — 2026-11-20
 
 ### Added
 - `Tests/quality.sh`: clang host + 103-variant matrix, ASan/UBSan, gcovr
@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Slave block upload: one `UPLOAD` with more than `MAX_CTO-1` elements streams
   multiple `RES` packets when block transfer is enabled; CONNECT advertises
   `SLAVE_BLOCK_MODE`
+
+### Changed
+- Ratchet ceilings tightened: `g_xcp_channel` 177 → 172 and
+  `xcp_preprocessor` 171 → 167
 
 ## [0.2.0] — 2026-11-20
 

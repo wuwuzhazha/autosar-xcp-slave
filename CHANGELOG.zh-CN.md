@@ -7,7 +7,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
-## [未发布]
+## [0.3.0] — 2026-11-20
 
 ### 新增
 - `Tests/quality.sh`：clang 主机 + 103 变体矩阵、ASan/UBSan、gcovr 覆盖率
@@ -15,6 +15,10 @@
 - CI `quality` job 在 Ubuntu 上运行完整门禁；覆盖率 XML/HTML 作为构建产物上传
 - 从站块上传：启用块传输时，单个超过 `MAX_CTO-1` 个元素的 `UPLOAD` 会连续
   发送多个 `RES` 包；CONNECT 通告 `SLAVE_BLOCK_MODE`
+
+### 变更
+- 收紧架构棘轮上限：`g_xcp_channel` 177 → 172，
+  `xcp_preprocessor` 171 → 167
 
 ## [0.2.0] — 2026-11-20
 
