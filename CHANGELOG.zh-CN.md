@@ -7,7 +7,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
-## [未发布]
+## [0.3.2] — 2026-11-20
 
 ### 新增
 - `PROGRAM_*` 参数、声明大小、callout 失败与 sector info 错误路径的主机测试；
