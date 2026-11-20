@@ -98,6 +98,37 @@ def upload_throughput(xcp, link, addr: int, total: int, chunk: int) -> dict:
     }
 
 
+def block_upload_throughput(
+    xcp, link, addr: int, total: int, request: int, frame_payload: int
+) -> dict:
+    pattern = bytes((i * 17 + 3) & 0xFF for i in range(total))
+    link.ram_write(pattern)
+    xcp.setMta(addr)
+    sent = 0
+    requests = 0
+    frames = 0
+    t0 = time.perf_counter()
+    while sent < total:
+        size = min(request, total - sent)
+        data = xcp.upload(size)
+        if data != pattern[sent : sent + size]:
+            raise AssertionError(f"UPLOAD block returned wrong data at {sent}")
+        sent += size
+        requests += 1
+        frames += -(-size // frame_payload)
+    elapsed = time.perf_counter() - t0
+    return {
+        "bytes": sent,
+        "seconds": round(elapsed, 3),
+        "bytes_per_s": round(sent / elapsed, 1),
+        "requests": requests,
+        "requests_per_s": round(requests / elapsed, 1),
+        "frames": frames,
+        "frames_per_s": round(frames / elapsed, 1),
+        "integrity": True,
+    }
+
+
 def download_throughput(xcp, link, addr: int, total: int, chunk: int) -> dict:
     payload = bytes([0xA5]) * chunk
     xcp.setMta(addr)
@@ -364,6 +395,9 @@ def run_variant(name: str, profile_sets: tuple[str, ...], fd: bool, payload_size
                 xcp, lambda: xcp.shortUpload(4, addr), int(300 * SCALE)
             )
             result["upload"] = upload_throughput(xcp, link, addr, transfer, cto_chunk)
+            result["upload_block"] = block_upload_throughput(
+                xcp, link, addr, transfer, 252, cto_chunk
+            )
             result["download"] = download_throughput(xcp, link, addr, transfer, dto_chunk)
             result["daq_sustained"] = daq_benchmark(xcp, link, tap_bus, addr, entries, 0, daq_window)
             result["daq_peak"] = daq_benchmark(xcp, link, tap_bus, addr, entries, 1, 1.0 * SCALE)
@@ -428,7 +462,8 @@ def main() -> int:
         ("CTO latency p50 (ms)", classic["cto_latency"]["p50_ms"], fd["cto_latency"]["p50_ms"]),
         ("CTO latency p99 (ms)", classic["cto_latency"]["p99_ms"], fd["cto_latency"]["p99_ms"]),
         ("CTO rate (cmd/s)", classic["cto_latency"]["per_s"], fd["cto_latency"]["per_s"]),
-        ("UPLOAD (B/s)", classic["upload"]["bytes_per_s"], fd["upload"]["bytes_per_s"]),
+        ("UPLOAD plain (B/s)", classic["upload"]["bytes_per_s"], fd["upload"]["bytes_per_s"]),
+        ("UPLOAD block (B/s)", classic["upload_block"]["bytes_per_s"], fd["upload_block"]["bytes_per_s"]),
         ("DOWNLOAD (B/s)", classic["download"]["bytes_per_s"], fd["download"]["bytes_per_s"]),
         ("DAQ event0 (frames/s)", classic["daq_sustained"]["frames_per_s"], fd["daq_sustained"]["frames_per_s"]),
         ("DAQ event0 sample (B/s)", classic["daq_sustained"]["sample_bytes_per_s"], fd["daq_sustained"]["sample_bytes_per_s"]),
@@ -454,6 +489,18 @@ def main() -> int:
     for label, variant in (("classic", classic), ("fd", fd)):
         ok &= check(variant["cto_latency"]["p99_ms"] < 500.0, f"{label}: CTO p99 below 500 ms")
         ok &= check(variant["upload"]["bytes_per_s"] > 1000.0, f"{label}: UPLOAD above 1 kB/s")
+        ok &= check(
+            variant["upload_block"]["integrity"],
+            f"{label}: block UPLOAD contents match",
+        )
+        ok &= check(
+            variant["upload_block"]["bytes_per_s"] > 1000.0,
+            f"{label}: block UPLOAD above 1 kB/s",
+        )
+        ok &= check(
+            variant["upload_block"]["requests"] < variant["upload"]["frames"],
+            f"{label}: block UPLOAD uses fewer requests than plain frames",
+        )
         ok &= check(variant["download"]["bytes_per_s"] > 1000.0, f"{label}: DOWNLOAD above 1 kB/s")
         ok &= check(variant["download"]["integrity"], f"{label}: DOWNLOAD contents match")
         ok &= check(

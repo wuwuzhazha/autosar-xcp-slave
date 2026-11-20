@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Block-UPLOAD performance benchmark: 252 elements per request, `upload_block`
+  JSON results and a check that it uses fewer requests than plain UPLOAD
+- pyxcp coverage for block UPLOAD while DAQ is running
+
+### Fixed
+- Starting a block UPLOAD now cancels any block transfer left active by a
+  previous download, instead of returning `ERR_SEQUENCE`
+
 ## [0.3.0] — 2026-11-20
 
 ### Added
