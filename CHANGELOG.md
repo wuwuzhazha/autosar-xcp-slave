@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Host tests for `PROGRAM_*` argument, declared-size, callout-failure and
+  sector-info error paths; `Xcp_FlashProg.c` file coverage is 95.4%
+
 ### Changed
 - CI quality-tool installation retries apt downloads, bounds network and lock
   waits, and fails within 10 minutes instead of hanging

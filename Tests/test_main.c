@@ -20,6 +20,8 @@ extern boolean test_tx_fail_next;
 extern void test_checksum_override_len(uint8);
 extern void test_nvm_corrupt(const uint8 *data, uint32 len);
 extern uint32 test_flash_program_calls;
+extern boolean test_flash_erase_fail;
+extern boolean test_flash_program_fail;
 extern uint8  test_det_api;
 extern uint8  test_det_err;
 extern uint32 test_det_count;
@@ -1316,6 +1318,17 @@ int main(void)
 #endif
     CHECK("H11 IsProgrammingActive == FALSE (after PGM reset)",
           Xcp_IsProgrammingActive(&g_xcp_channel) == FALSE);
+    {
+        Xcp_Channel null_channel;
+        (void)memset(&null_channel, 0, sizeof(null_channel));
+        Xcp_InitFlashProg(&null_channel);
+        CHECK("H11a InitFlashProg NULL runtime tolerated",
+              null_channel.runtime_ptr == NULL_PTR);
+        CHECK("H11b IsProgrammingActive NULL runtime -> FALSE",
+              Xcp_IsProgrammingActive(&null_channel) == FALSE);
+        CHECK("H11c GetSectorConfig out of range -> NULL",
+              Xcp_GetSectorConfig(XCP_MAX_FLASH_SECTOR) == NULL_PTR);
+    }
     CHECK("H12 IsResumeModeActive == TRUE (activated after resume)",
           Xcp_IsResumeModeActive(&g_xcp_channel) == TRUE);
 
@@ -1922,6 +1935,19 @@ int main(void)
         CHECK("K12c PROGRAM_MAX before START -> ERR_SEQUENCE",
               (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
 
+        l = xcp_cmd((const uint8 *)"\xCC\x00\x01\x00", 4U, res);
+        CHECK("K12c1 PROGRAM_PREPARE before START -> ERR_SEQUENCE",
+              (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+        l = xcp_cmd((const uint8 *)"\xCB\x00\x00\x00\x00", 5U, res);
+        CHECK("K12c2 PROGRAM_FORMAT before START -> ERR_SEQUENCE",
+              (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+        l = xcp_cmd((const uint8 *)"\xC8\x00\x00\x00\x00\x00\x00\x00", 8U, res);
+        CHECK("K12c3 PROGRAM_VERIFY before START -> ERR_SEQUENCE",
+              (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+        l = xcp_cmd((const uint8 *)"\xCF", 1U, res);
+        CHECK("K12c4 PROGRAM_RESET before START -> ERR_SEQUENCE",
+              (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+
         g_xcp_channel.runtime_ptr->pgm_started = TRUE;
 
         g_xcp_channel.runtime_ptr->mta = 0xFFFFFF00UL;
@@ -1948,6 +1974,75 @@ int main(void)
         l = xcp_cmd((const uint8 *)"\xC9", 1U, res);
         CHECK("K12h PROGRAM_MAX empty -> ERR_OUT_OF_RANGE",
               (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+
+        l = xcp_cmd((const uint8 *)"\xD1\x01\x00\x00\x00\x40\x00\x00", 8U, res);
+        CHECK("K12i PROGRAM_CLEAR bad mode -> ERR_MODE_NOT_VALID",
+              (l == 2U) && (res[1] == XCP_ERR_MODE_NOT_VALID));
+
+        l = xcp_cmd((const uint8 *)"\xCD\x01\x00", 3U, res);
+        CHECK("K12j GET_SECTOR_INFO mode1 returns length",
+              (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] == 0x00U)
+              && (res[5] == 0x40U) && (res[6] == 0x00U) && (res[7] == 0x00U));
+        l = xcp_cmd((const uint8 *)"\xCD\x02\x00", 3U, res);
+        CHECK("K12k GET_SECTOR_INFO mode2 returns empty name",
+              (l == 2U) && (res[0] == XCP_PID_RES) && (res[1] == 0x00U));
+        l = xcp_cmd((const uint8 *)"\xCD\x03\x00", 3U, res);
+        CHECK("K12l GET_SECTOR_INFO bad mode -> ERR_MODE_NOT_VALID",
+              (l == 2U) && (res[1] == XCP_ERR_MODE_NOT_VALID));
+
+        l = xcp_cmd((const uint8 *)"\xCC\x00\xFF\xFF", 4U, res);
+        CHECK("K12m PROGRAM_PREPARE oversize -> ERR_OUT_OF_RANGE",
+              (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+
+        l = xcp_cmd((const uint8 *)"\xCB\x01\x00\x00\x00", 5U, res);
+        CHECK("K12n PROGRAM_FORMAT compression -> ERR_OUT_OF_RANGE",
+              (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+        l = xcp_cmd((const uint8 *)"\xCB\x00\x00\x00\x00", 5U, res);
+        CHECK("K12o PROGRAM_FORMAT bad method -> ERR_MODE_NOT_VALID",
+              (l == 2U) && (res[1] == XCP_ERR_MODE_NOT_VALID));
+        l = xcp_cmd((const uint8 *)"\xCB\x00\x00\x01\x02", 5U, res);
+        CHECK("K12p PROGRAM_FORMAT bad access -> ERR_MODE_NOT_VALID",
+              (l == 2U) && (res[1] == XCP_ERR_MODE_NOT_VALID));
+
+        l = xcp_cmd((const uint8 *)"\xCA\x08\xAA", 3U, res);
+        CHECK("K12q PROGRAM_NEXT truncated -> ERR_OUT_OF_RANGE",
+              (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+
+        g_xcp_channel.runtime_ptr->mta = 0xDEAD0000UL;
+        l = xcp_cmd((const uint8 *)"\xC9\xAA", 2U, res);
+        CHECK("K12r PROGRAM_MAX outside sector -> ERR_GENERIC",
+              (l == 2U) && (res[1] == XCP_ERR_GENERIC));
+
+        g_xcp_channel.runtime_ptr->mta = 0x08000000UL;
+        (void)xcp_cmd((const uint8 *)"\xCC\x00\x02\x00", 4U, res);
+        l = xcp_cmd((const uint8 *)"\xD0\x04\x01\x02\x03\x04", 6U, res);
+        CHECK("K12s PROGRAM exceeds declared size -> ERR_SEQUENCE",
+              (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+        l = xcp_cmd((const uint8 *)"\xCA\x04\x01\x02\x03\x04", 6U, res);
+        CHECK("K12t PROGRAM_NEXT exceeds declared size -> ERR_SEQUENCE",
+              (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+        l = xcp_cmd((const uint8 *)"\xC9\x01\x02\x03\x04", 5U, res);
+        CHECK("K12u PROGRAM_MAX exceeds declared size -> ERR_SEQUENCE",
+              (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
+
+        test_flash_erase_fail = TRUE;
+        l = xcp_cmd((const uint8 *)"\xD1\x00\x00\x00\x00\x40\x00\x00", 8U, res);
+        CHECK("K12v PROGRAM_CLEAR callout failure -> ERR_GENERIC",
+              (l == 2U) && (res[1] == XCP_ERR_GENERIC));
+        test_flash_erase_fail = FALSE;
+
+        (void)xcp_cmd((const uint8 *)"\xCC\x00\x00\x00", 4U, res);
+        test_flash_program_fail = TRUE;
+        l = xcp_cmd((const uint8 *)"\xD0\x04\x01\x02\x03\x04", 6U, res);
+        CHECK("K12w PROGRAM callout failure -> ERR_GENERIC",
+              (l == 2U) && (res[1] == XCP_ERR_GENERIC));
+        l = xcp_cmd((const uint8 *)"\xCA\x02\xAA\xBB", 4U, res);
+        CHECK("K12x PROGRAM_NEXT callout failure -> ERR_GENERIC",
+              (l == 2U) && (res[1] == XCP_ERR_GENERIC));
+        l = xcp_cmd((const uint8 *)"\xC9\xAA\xBB", 3U, res);
+        CHECK("K12y PROGRAM_MAX callout failure -> ERR_GENERIC",
+              (l == 2U) && (res[1] == XCP_ERR_GENERIC));
+        test_flash_program_fail = FALSE;
 
         g_xcp_channel.runtime_ptr->pgm_started = FALSE;
         g_xcp_channel.runtime_ptr->protection_status |= XCP_RESOURCE_PGM;
