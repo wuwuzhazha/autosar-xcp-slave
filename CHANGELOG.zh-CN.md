@@ -17,8 +17,8 @@
   产物上传；该报告不是合规门禁
 
 ### 变更
-- GitHub Actions `checkout`、`setup-python`、`upload-artifact` 更新到当前
-  Node 24 版本
+- actions/checkout、actions/setup-python 与 actions/upload-artifact
+  更新到当前 Node 24 版本
 - Windows CI 改用 MSYS2 UCRT64 工具链，替代已弃用的 MINGW64
 
 ### 修复

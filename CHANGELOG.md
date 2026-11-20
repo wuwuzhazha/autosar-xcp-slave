@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an artifact. It is not a compliance gate.
 
 ### Changed
-- GitHub Actions `checkout`, `setup-python` and `upload-artifact` updated to
+- GitHub Actions for checkout, setup-python and upload-artifact updated to
   current Node 24 releases
 - Windows CI uses the MSYS2 UCRT64 toolchain instead of deprecated MINGW64
 
