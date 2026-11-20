@@ -85,6 +85,10 @@ def unlock_all(xcp) -> None:
 def minimal(suite: Suite, xcp, link, addr: int) -> None:
     status = xcp.getStatus()
     suite.check(
+        "CONNECT does not advertise slave block mode",
+        xcp.slaveProperties.slaveBlockMode is False,
+    )
+    suite.check(
         "GET_STATUS reports no protected resources",
         status.resourceProtectionStatus.calpag is False
         and status.resourceProtectionStatus.daq is False
@@ -117,6 +121,10 @@ def minimal(suite: Suite, xcp, link, addr: int) -> None:
     )
     xcp.setMta(addr + 2)
     suite.check("plain UPLOAD still works", xcp.upload(2) == b"\xBE\xEF")
+    suite.error(
+        "UPLOAD > MAX_CTO-1 without block mode -> ERR_OUT_OF_RANGE",
+        xcp.upload, 8, code="ERR_OUT_OF_RANGE",
+    )
     ident = xcp.getId(0)
     suite.check(
         "GET_ID + UPLOAD identify the slave",
@@ -232,6 +240,10 @@ def fd_limits(suite: Suite, xcp, link, addr: int) -> None:
         xcp.slaveProperties.maxCto == 64 and xcp.slaveProperties.maxDto == 64,
         f"maxCto={xcp.slaveProperties.maxCto} maxDto={xcp.slaveProperties.maxDto}",
     )
+    suite.check(
+        "CONNECT advertises slave block mode",
+        xcp.slaveProperties.slaveBlockMode is True,
+    )
 
     # Payload-carrying SHORT_DOWNLOAD only fits when the CTO exceeds 8 bytes.
     xcp.shortDownload(addr + 36, 0, b"\x11\x22\x33\x44")
@@ -242,6 +254,11 @@ def fd_limits(suite: Suite, xcp, link, addr: int) -> None:
     )
 
     link.ram_write(bytes(range(128)))
+    xcp.setMta(addr)
+    suite.check(
+        "UPLOAD block mode streams 64 bytes on CAN-FD",
+        xcp.upload(64) == bytes(range(64)),
+    )
     suite.check(
         "SHORT_UPLOAD returns 60 bytes in one CTO",
         xcp.shortUpload(60, addr) == bytes(range(60)),

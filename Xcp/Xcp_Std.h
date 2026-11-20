@@ -24,6 +24,8 @@ sint16 Xcp_CmdSetMta(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, X
 
 sint16 Xcp_CmdUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
+boolean Xcp_ContinueBlockUpload(Xcp_Channel *ch);
+
 sint16 Xcp_CmdShortUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
 sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
@@ -42,20 +44,19 @@ sint16 Xcp_CmdSetRequest(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_lengt
 
 sint16 Xcp_CmdTransportLayerCmd(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res);
 
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-
 void Xcp_InitBlockTransfer(Xcp_Channel *ch);
 
 Std_ReturnType Xcp_StartBlockTransfer(Xcp_Channel *ch, uint8 block_type, uint32 total_size, uint32 first_packet_size);
 
 Std_ReturnType Xcp_ValidateBlockSequence(Xcp_Channel *ch, uint8 block_type, uint32 data_size);
 
-void Xcp_CancelBlockTransfer(void);
+void Xcp_CancelBlockTransfer(Xcp_Channel *ch);
 
 boolean Xcp_IsBlockTransferActive(Xcp_Channel *ch);
 
+boolean Xcp_IsBlockUploadActive(Xcp_Channel *ch);
+
 uint32 Xcp_GetBlockTransferRemaining(Xcp_Channel *ch);
-#endif
 
 #ifdef __cplusplus
 }

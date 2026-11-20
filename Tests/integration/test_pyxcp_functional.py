@@ -76,6 +76,10 @@ def main() -> int:
         with Master("can", h.make_app(channel, timeout=3.0), transport_layer_interface=master_bus) as xcp:
             xcp.connect()
             addr = link.ram_addr()
+            suite.check(
+                "CONNECT advertises slave block mode",
+                xcp.slaveProperties.slaveBlockMode is True,
+            )
 
             # ---------------- A. connection / protection ----------------
             print("-- A. connection, status, identity")
@@ -227,9 +231,14 @@ def main() -> int:
                 "SHORT_UPLOAD at +16",
                 xcp.shortUpload(4, addr + 16) == pattern[16:20],
             )
-            suite.error(
-                "UPLOAD > MAX_CTO-1 -> ERR_OUT_OF_RANGE",
-                xcp.upload, 9, code="ERR_OUT_OF_RANGE",
+            xcp.setMta(addr)
+            suite.check(
+                "UPLOAD block mode streams 64 bytes",
+                xcp.upload(64) == pattern[:64],
+            )
+            suite.check(
+                "block UPLOAD advances MTA",
+                xcp.upload(4) == pattern[64:68],
             )
             suite.error(
                 "SHORT_UPLOAD 8B > MAX_CTO-1 -> ERR_OUT_OF_RANGE",

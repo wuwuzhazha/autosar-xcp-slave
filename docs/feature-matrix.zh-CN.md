@@ -21,7 +21,7 @@
 | 0xF8 | GET_SEED（mode 0 首次 / mode 1 续传） | ✓ |
 | 0xF7 | UNLOCK | ✓ |
 | 0xF6 | SET_MTA | ✓ |
-| 0xF5 | UPLOAD | ✓ |
+| 0xF5 | UPLOAD（启用块传输时支持从站块上传） | ✓ |
 | 0xF4 | SHORT_UPLOAD | ✓ |
 | 0xF3 | BUILD_CHECKSUM | ✓ |
 | 0xF2 | TRANSPORT_LAYER_CMD（CAN GET_SLAVE_ID） | ✓ |
@@ -109,11 +109,17 @@
 `ERR_MEMORY_OVERFLOW`、`ERR_GENERIC`、`ERR_VERIFY`、
 `ERR_RESOURCE_TEMP_NOT_ACC`、`ERR_WRITE_PROTECTED`。
 
+## 块传输
+
+`XcpBlockTransferEnabled=1` 同时启用两个方向：
+
+- **主站块下载**——`DOWNLOAD_NEXT` / `DOWNLOAD_MAX`
+- **从站块上传**——单个 `UPLOAD` 请求超过 `MAX_CTO-1` 个元素时，从站连续发送
+  多个 `RES` 包；CONNECT 通告 `SLAVE_BLOCK_MODE`。`GET_COMM_MODE_INFO`
+  通告 `MASTER_BLOCK_MODE` 及配置的 `MAX_BS` / `MIN_ST`。
+
 ## 声明的非目标
 
-- **从站块上传**（多帧 `UPLOAD` 续传）——未实现；
-  CONNECT 通告 `SLAVE_BLOCK_MODE = 0`。`GET_COMM_MODE_INFO` 通告
-  `MASTER_BLOCK_MODE = 1`（仅下载方向）。
 - **多通道**——设计上只有单个 `Xcp_Channel`。
 - **运行时生成 A2L**——`Tools/xcpgen` 在生成时输出 `Gen/<profile>/Xcp_IfData.a2l`
   （离线生成，不走总线）。

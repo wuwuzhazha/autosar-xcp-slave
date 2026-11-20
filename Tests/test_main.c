@@ -340,6 +340,12 @@ static uint32 xcp_cmd_reply(const uint8 *c, uint32 len, uint8 *res)
 #  define TST_QUEUE_SIZE 0x00U
 #endif
 
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+#  define TST_CONNECT_COMM (XCP_COMM_BASIC_OPTIONAL | XCP_COMM_BASIC_SLAVE_BLOCK_MODE)
+#else
+#  define TST_CONNECT_COMM XCP_COMM_BASIC_OPTIONAL
+#endif
+
 static uint8  test_ram[256];
 static uint32 test_ram_var32;
 static uint8  test_ram_var8;
@@ -428,7 +434,7 @@ int main(void)
     CHECK("B2 CONNECT -> RES len 8", (l == 8U) && (res[0] == XCP_PID_RES));
 
     CHECK("B3 CONNECT bytes: CAL|DAQ|STIM|PGM, OPTIONAL+BYTE+Intel, CTO/DTO 8, v1/1",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x1D, 0x80,
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x1D, TST_CONNECT_COMM,
               8U, 8U, 0x00, 0x01, 0x01 }, 8U));
 
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
@@ -600,10 +606,50 @@ int main(void)
     CHECK("C3 UPLOAD again reads advanced MTA (04)",
           (l == 5U) && (res[1] == 4U));
 
-    cmd[0] = 0xF5; cmd[1] = 9U;
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    {
+        uint8  block[32];
+        uint32 got;
+        uint32 fl;
+
+        cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+        memcpy(&cmd[4], &(uint32){RAM_ADDR}, 4U);
+        (void)xcp_cmd(cmd, 8U, res);
+
+        cmd[0] = 0xF5; cmd[1] = 20U;
+        l = xcp_cmd(cmd, 2U, res);
+        CHECK("C4 UPLOAD block mode first frame",
+              (l > 1U) && (l <= XCP_MAX_CTO) && (res[0] == XCP_PID_RES));
+
+        got = l - 1U;
+        (void)memcpy(block, &res[1], got);
+
+        while (got < 20U)
+        {
+            xcp_pump(1U);
+            l = xcp_pop_pdu(res, &fl);
+            if (l == 0U)
+            {
+                break;
+            }
+            (void)memcpy(&block[got], &res[1], l - 1U);
+            got += l - 1U;
+        }
+        xcp_pump(1U);
+
+        CHECK("C4a UPLOAD block mode streams 20 bytes",
+              (got == 20U) && (memcmp(block, test_ram, 20U) == 0));
+        CHECK("C4b UPLOAD block mode advances MTA",
+              g_xcp_channel.runtime_ptr->mta == (RAM_ADDR + 20U));
+        CHECK("C4c UPLOAD block mode completes",
+              g_xcp_channel.runtime_ptr->block_transfer_active == FALSE);
+    }
+#else
+    cmd[0] = 0xF5; cmd[1] = 20U;
     l = xcp_cmd(cmd, 2U, res);
     CHECK("C4 UPLOAD >MAX_CTO-1 -> ERR_OUT_OF_RANGE",
           (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+#endif
     l = xcp_cmd((const uint8 *)"\xEF\x01\xAA", 3U, res);
     CHECK("C4a DOWNLOAD_NEXT no block -> ERR_SEQUENCE",
           (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
@@ -2074,11 +2120,26 @@ int main(void)
         memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram)}, 4U);
         (void)xcp_cmd(cmd, 8U, res);
 
+        memset(test_ram, 0x5A, 16U);
+
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+        {
+            uint32 fl;
+            l = xcp_cmd((const uint8 *)"\xF5\x08", 2U, res);
+            CHECK("K16a UPLOAD 8 -> block first frame",
+                  (l == 8U) && (res[0] == XCP_PID_RES) && (res[1] == 0x5AU));
+            xcp_pump(1U);
+            l = xcp_pop_pdu(res, &fl);
+            CHECK("K16a2 UPLOAD 8 -> block tail",
+                  (l == 2U) && (res[0] == XCP_PID_RES) && (res[1] == 0x5AU));
+            xcp_pump(1U);
+        }
+#else
         l = xcp_cmd((const uint8 *)"\xF5\x08", 2U, res);
         CHECK("K16a UPLOAD 8 -> ERR_OUT_OF_RANGE",
               (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+#endif
 
-        memset(test_ram, 0x5A, 16U);
         l = xcp_cmd((const uint8 *)"\xF5\x07", 2U, res);
         CHECK("K16b UPLOAD 7 -> RES len8",
               (l == 8U) && (res[0] == XCP_PID_RES));

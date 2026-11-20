@@ -215,12 +215,9 @@ typedef struct
     boolean stim_timeout_flag[XCP_MAX_DAQ];
 #endif
 
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-
     boolean block_transfer_active;
     uint32  block_transfer_remaining;
     uint8   block_transfer_type;
-#endif
 } Xcp_RuntimeType;
 
 struct Xcp_Channel

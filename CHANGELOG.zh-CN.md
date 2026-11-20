@@ -13,6 +13,8 @@
 - `Tests/quality.sh`：clang 主机 + 103 变体矩阵、ASan/UBSan、gcovr 覆盖率
   门禁（行 ≥80%、函数 ≥90%）、Cortex-M0/M4 ARM 交叉编译与 cppcheck 静态分析
 - CI `quality` job 在 Ubuntu 上运行完整门禁；覆盖率 XML/HTML 作为构建产物上传
+- 从站块上传：启用块传输时，单个超过 `MAX_CTO-1` 个元素的 `UPLOAD` 会连续
+  发送多个 `RES` 包；CONNECT 通告 `SLAVE_BLOCK_MODE`
 
 ## [0.2.0] — 2026-11-20
 
