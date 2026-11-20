@@ -614,6 +614,13 @@ def main() -> int:
                 seen.get(0) == b"\x44\x33\x22\x11" and seen.get(1) == b"\x88\x77\x66\x55",
                 f"{seen}",
             )
+            block_pattern = bytes((i * 3 + 1) & 0xFF for i in range(64))
+            link.ram_write(block_pattern)
+            xcp.setMta(addr)
+            suite.check(
+                "block UPLOAD while DAQ is running",
+                xcp.upload(64) == block_pattern,
+            )
             # START_STOP_SYNCH mode 1 consumes the selection; re-select before
             # stopping through the selected-lists path.
             xcp.startStopDaqList(2, 0)
