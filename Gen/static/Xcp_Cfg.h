@@ -41,8 +41,8 @@
 #define XCP_ON_CDD_ENABLED STD_OFF
 #define XCP_MAX_CTO (8U)
 #define XCP_MAX_DTO (8U)
-#define XCP_MAX_BS (0U)
-#define XCP_MIN_ST (0U)
+#define XCP_MAX_BS (4U)
+#define XCP_MIN_ST (10U)
 #define XCP_DAQ_CONFIG_TYPE XCP_DAQ_STATIC
 #define XCP_MIN_DAQ (1U)
 #define XCP_MAX_DAQ (8U)
