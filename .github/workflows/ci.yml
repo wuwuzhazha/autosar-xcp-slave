@@ -101,9 +101,18 @@ jobs:
           python-version: '3.12'
 
       - name: Install quality tools
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang gcc-arm-none-eabi libnewlib-arm-none-eabi cppcheck
+          sudo apt-get update \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            -o DPkg::Lock::Timeout=60 \
+            clang gcc-arm-none-eabi libnewlib-arm-none-eabi cppcheck
           python -m pip install --quiet gcovr
 
       - name: Quality gates

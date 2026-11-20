@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Host tests for `PROGRAM_*` argument, declared-size, callout-failure and
+  sector-info error paths; `Xcp_FlashProg.c` file coverage is 95.4%
+
+### Changed
+- CI quality-tool installation retries apt downloads, bounds network and lock
+  waits, and fails within 10 minutes instead of hanging
+
 ## [0.3.1] — 2026-11-20
 
 ### Added

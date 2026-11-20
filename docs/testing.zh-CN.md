@@ -141,6 +141,8 @@ CI 会显式安装。MISRA 报告不构成合规声明：它使用 cppcheck addo
 - pyxcp 性能（`XCP_PERF_SCALE=0.5`），JSON 报告作为构建产物上传
 - Ubuntu `quality` job：clang 主机 + 变体矩阵、ASan/UBSan、覆盖率门禁、
   Cortex-M0/M4 交叉编译和 cppcheck；提示性 MISRA 报告作为构建产物上传
+- 质量工具安装会重试 apt 下载并限制网络与锁等待，镜像异常时在 10 分钟内
+  失败，而不是挂起
 
 实时状态见 README 的 CI 徽章。文档不固定断言数量与耗时，因为它们随每次
 提交变化；以 workflow 运行结果为准。

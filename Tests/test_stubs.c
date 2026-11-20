@@ -211,10 +211,12 @@ boolean Xcp_VerifyKey_Callout(uint8 resource, const uint8 *key, uint8 key_length
 }
 
 uint8 test_flash_mem[0x20000];
+boolean test_flash_erase_fail = FALSE;
 
 Std_ReturnType Xcp_FlashErase_Callout(uint32 address, uint32 length)
 {
-    if ((address < 0x08000000UL) || ((address - 0x08000000UL + length) > 0x10000UL))
+    if (test_flash_erase_fail
+        || (address < 0x08000000UL) || ((address - 0x08000000UL + length) > 0x10000UL))
     {
         return E_NOT_OK;
     }
@@ -222,11 +224,13 @@ Std_ReturnType Xcp_FlashErase_Callout(uint32 address, uint32 length)
     return E_OK;
 }
 uint32 test_flash_program_calls = 0U;
+boolean test_flash_program_fail = FALSE;
 
 Std_ReturnType Xcp_FlashProgram_Callout(uint32 address, const uint8 *data, uint32 length)
 {
     test_flash_program_calls++;
-    if ((address < 0x08000000UL) || ((address - 0x08000000UL + length) > 0x10000UL) || (data == NULL))
+    if (test_flash_program_fail
+        || (address < 0x08000000UL) || ((address - 0x08000000UL + length) > 0x10000UL) || (data == NULL))
     {
         return E_NOT_OK;
     }
