@@ -19,9 +19,9 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         cc: [gcc]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -29,9 +29,9 @@ jobs:
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: false
-          install: mingw-w64-x86_64-gcc
+          install: mingw-w64-ucrt-x86_64-gcc
 
       - name: Ratchet + regen
         run: python Tests/ratchet.py
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload pyxcp performance report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pyxcp-perf-${{ matrix.os }}
           path: Tests/integration/.build/perf.json
@@ -94,9 +94,9 @@ jobs:
     name: quality (ubuntu-latest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -110,7 +110,7 @@ jobs:
         run: Tests/quality.sh all
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |
@@ -120,7 +120,7 @@ jobs:
 
       - name: Upload MISRA report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: misra-report
           path: Tests/integration/.build/quality/misra/misra.txt

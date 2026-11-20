@@ -16,6 +16,11 @@
 - `Tests/quality.sh` 生成 cppcheck 的提示性 MISRA 报告，CI 将其作为构建
   产物上传；该报告不是合规门禁
 
+### 变更
+- GitHub Actions `checkout`、`setup-python`、`upload-artifact` 更新到当前
+  Node 24 版本
+- Windows CI 改用 MSYS2 UCRT64 工具链，替代已弃用的 MINGW64
+
 ### 修复
 - 新的块 UPLOAD 会取消上一次下载遗留的块传输，不再返回 `ERR_SEQUENCE`
 
