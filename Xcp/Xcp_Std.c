@@ -409,51 +409,71 @@ static sint16 Xcp_WriteDownloadPayload(Xcp_Channel *ch, const uint8 *cmd_data,
     return (sint16)(1U);
 }
 
-static void Xcp_ArmDownloadBlock(Xcp_Channel *ch)
+/* Arms a block download with the declared remaining element count.
+   Returns 0 when the frame completes the transfer, 1 when the block
+   continues (the slave stays silent until the last frame) and -1 when
+   block mode is disabled but the master declared a longer block. */
+static sint16 Xcp_ArmDownloadBlock(Xcp_Channel *ch, uint32 remaining)
 {
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    if (remaining == 0U)
+    {
+        return (sint16)(0);
+    }
+
     ch->runtime_ptr->block_transfer_active    = TRUE;
     ch->runtime_ptr->block_transfer_type      = XCP_BLOCK_TYPE_DOWNLOAD;
-    ch->runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
+    ch->runtime_ptr->block_transfer_remaining = remaining;
+    return (sint16)(1);
 #else
     (void)ch;
+    return (remaining == 0U) ? (sint16)(0) : (sint16)(-1);
 #endif
 }
 
 sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
-    uint8  num_elements;
+    uint8  declared;
+    uint8  payload;
+    uint8  written;
     sint16 ret;
+    sint16 block;
 
-    num_elements = cmd_data[1];
+    /* Byte 1 is the total block length in block mode and the element count
+       otherwise; bytes beyond the declared count are transport padding. */
+    declared = cmd_data[1];
+    payload  = (uint8)(cmd_length - 2U);
+    written  = (declared < payload) ? declared : payload;
 
-    if ((2U + num_elements) > cmd_length)
-    {
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
-    }
-
-    ret = Xcp_WriteDownloadPayload(ch, cmd_data, num_elements, res);
+    ret = Xcp_WriteDownloadPayload(ch, cmd_data, written, res);
 
     if (ret != (sint16)(1U))
     {
         return ret;
     }
 
-    Xcp_ArmDownloadBlock(ch);
-    return ret;
+    block = Xcp_ArmDownloadBlock(ch, (uint32)(declared - written));
+
+    if (block < (sint16)(0))
+    {
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+    }
+
+    return (block > (sint16)(0)) ? (sint16)(0) : ret;
 }
 
 sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-    uint8 num_elements;
+    uint8  declared;
+    uint8  payload;
+    uint8  written;
+    sint16 ret;
 
-    num_elements = cmd_data[1];
-
-    if ((2U + num_elements) > cmd_length)
-    {
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
-    }
+    /* Byte 1 is the remaining block length including this frame's elements. */
+    declared = cmd_data[1];
+    payload  = (uint8)(cmd_length - 2U);
+    written  = (declared < payload) ? declared : payload;
 
     if ((ch->runtime_ptr->block_transfer_active == FALSE)
         || (ch->runtime_ptr->block_transfer_type != XCP_BLOCK_TYPE_DOWNLOAD))
@@ -461,12 +481,24 @@ sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
-    if (Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, num_elements) != E_OK)
+    if ((uint32)declared != ch->runtime_ptr->block_transfer_remaining)
     {
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
-    return Xcp_WriteDownloadPayload(ch, cmd_data, num_elements, res);
+    if (Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, written) != E_OK)
+    {
+        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
+    }
+
+    ret = Xcp_WriteDownloadPayload(ch, cmd_data, written, res);
+
+    if (ret != (sint16)(1U))
+    {
+        return ret;
+    }
+
+    return (Xcp_IsBlockTransferActive(ch) != FALSE) ? (sint16)(0) : ret;
 #else
     (void)ch; (void)cmd_data; (void)cmd_length;
     return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
@@ -541,8 +573,6 @@ sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
     (void) memcpy(dst_ptr, &cmd_data[1U], num_elements);
 
     ch->runtime_ptr->mta += num_elements;
-
-    Xcp_ArmDownloadBlock(ch);
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);

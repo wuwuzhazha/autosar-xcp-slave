@@ -157,6 +157,8 @@ def main():
              ("XcpTimestampType=NO_TIME_STAMP", "XcpTimestampFixed=1")),
             ("ilv w/o block", "requires XcpBlockTransferEnabled",
              ("XcpInterleavedModeEnabled=1", "XcpBlockTransferEnabled=0")),
+            ("block w/ maxbs 0", "requires XcpMaxBs>0",
+             ("XcpBlockTransferEnabled=1", "XcpMaxBs=0")),
             ("enum bogus", "not in", ("XcpTimestampType=BOGUS",)),
         ]
         for name, needle, sets in NEG:

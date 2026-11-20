@@ -66,6 +66,11 @@ BRIDGE_API void bridge_rx(const uint8 *data, uint32 length)
     pdu.sdu_length    = length;
 
     Xcp_CanIfRxIndication(BRIDGE_RX_PDU_ID, &pdu);
+
+    /* The harness models an RX-ISR-driven slave: the main loop runs right
+       after the frame is queued, so command handling does not race the
+       1 ms tick thread. */
+    Xcp_MainFunction();
 }
 
 BRIDGE_API uint32 bridge_tx_pop(uint8 *out, uint32 *length)

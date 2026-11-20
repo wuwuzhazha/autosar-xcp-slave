@@ -78,11 +78,30 @@ If `XcpResumeModeEnabled`:
 
 ## Threads / critical sections
 
-`XCP_DTO_ENTER_CRITICAL` / `XCP_DTO_EXIT_CRITICAL` guard the DTO queue + TX state.
-Default maps to `SchM_Enter_Xcp/SchM_Exit_Xcp(XCP_EXCLUSIVE_AREA_0)` — override via
+`XCP_DTO_ENTER_CRITICAL` / `XCP_DTO_EXIT_CRITICAL` guard the DTO queue and every
+`tx.state` transition (including `Xcp_HandleTxConfirmation`). Default maps to
+`SchM_Enter_Xcp/SchM_Exit_Xcp(XCP_EXCLUSIVE_AREA_0)` — override via
 `Xcp_Cfg.h` or define them to your own locking primitive.
 
 `Xcp_Tl_SendCto`/`SendDto` are **outside** the critical region (calls may be slow).
+
+Concurrency contract:
+
+- `Xcp_CanIfRxIndication` / `Xcp_CanIfTxConfirmation` (and the Fr/Eth/Cdd
+  equivalents) are the only callbacks that may run in interrupt context.
+  They enqueue a frame and update the TX state; they never call the lower
+  layer's transmit function directly.
+- `Xcp_MainFunction` processes the queued command, DAQ events and block
+  upload. Call it from one task context only.
+- The command hand-off is single-producer/single-consumer: the RX callback
+  writes `cmd_queue_buffer`/`cmd_pending`, the main loop reads them and
+  clears `cmd_pending`. The producer sets `busy_pending` instead of
+  overwriting while a command is pending; the main loop answers
+  `ERR_CMD_BUSY` and clears it. No other context may write those fields.
+- A second command that arrives before the main loop processed the first is
+  answered `ERR_CMD_BUSY`. Block-mode masters must pace their frames with
+  the advertised `MIN_ST` (1 ms by default); `XcpInterleavedModeEnabled`
+  queues commands instead of answering busy.
 
 ## Session lifecycle
 

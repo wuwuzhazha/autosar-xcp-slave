@@ -57,8 +57,8 @@ P = [
     ("XcpOnCddEnabled", "bool", False, 0, 1, "XCP_ON_CDD_ENABLED", "PC"),
     ("XcpMaxCto", "int", 8, 8, 255, "XCP_MAX_CTO", "PC"),
     ("XcpMaxDto", "int", 8, 8, 255, "XCP_MAX_DTO", "PC"),
-    ("XcpMaxBs", "int", 0, 0, 255, "XCP_MAX_BS", "PC"),
-    ("XcpMinSt", "int", 0, 0, 255, "XCP_MIN_ST", "PC"),
+    ("XcpMaxBs", "int", 4, 0, 255, "XCP_MAX_BS", "PC"),
+    ("XcpMinSt", "int", 10, 0, 255, "XCP_MIN_ST", "PC"),
     ("XcpDaqConfigType", "enum", "DAQ_DYNAMIC", None, ("DAQ_DYNAMIC", "DAQ_STATIC"),
      "XCP_DAQ_CONFIG_TYPE", "PC"),
     ("XcpMinDaq", "int", 0, 0, 255, "XCP_MIN_DAQ", "PC"),
@@ -317,6 +317,8 @@ def normalize(cfg, sets):
         errs.append("XcpTimestampFixed requires a non-NO_TIME_STAMP type")
     if vals["XcpInterleavedModeEnabled"] and not vals["XcpBlockTransferEnabled"]:
         errs.append("XcpInterleavedModeEnabled requires XcpBlockTransferEnabled")
+    if vals["XcpBlockTransferEnabled"] and vals["XcpMaxBs"] == 0:
+        errs.append("XcpBlockTransferEnabled requires XcpMaxBs>0")
 
     t = {k: cfg.get(k, []) for k in TABLE_KEYS}
     t["pdu"] = cfg.get("pdu", {"rx": 0, "tx": 1})
