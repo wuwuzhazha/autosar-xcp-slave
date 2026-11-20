@@ -12,6 +12,21 @@
 static void Xcp_LoadStaticDaqLists(Xcp_Channel *ch);
 #endif
 
+static boolean Xcp_AnyDaqListRunning(Xcp_Channel *ch)
+{
+    uint16 i;
+
+    for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
+    {
+        if (ch->storage_ptr->daq_list[i].state == XCP_DAQ_STATE_RUNNING)
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 void Xcp_InitDaqLists(Xcp_Channel *ch)
 {
     uint16 daq_idx = 0;
@@ -231,6 +246,11 @@ sint16 Xcp_CmdFreeDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, 
     (void) cmd_data;
     (void) cmd_length;
 
+    if (Xcp_AnyDaqListRunning(ch) != FALSE)
+    {
+        return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
+    }
+
     Xcp_FreeDaqLists(&g_xcp_channel);
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
@@ -244,7 +264,6 @@ sint16 Xcp_CmdAllocDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
     return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
 #else
     uint16 daq_count = Xcp_LeRead16(&cmd_data[2U]);
-    uint16 i;
 
     (void) cmd_length;
 
@@ -253,12 +272,9 @@ sint16 Xcp_CmdAllocDaq(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
         return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
     }
 
-    for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
+    if (Xcp_AnyDaqListRunning(ch) != FALSE)
     {
-        if (ch->storage_ptr->daq_list[i].state == XCP_DAQ_STATE_RUNNING)
-        {
-            return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
-        }
+        return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
 
     ch->runtime_ptr->daq_count = XCP_MIN_DAQ + daq_count;
@@ -298,7 +314,7 @@ sint16 Xcp_CmdAllocOdt(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
         return Xcp_ResErr(res, XCP_ERR_MEMORY_OVERFLOW);
     }
 
-    if (ch->storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
+    if (Xcp_AnyDaqListRunning(ch) != FALSE)
     {
         return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
@@ -350,7 +366,7 @@ sint16 Xcp_CmdAllocOdtEntry(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_le
     }
 #endif
 
-    if (ch->storage_ptr->daq_list[daq_list_no].state == XCP_DAQ_STATE_RUNNING)
+    if (Xcp_AnyDaqListRunning(ch) != FALSE)
     {
         return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }
@@ -644,6 +660,11 @@ sint16 Xcp_CmdStartStopDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd
     }
     else if (mode == XCP_START_STOP_START)
     {
+        if (ch->storage_ptr->daq_list[daq_list_no].odt_count == 0U)
+        {
+            return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
+        }
+
         ch->storage_ptr->daq_list[daq_list_no].state = XCP_DAQ_STATE_RUNNING;
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
         if (ch->storage_ptr->daq_list[daq_list_no].direction == XCP_DAQ_LIST_TYPE_STIM)
@@ -696,6 +717,18 @@ sint16 Xcp_CmdStartStopSynch(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
     if (mode > XCP_START_STOP_SELECT)
     {
         return Xcp_ResErr(res, XCP_ERR_MODE_NOT_VALID);
+    }
+
+    if (mode == XCP_START_STOP_START)
+    {
+        for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
+        {
+            if ((ch->storage_ptr->daq_list[i].selected != FALSE)
+                && (ch->storage_ptr->daq_list[i].odt_count == 0U))
+            {
+                return Xcp_ResErr(res, XCP_ERR_DAQ_CONFIG);
+            }
+        }
     }
 
     for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
