@@ -399,6 +399,30 @@ int main(void)
     CHECK("A5 state == XCP_INIT",
           g_xcp_channel.runtime_ptr->state == XCP_INIT);
 
+#if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP) && (XCP_TIMESTAMP_SOURCE_OS == STD_ON)
+    /* The OS counter already runs when Xcp_Init is called: the first elapsed
+       measurement must start at init, not at tick 0 (issue #9 item 5). */
+    test_os_ticks = 5000UL;
+    Xcp_Init(NULL_PTR);
+    CHECK("A5a Init primes os_last_tick: first timestamp is 0",
+          Xcp_GetTimestamp() == 0U);
+    test_os_ticks += 7UL;
+    CHECK("A5b timestamp advances by elapsed ticks only",
+          Xcp_GetTimestamp() == 7U);
+    test_os_ticks = 0UL;
+    Xcp_Init(NULL_PTR);
+#endif
+
+#if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
+    /* Xcp_Init must reset the segment page selection (issue #9 item 7). */
+    Xcp_SegmentRuntime[0].active_page_ecu = 1U;
+    Xcp_SegmentRuntime[0].active_page_xcp = 1U;
+    Xcp_Init(NULL_PTR);
+    CHECK("A5c Init resets segment active pages",
+          (Xcp_SegmentRuntime[0].active_page_ecu == 0U)
+          && (Xcp_SegmentRuntime[0].active_page_xcp == 0U));
+#endif
+
 #if (XCP_DAQ_CONFIG_TYPE == XCP_DAQ_STATIC)
     /* Static DAQ entries are baked as literal addresses (e.g. 0x20000000) that
        are unmapped in the test process. Rewrite the runtime copies to point at
@@ -434,6 +458,15 @@ int main(void)
     printf("-- B. CONNECT / basic commands\n");
     l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
     CHECK("B2 CONNECT -> RES len 8", (l == 8U) && (res[0] == XCP_PID_RES));
+
+#if (XCP_DAQ_ENABLED == STD_ON)
+    /* A scheduler backlog must be clamped to the cycle, not carried forward
+       (issue #9 item 6): the counter has to stay below the 10 ms cycle. */
+    g_xcp_channel.runtime_ptr->event_channel_counter[0] = 1000U;
+    Xcp_MainFunction();
+    CHECK("B2a scheduler counter stays below the cycle after a backlog",
+          g_xcp_channel.runtime_ptr->event_channel_counter[0] < 10U);
+#endif
 
     CHECK("B3 CONNECT bytes: CAL|DAQ|STIM|PGM, OPTIONAL+BYTE+Intel, CTO/DTO 8, v1/1",
           frame_is(res, l, (const uint8[]){ 0xFF, 0x1D, TST_CONNECT_COMM,
@@ -709,6 +742,41 @@ int main(void)
           (l == 1U) && (res[0] == XCP_PID_RES)
           && (test_ram[91] == 0xB1U) && (test_ram[92] == 0xB2U));
 
+    /* DOWNLOAD_NEXT only decrements the block bound; it must not re-arm it
+       (issue #9 item 1b). */
+    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){RAM_ADDR + 100U}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    cmd[0] = 0xF0; cmd[1] = 2U; cmd[2] = 0x11; cmd[3] = 0x22;
+    (void)xcp_cmd(cmd, 4U, res);
+    {
+        uint32 before = g_xcp_channel.runtime_ptr->block_transfer_remaining;
+        cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0x33; cmd[3] = 0x44;
+        l = xcp_cmd(cmd, 4U, res);
+        CHECK("C8g DOWNLOAD_NEXT decrements the block bound, no re-arm",
+              (l == 1U) && (res[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->block_transfer_remaining
+                  == (before - 2U)));
+    }
+
+    /* Byte 1 is the element count: a count that does not fit the frame is
+       rejected instead of silently truncating, and the rejected frame must
+       not consume block budget (issue #9 item 2). */
+    {
+        uint32 before = g_xcp_channel.runtime_ptr->block_transfer_remaining;
+        CHECK("C8h DOWNLOAD_NEXT count beyond frame -> ERR_OUT_OF_RANGE",
+              xcp_cmd_has_err((const uint8 *)"\xEF\x07\x01\x02\x03\x04\x05\x06", 8U,
+                              XCP_ERR_OUT_OF_RANGE));
+        CHECK("C8h2 rejected frame leaves the block bound untouched",
+              g_xcp_channel.runtime_ptr->block_transfer_remaining == before);
+    }
+    cmd[0] = 0xEF; cmd[1] = 6U; cmd[2] = 0x51; cmd[3] = 0x52; cmd[4] = 0x53;
+    cmd[5] = 0x54; cmd[6] = 0x55; cmd[7] = 0x56;
+    l = xcp_cmd(cmd, 8U, res);
+    CHECK("C8i DOWNLOAD_NEXT count == frame payload -> RES",
+          (l == 1U) && (res[0] == XCP_PID_RES)
+          && (test_ram[104] == 0x51U) && (test_ram[109] == 0x56U));
+
     cmd[0] = 0xED; cmd[1] = 1U; cmd[2] = 0; cmd[3] = 0;
     memcpy(&cmd[4], &(uint32){RAM_ADDR + 60U}, 4U);
     l = xcp_cmd(cmd, 8U, res);
@@ -733,6 +801,21 @@ int main(void)
           (l == 2U) && (res[1] == XCP_ERR_CMD_SYNTAX));
     CHECK("C10c MODIFY_BITS shift17 leaves RAM untouched",
           (*(uint32 *)(void *)&test_ram[40]) == 0xFFFFFFFFUL);
+
+    /* An unaligned MTA must not be dereferenced as uint32* (issue #9 item 3);
+       the RMW is byte-wise, so the value is correct on any alignment. */
+    test_ram[41] = 0x29U; test_ram[42] = 0x2AU;
+    test_ram[43] = 0x2BU; test_ram[44] = 0x2CU;
+    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){RAM_ADDR + 41U}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    cmd[0] = 0xEC; cmd[1] = 0x00U; cmd[2] = 0xF0U; cmd[3] = 0x00U; cmd[4] = 0x05U; cmd[5] = 0x00U;
+    l = xcp_cmd(cmd, 6U, res);
+    CHECK("C10d MODIFY_BITS at unaligned MTA -> RES",
+          (l == 1U) && (res[0] == XCP_PID_RES));
+    CHECK("C10e MODIFY_BITS unaligned RMW correct",
+          (test_ram[41] == 0xF5U) && (test_ram[42] == 0x00U)
+          && (test_ram[43] == 0x2BU) && (test_ram[44] == 0x2CU));
 
     cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
     memcpy(&cmd[4], &(uint32){RAM_ADDR}, 4U);
@@ -2619,6 +2702,24 @@ int main(void)
             {
                 CHECK("K6f DTO carries OS timestamp", FALSE);
             }
+        }
+        {
+            uint32 enter0;
+            uint32 exit0;
+
+            /* The first event sends immediately, the second is queued; the TX
+               confirmation dequeues it and that path must hold the DTO
+               critical section (issue #9 item 4). */
+            Xcp_Event(0U);
+            Xcp_Event(0U);
+            enter0 = test_schm_enter_count;
+            exit0  = test_schm_exit_count;
+            Xcp_Tl_TxConfirmation(0U, E_OK);
+            CHECK("K6g TX confirmation dequeue takes the DTO critical section",
+                  (test_schm_enter_count > enter0)
+                  && (test_schm_exit_count > exit0)
+                  && ((test_schm_enter_count - enter0)
+                      == (test_schm_exit_count - exit0)));
         }
         (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
         xcp_drain_tx();
