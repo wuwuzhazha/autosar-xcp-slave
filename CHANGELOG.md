@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Tests/quality.sh`: clang host + 103-variant matrix, ASan/UBSan, gcovr
+  coverage gate (line ≥80%, functions ≥90%), Cortex-M0/M4 ARM cross-compile
+  and cppcheck static analysis
+- CI `quality` job runs the full gate set on Ubuntu; coverage XML/HTML is
+  uploaded as an artifact
+
 ## [0.2.0] — 2026-11-20
 
 ### Added

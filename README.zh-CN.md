@@ -158,6 +158,8 @@ int main(void)
 - `Tests/integration/test_pyxcp_functional.py` — 完整命令面、保护矩阵与负向路径
 - `Tests/integration/test_pyxcp_variants.py` — 特性裁剪 profile 与 CAN-FD 线上边界
 - `Tests/integration/test_pyxcp_perf.py` — 延迟/吞吐包络
+- `Tests/quality.sh` — clang、ASan/UBSan、覆盖率、ARM 交叉编译与 cppcheck
+  门禁（由 CI 的 `quality` job 执行）
 
 测试分层与覆盖见 [docs/testing.zh-CN.md](docs/testing.zh-CN.md)，基准方法与
 参考数据见 [docs/performance.zh-CN.md](docs/performance.zh-CN.md)。CI 是

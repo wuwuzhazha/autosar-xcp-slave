@@ -36,6 +36,9 @@ python3 Tests/integration/test_pyxcp_master.py        # smoke
 python3 Tests/integration/test_pyxcp_functional.py    # every service + negative paths
 python3 Tests/integration/test_pyxcp_variants.py      # feature-gated profiles
 python3 Tests/integration/test_pyxcp_perf.py          # latency/throughput envelope
+
+# Linux quality gates (clang, ASan/UBSan, coverage, ARM, cppcheck)
+Tests/quality.sh all
 ```
 
 The performance suite honours `XCP_PERF_SCALE` (default `1.0`, CI uses `0.5`)
@@ -46,7 +49,8 @@ reference numbers.
 
 Required tools: `python3` (3.11+ recommended, uses `tomllib`), `gcc` (C99),
 `make`/`bash` for local test orchestration. No other dependencies — the host
-harness uses stubs under `Tests/stubs/`.
+harness uses stubs under `Tests/stubs/`. The optional quality gates also need
+`clang`, `gcovr`, `arm-none-eabi-gcc` and `cppcheck`.
 
 Host tests do not treat raw host pointers as XCP addresses: test objects are
 registered in a mapped 32-bit address space (`Tests/test_stubs.c`), so the

@@ -164,6 +164,8 @@ End-to-end, with pyxcp over a `python-can` virtual bus:
 - `Tests/integration/test_pyxcp_variants.py` — feature-gated profiles and CAN-FD
   wire limits
 - `Tests/integration/test_pyxcp_perf.py` — latency/throughput envelope
+- `Tests/quality.sh` — clang, ASan/UBSan, coverage, ARM cross-compile and
+  cppcheck gates (run by CI's `quality` job)
 
 See [docs/testing.md](docs/testing.md) for the test layers and coverage, and
 [docs/performance.md](docs/performance.md) for the benchmark method and reference

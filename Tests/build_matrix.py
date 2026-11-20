@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 GENCFG = "Config/xcp_base.toml"
 XCPGEN = "Tools/xcpgen/xcpgen.py"
+CC = os.environ.get("CC", "gcc")
 
 MODULE_SRC = [
     "Xcp/Xcp.c", "Xcp/Xcp_Cmd.c", "Xcp/Xcp_Std.c", "Xcp/Xcp_DaqCfg.c", "Xcp/Xcp_DaqRun.c", "Xcp/Xcp_DaqStim.c", "Xcp/Xcp_SeedKey.c",
@@ -118,8 +119,8 @@ def build(vid, sets, workdir):
     test_src = FUNC_TESTS.get(vid)
     link = ["Tests/test_stubs.c", test_src] if test_src else LINK_ONLY
     steps = [
-        ["gcc", *cflags, "-o", str(exe), *MODULE_SRC, str(gendir / "Xcp_Cfg.c"), *link],
-        ["gcc", *cflags, "-fsyntax-only", *SYNTAX_ONLY],
+        [CC, *cflags, "-o", str(exe), *MODULE_SRC, str(gendir / "Xcp_Cfg.c"), *link],
+        [CC, *cflags, "-fsyntax-only", *SYNTAX_ONLY],
     ]
     for cmd in steps:
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, errors="replace")

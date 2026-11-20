@@ -26,11 +26,15 @@ Tests\run_all_tests.bat
 
 # Linux/macOS equivalent
 python3 Tests/build_matrix.py
+
+# Linux quality gates (clang, ASan/UBSan, coverage, ARM, cppcheck)
+Tests/quality.sh all
 ```
 
 所需工具：`python3`（推荐 3.11+，使用 `tomllib`）、`gcc`（C99）、
 `make`/`bash` 用于本地测试编排。没有其他依赖 —— 主机测试框架使用
-`Tests/stubs/` 下的桩代码。
+`Tests/stubs/` 下的桩代码。可选质量门禁还需要 `clang`、`gcovr`、
+`arm-none-eabi-gcc` 和 `cppcheck`。
 
 ## 工作流程
 
