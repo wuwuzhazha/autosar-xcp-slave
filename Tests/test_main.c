@@ -2736,6 +2736,20 @@ int main(void)
                   && ((test_schm_enter_count - enter0)
                       == (test_schm_exit_count - exit0)));
         }
+        {
+            uint32 enter0;
+            uint32 exit0;
+
+            /* With no frame in flight the confirmation must still hold the
+               lock while it inspects and clears tx.state (issue #11 item 4). */
+            g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+            enter0 = test_schm_enter_count;
+            exit0  = test_schm_exit_count;
+            Xcp_Tl_TxConfirmation(0U, E_OK);
+            CHECK("K29 TX confirmation transition takes the DTO critical section",
+                  ((test_schm_enter_count - enter0) == 1U)
+                  && ((test_schm_exit_count - exit0) == 1U));
+        }
         (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
         xcp_drain_tx();
 
