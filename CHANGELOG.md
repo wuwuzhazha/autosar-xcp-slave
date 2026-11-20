@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - GitHub Actions `checkout`, `setup-python` and `upload-artifact` updated to
   current Node 24 releases
+- Windows CI uses the MSYS2 UCRT64 toolchain instead of deprecated MINGW64
 
 ### Fixed
 - Starting a block UPLOAD now cancels any block transfer left active by a
