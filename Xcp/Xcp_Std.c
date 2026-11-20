@@ -382,17 +382,10 @@ sint16 Xcp_CmdShortUpload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
     return (sint16)(1U + num_elements);
 }
 
-sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+static sint16 Xcp_WriteDownloadPayload(Xcp_Channel *ch, const uint8 *cmd_data,
+                                       uint8 num_elements, Xcp_ResFrame *res)
 {
-    uint8  num_elements;
     uint8 *dst_ptr;
-
-    num_elements = cmd_data[1];
-
-    if ((2U + num_elements) > cmd_length)
-    {
-        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
-    }
 
     dst_ptr = Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements);
 
@@ -412,22 +405,48 @@ sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
 
     ch->runtime_ptr->mta += num_elements;
 
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-
-    ch->runtime_ptr->block_transfer_active = TRUE;
-    ch->runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
-    ch->runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
-#endif
-
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
+}
+
+static void Xcp_ArmDownloadBlock(Xcp_Channel *ch)
+{
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
+    ch->runtime_ptr->block_transfer_active    = TRUE;
+    ch->runtime_ptr->block_transfer_type      = XCP_BLOCK_TYPE_DOWNLOAD;
+    ch->runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
+#else
+    (void)ch;
+#endif
+}
+
+sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
+{
+    uint8  num_elements;
+    sint16 ret;
+
+    num_elements = cmd_data[1];
+
+    if ((2U + num_elements) > cmd_length)
+    {
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+    }
+
+    ret = Xcp_WriteDownloadPayload(ch, cmd_data, num_elements, res);
+
+    if (ret != (sint16)(1U))
+    {
+        return ret;
+    }
+
+    Xcp_ArmDownloadBlock(ch);
+    return ret;
 }
 
 sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xcp_ResFrame *res)
 {
 #if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-    uint8  num_elements;
-    uint8 *dst_ptr;
+    uint8 num_elements;
 
     num_elements = cmd_data[1];
 
@@ -447,26 +466,7 @@ sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
-    dst_ptr = Xcp_MemPtrWrite(ch, ch->runtime_ptr->mta_extension, ch->runtime_ptr->mta, num_elements);
-
-    if (dst_ptr == NULL_PTR)
-    {
-        return Xcp_ResErr(res, XCP_ERR_ACCESS_DENIED);
-    }
-
-#if (XCP_SEED_KEY_ENABLED == STD_ON)
-    if (!Xcp_IsResourceUnlocked(ch, XCP_RESOURCE_CAL_PAG))
-    {
-        return Xcp_ResErr(res, XCP_ERR_ACCESS_LOCKED);
-    }
-#endif
-
-    (void) memcpy(dst_ptr, &cmd_data[2U], num_elements);
-
-    ch->runtime_ptr->mta += num_elements;
-
-    ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
-    return (sint16)(1U);
+    return Xcp_WriteDownloadPayload(ch, cmd_data, num_elements, res);
 #else
     (void)ch; (void)cmd_data; (void)cmd_length;
     return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
@@ -542,12 +542,7 @@ sint16 Xcp_CmdDownloadMax(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_leng
 
     ch->runtime_ptr->mta += num_elements;
 
-#if (XCP_BLOCK_TRANSFER_ENABLED == STD_ON)
-
-    ch->runtime_ptr->block_transfer_active = TRUE;
-    ch->runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
-    ch->runtime_ptr->block_transfer_remaining = 0xFFFFFFFFUL;
-#endif
+    Xcp_ArmDownloadBlock(ch);
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
     return (sint16)(1U);
