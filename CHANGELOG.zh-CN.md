@@ -7,6 +7,16 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [未发布]
+
+### 新增
+- 块 UPLOAD 性能基准：每次请求 252 个元素，输出 `upload_block` JSON 结果，
+  并断言其请求数少于普通 UPLOAD
+- pyxcp 覆盖：DAQ 运行期间进行块 UPLOAD
+
+### 修复
+- 新的块 UPLOAD 会取消上一次下载遗留的块传输，不再返回 `ERR_SEQUENCE`
+
 ## [0.3.0] — 2026-11-20
 
 ### 新增

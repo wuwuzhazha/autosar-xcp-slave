@@ -101,6 +101,11 @@ void Xcp_ProcessCommand(const uint8 *cmd_data, uint8 cmd_length)
         return;
     }
 
+    if ((cmd_data[0] != XCP_CMD_DOWNLOAD_MAX) && (cmd_data[0] != XCP_CMD_DOWNLOAD_NEXT))
+    {
+        Xcp_CancelBlockTransfer(man);
+    }
+
     for (i = 0U; i < XCP_CMD_TABLE_SIZE; i++)
     {
         if (XCP_CMD_TABLE[i].cmd == cmd_data[0])

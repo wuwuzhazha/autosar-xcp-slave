@@ -18,7 +18,10 @@ Two generated profiles are compiled and driven through pyxcp over a
 | CAN-FD | 64 bytes | 15 × 4-byte entries | 128 |
 
 UPLOAD and DOWNLOAD move the same 8 KiB of application data on both builds.
-DAQ uses the maximum dynamic configuration: 8 lists × 4 ODTs, sampled on
+UPLOAD is measured twice: plain mode sends one `CTO-1`-sized request per
+frame (7/63 bytes), while block mode sends 252 elements per `UPLOAD`, which
+the slave streams as 36 classic-CAN or 4 CAN-FD `RES` frames. DAQ uses the
+maximum dynamic configuration: 8 lists × 4 ODTs, sampled on
 event channel 0 (10 ms) for sustained load and event channel 1 (1 ms) for the
 peak test. STIM uses the same 8 × 4 ODT geometry, driven through pyxcp's
 `Stim.triggerEvent`; 12 800 frames are sent per build and the bridge counts
@@ -28,9 +31,10 @@ every frame that reaches the slave.
 
 - **CTO latency** — one command/response round trip, including pyxcp and the
   bridge threads. p50/p95/p99 are over 300 commands.
-- **Bulk throughput** — application bytes per second for UPLOAD/DOWNLOAD, with
-  the largest payload that fits the CTO (7/63 bytes for UPLOAD, 6/62 for
-  DOWNLOAD).
+- **Bulk throughput** — application bytes per second for UPLOAD/DOWNLOAD.
+  Plain UPLOAD uses the largest payload that fits one CTO (7/63 bytes);
+  block UPLOAD sends 252 elements per request and streams the result.
+  DOWNLOAD uses 6/62 bytes per frame.
 - **DAQ sample bytes** — configured entry bytes only (`entries × 4`).
 - **DAQ wire bytes** — full DTO payload after the PID, including the slave's
   padding to `XCP_MAX_DTO`.
@@ -44,26 +48,28 @@ every frame that reaches the slave.
 ## Reference run
 
 Environment: Windows 10 x64, CPython 3.13.13, pyxcp 0.30.5, python-can 4.6.1,
-commit `890c7db`, `XCP_PERF_SCALE=1.0` (run time 21 s).
+main after `v0.3.0`, `XCP_PERF_SCALE=1.0` (run time 28 s).
 
 | Metric | Classic CAN | CAN-FD |
 |--------|------------:|-------:|
-| CTO latency p50 | 1.23 ms | 1.15 ms |
-| CTO latency p99 | 2.47 ms | 2.08 ms |
-| CTO rate | 755 cmd/s | 819 cmd/s |
-| UPLOAD | 5.5 kB/s | 52.0 kB/s |
-| DOWNLOAD | 4.7 kB/s | 49.1 kB/s |
-| DAQ event0 frames | 2 353 /s | 2 237 /s |
-| DAQ event0 sample, wall | 9.4 kB/s | 134.2 kB/s |
-| DAQ event0 sample, simulated | 12.7 kB/s | 192.2 kB/s |
-| DAQ event0 wire | 16.5 kB/s | 140.9 kB/s |
-| DAQ event0 delivery / drops | 1.00 / 0 | 1.01 / 0 |
-| DAQ event1 frames | 15 502 /s | 14 235 /s |
-| DAQ event1 sample, simulated | 128.4 kB/s | 1 919.3 kB/s |
-| DAQ event1 drops | 0 | 0 |
-| STIM frames | 48 770 /s | 42 203 /s |
-| STIM payload | 195 kB/s | 2 532 kB/s |
-| Flash programming | 3.2 kB/s | 8.0 kB/s |
+| CTO latency p50 | 1.59 ms | 1.22 ms |
+| CTO latency p99 | 7.66 ms | 2.18 ms |
+| CTO rate | 533 cmd/s | 749 cmd/s |
+| UPLOAD plain | 4.4 kB/s | 46.8 kB/s |
+| UPLOAD block | 30.5 kB/s | 155.0 kB/s |
+| UPLOAD block requests | 33 | 33 |
+| DOWNLOAD | 3.6 kB/s | 48.3 kB/s |
+| DAQ event0 frames | 1 752 /s | 2 417 /s |
+| DAQ event0 sample, wall | 7.0 kB/s | 145.0 kB/s |
+| DAQ event0 sample, simulated | 12.8 kB/s | 192.0 kB/s |
+| DAQ event0 wire | 12.3 kB/s | 152.2 kB/s |
+| DAQ event0 delivery / drops | 1.01 / 0 | 1.00 / 0 |
+| DAQ event1 frames | 5 399 /s | 12 961 /s |
+| DAQ event1 sample, simulated | 81.8 kB/s | 1 920.1 kB/s |
+| DAQ event1 drops | 2 954 | 0 |
+| STIM frames | 10 499 /s | 31 906 /s |
+| STIM payload | 42.0 kB/s | 1 914.4 kB/s |
+| Flash programming | 2.6 kB/s | 8.0 kB/s |
 
 The DAQ sample numbers match the configuration exactly in simulated time:
 
@@ -73,9 +79,9 @@ CAN-FD:  32 DTO × 60 B / 10 ms = 192 kB/s
 ```
 
 At event channel 1 (1 ms), a 32-DTO burst can exceed the 128-entry queue when
-the host cannot drain it; earlier runs reported FD drops (for example 185),
-while this run reports none. This is the expected queue-depth limit, not data
-corruption (all delivered samples match RAM).
+the host cannot drain it. This run reports 2 954 classic-CAN drops and none on
+FD; the count varies with host load. This is the expected queue-depth limit,
+not data corruption (all delivered samples match RAM).
 
 ## Interpretation
 
@@ -89,6 +95,10 @@ timing. Consequently:
 - **Byte-bound workloads gain the payload ratio.** UPLOAD/DOWNLOAD gain about
   9–10× (63/7 and 62/6 bytes), and DAQ sample throughput gains 15× because an
   FD ODT carries 15 entries instead of one.
+- **Block UPLOAD removes per-frame round trips.** The same 8 KiB takes 33
+  requests instead of 1 171 classic / 131 FD requests, raising application
+  throughput 7× on classic CAN and 3.3× on FD in this run. The gain is bounded
+  by link frame rate on a real bus, not by the host round trip.
 - **Padding matters.** DTOs are padded to `XCP_MAX_DTO`, so wire bytes grow
   9× while useful sample bytes grow 15×. Reporting only whole frames as
   "payload" understates the FD advantage.
