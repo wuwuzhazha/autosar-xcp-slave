@@ -48,7 +48,7 @@ every frame that reaches the slave.
 ## Reference run
 
 Environment: Windows 10 x64, CPython 3.13.13, pyxcp 0.30.5, python-can 4.6.1,
-main after `v0.3.0`, `XCP_PERF_SCALE=1.0` (run time 28 s).
+`v0.3.1`, `XCP_PERF_SCALE=1.0` (run time 28 s).
 
 | Metric | Classic CAN | CAN-FD |
 |--------|------------:|-------:|

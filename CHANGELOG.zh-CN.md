@@ -7,7 +7,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
-## [未发布]
+## [0.3.1] — 2026-11-20
 
 ### 新增
 - 块 UPLOAD 性能基准：每次请求 252 个元素，输出 `upload_block` JSON 结果，

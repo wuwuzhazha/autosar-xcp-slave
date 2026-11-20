@@ -41,7 +41,7 @@ pyxcp 的 `Stim.triggerEvent` 发送；每种构建发送 12 800 帧，桥接层
 ## 参考运行
 
 环境：Windows 10 x64、CPython 3.13.13、pyxcp 0.30.5、python-can 4.6.1、
-`v0.3.0` 之后的 main、`XCP_PERF_SCALE=1.0`（运行约 28 秒）。
+`v0.3.1`、`XCP_PERF_SCALE=1.0`（运行约 28 秒）。
 
 | 指标 | 经典 CAN | CAN-FD |
 |------|---------:|-------:|
