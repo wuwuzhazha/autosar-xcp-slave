@@ -125,6 +125,20 @@ int main(void)
     CHECK("download", (l == 1U) && (res[0] == XCP_PID_RES)
           && (ram_var[0] == 0x11U) && (ram_var[3] == 0x44U));
 
+#if (XCP_BLOCK_TRANSFER_ENABLED == STD_OFF)
+    /* A declaration longer than the frame is rejected before anything is
+       written on a build without block transfer (issue #14 item 4b). */
+    cmd[0] = 0xF0; cmd[1] = 14; cmd[2] = 0xAA; cmd[3] = 0xBB; cmd[4] = 0xCC;
+    cmd[5] = 0xDD; cmd[6] = 0xEE; cmd[7] = 0xFF;
+    l = do_cmd(cmd, 8U, res);
+    CHECK("block_off: DOWNLOAD declared > payload rejected, nothing written",
+          (l == 2U) && (res[1] == XCP_ERR_OUT_OF_RANGE)
+          && (ram_var[0] == 0x11U) && (ram_var[3] == 0x44U));
+    l = do_cmd((const uint8 *)"\xEF\x02\x01\x02", 4U, res);
+    CHECK("block_off: DOWNLOAD_NEXT -> ERR_CMD_UNKNOWN",
+          (l == 2U) && (res[1] == XCP_ERR_CMD_UNKNOWN));
+#endif
+
     /* After DOWNLOAD the MTA advances by 4; UPLOAD reads the advanced position */
     cmd[0] = 0xF5; cmd[1] = 4;
     l = do_cmd(cmd, 2U, res);

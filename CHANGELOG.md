@@ -19,14 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The slave stays silent on intermediate frames, answers only the frame
   that exhausts the block and rejects overruns with `ERR_SEQUENCE`. A
   plain `DOWNLOAD` and `DOWNLOAD_MAX` are single-frame transfers and do
-  not open a block
+  not open a block; a denied frame leaves the block budget untouched, and
+  a longer declaration on a build without block transfer is rejected
+  before anything is written
 - `MODIFY_BITS` performs the 32-bit read-modify-write byte-wise, so an
   unaligned `mta` no longer faults on Cortex-M0/M0+ or `UNALIGN_TRP`
   builds; the discarded read-pointer check is folded into the single
   write-access check
-- `Xcp_DtoSendNext` and `Xcp_HandleTxConfirmation` take the DTO critical
-  section around the queue and `tx.state` transitions, closing the
-  cross-context races with `Xcp_DtoSendOrQueue`
+- Every `tx.state` transition (`Xcp_SendResponse`, `Xcp_SendPendingCto`,
+  `Xcp_HandleTxConfirmation`, `Xcp_DtoSendNext`) takes the DTO critical
+  section, and `Xcp_ReportDtoOverload` transmits with the lock released —
+  no lower-layer call runs inside the region any more
 - `Xcp_Init` primes `os_last_tick`, so the first timestamp no longer
   carries the full uptime
 - The event scheduler keeps `event_channel_counter` below the cycle
@@ -36,10 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was an empty stub)
 - The shipped event-channel configuration reports ODT consistency only;
   DAQ/EVENT consistency was advertised without being implemented
-- DAQ configuration is frozen while any list runs: `FREE_DAQ` and
-  `ALLOC_ODT`/`ALLOC_ODT_ENTRY` return `ERR_DAQ_ACTIVE`, and starting an
-  unconfigured list returns `ERR_DAQ_CONFIG`, so a running list's
-  absolute PID can no longer shift mid-stream
+- DAQ configuration is frozen while any list runs: `FREE_DAQ`,
+  `CLEAR_DAQ_LIST` and `ALLOC_ODT`/`ALLOC_ODT_ENTRY` return
+  `ERR_DAQ_ACTIVE`, and starting an unconfigured list returns
+  `ERR_DAQ_CONFIG`, so a running list's absolute PID can no longer shift
+  mid-stream; `SET_DAQ_LIST_MODE` on a live list still tunes the
+  prescaler but rejects moving the list to another event channel
 - Block mode is usable out of the box: `xcpgen` rejects
   `XcpBlockTransferEnabled=1` with `XcpMaxBs=0`, and the defaults are
   `MAX_BS=4` and `MIN_ST=1 ms` (one main-loop cycle per block frame)

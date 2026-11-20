@@ -17,21 +17,25 @@
 - 块下载按声明长度执行：`DOWNLOAD` byte 1 为整块长度，`DOWNLOAD_NEXT`
   byte 1 为剩余长度。从站对中间帧保持静默，只在耗尽整块的最后一帧应答，
   越界帧返回 `ERR_SEQUENCE`；普通 `DOWNLOAD` 与 `DOWNLOAD_MAX` 均为
-  单帧传输，不开启块
+  单帧传输，不开启块；被拒绝的帧不消耗块预算，无块传输构建上声明
+  超长在写内存之前即被拒绝
 - `MODIFY_BITS` 改为逐字节完成 32 位读改写，非对齐 `mta` 不再在
   Cortex-M0/M0+ 或启用 `UNALIGN_TRP` 的构建上触发异常；废弃的只读
   指针校验合并进唯一的写访问校验
-- `Xcp_DtoSendNext` 与 `Xcp_HandleTxConfirmation` 在队列与 `tx.state`
-  迁移时进入 DTO 临界区，消除与 `Xcp_DtoSendOrQueue` 的跨上下文竞争
+- 所有 `tx.state` 迁移（`Xcp_SendResponse`、`Xcp_SendPendingCto`、
+  `Xcp_HandleTxConfirmation`、`Xcp_DtoSendNext`）进入 DTO 临界区，
+  `Xcp_ReportDtoOverload` 在锁外发送——临界区内不再有任何下层调用
 - `Xcp_Init` 播种 `os_last_tick`，首个时间戳不再包含整个 uptime
 - 事件周期短于主函数周期时，调度器将 `event_channel_counter`
   限制在周期以内，不再无界增长
 - `Xcp_Init` 重置标定页选择（`Xcp_InitCalPage` 原为空实现）
 - 出厂事件通道配置只声明 ODT 一致性；此前声明了未实现的
   DAQ/EVENT 一致性
-- 任一 DAQ 列表运行时冻结配置：`FREE_DAQ` 与 `ALLOC_ODT`/
-  `ALLOC_ODT_ENTRY` 返回 `ERR_DAQ_ACTIVE`，启动未配置列表返回
-  `ERR_DAQ_CONFIG`；运行中列表的绝对 PID 不再中途漂移
+- 任一 DAQ 列表运行时冻结配置：`FREE_DAQ`、`CLEAR_DAQ_LIST` 与
+  `ALLOC_ODT`/`ALLOC_ODT_ENTRY` 返回 `ERR_DAQ_ACTIVE`，启动未配置
+  列表返回 `ERR_DAQ_CONFIG`；运行中列表的绝对 PID 不再中途漂移；
+  运行中 `SET_DAQ_LIST_MODE` 仍可调 prescaler，但迁移事件通道或
+  翻转方向返回 `ERR_DAQ_ACTIVE`
 - 块模式开箱可用：xcpgen 拒绝 `XcpBlockTransferEnabled=1` 且
   `XcpMaxBs=0`；默认值为 `MAX_BS=4`、`MIN_ST=1 ms`（每个块帧
   一个主循环周期）

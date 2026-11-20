@@ -541,6 +541,16 @@ sint16 Xcp_CmdSetDaqListMode(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_l
     {
         Xcp_DaqListType *daq = &ch->storage_ptr->daq_list[daq_list_no];
         uint8 evt_idx = Xcp_EventChannelIdx(ch, event_channel);
+        boolean new_stim = ((mode & XCP_DAQ_MODE_DIRECTION_STIM) != 0U);
+
+        /* A live list keeps its event routing: the prescaler may be tuned on
+           the fly, but moving the list would silently re-route acquisition. */
+        if ((daq->state == (uint8) XCP_DAQ_STATE_RUNNING)
+            && ((event_channel != daq->event_channel)
+                || (new_stim != (boolean)(daq->direction == XCP_DAQ_LIST_TYPE_STIM))))
+        {
+            return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
+        }
 
         if (evt_idx >= XCP_MAX_EVENT_CHANNEL)
         {
@@ -867,7 +877,7 @@ sint16 Xcp_CmdClearDaqList(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
 
     daq = &ch->storage_ptr->daq_list[daq_list_no];
 
-    if (daq->state == (uint8) XCP_DAQ_STATE_RUNNING)
+    if (Xcp_AnyDaqListRunning(ch) != FALSE)
     {
         return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
     }

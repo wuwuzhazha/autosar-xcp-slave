@@ -1791,19 +1791,10 @@ int main(void)
         CHECK("K3b state preserved after rejected start",
               g_xcp_channel.runtime_ptr->block_transfer_active == TRUE
               && g_xcp_channel.runtime_ptr->block_transfer_remaining == 100U);
-
-        r = Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_UPLOAD, 4U);
-        CHECK("K3c type-mismatch Validate -> E_NOT_OK", r == E_NOT_OK);
-        CHECK("K3d type-mismatch resets block state",
+        Xcp_CancelBlockTransfer(&g_xcp_channel);
+        CHECK("K3c cancel clears the block state",
               g_xcp_channel.runtime_ptr->block_transfer_active == FALSE
               && g_xcp_channel.runtime_ptr->block_transfer_remaining == 0U);
-
-        g_xcp_channel.runtime_ptr->block_transfer_active = TRUE;
-        g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_DOWNLOAD;
-        g_xcp_channel.runtime_ptr->block_transfer_remaining = 4U;
-        r = Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, 10U);
-        CHECK("K3e oversize data clamped, transfer completes",
-              (r == E_OK) && (g_xcp_channel.runtime_ptr->block_transfer_active == FALSE));
     }
 
     {
@@ -3375,6 +3366,144 @@ int main(void)
         xcp_settle();
     }
 #endif
+
+#if (XCP_DAQ_ENABLED == STD_ON) && (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
+    printf("-- K30. CLEAR_DAQ_LIST obeys the freeze (issue #14 item 1)\n");
+    {
+        uint8  dto[64];
+        uint32 dl;
+        uint16 pid_before = 0U;
+        uint16 pid_after  = 0U;
+
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x02\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x02", 5U, res);
+        (void)xcp_cmd((const uint8 *)"\xD4\x00\x01\x00\x02", 5U, res);
+        cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0;
+        (void)xcp_cmd(cmd, 6U, res);
+        cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
+        (void)xcp_cmd(cmd, 8U, res);
+        cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 1; cmd[3] = 0; cmd[4] = 2;
+        cmd[5] = 0; cmd[6] = 0; cmd[7] = 0;
+        (void)xcp_cmd(cmd, 8U, res);
+        (void)xcp_cmd((const uint8 *)"\xDE\x01\x01\x00", 4U, res);
+        xcp_drain_tx();
+
+        Xcp_Event(2U);
+        if (test_tx_pop(dto, &dl) > 0U) { pid_before = dto[0]; }
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        xcp_drain_tx();
+
+        l = xcp_cmd((const uint8 *)"\xE3\x00\x00\x00", 4U, res);
+        CHECK("K30a CLEAR_DAQ_LIST lower list while running -> ERR_DAQ_ACTIVE",
+              (l == 2U) && (res[1] == XCP_ERR_DAQ_ACTIVE));
+
+        xcp_drain_tx();
+        Xcp_Event(2U);
+        if (test_tx_pop(dto, &dl) > 0U) { pid_after = dto[0]; }
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        xcp_drain_tx();
+        CHECK("K30b abs_pid unchanged after the rejected CLEAR_DAQ_LIST",
+              (pid_after == pid_before) && (pid_before == 2U));
+
+        /* A live list keeps its event routing; the prescaler stays tunable. */
+        cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 1; cmd[3] = 0; cmd[4] = 1;
+        cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+        l = xcp_cmd(cmd, 8U, res);
+        CHECK("K30e moving a live list to another event -> ERR_DAQ_ACTIVE",
+              (l == 2U) && (res[1] == XCP_ERR_DAQ_ACTIVE));
+
+        l = xcp_cmd((const uint8 *)"\xDE\x00\x01\x00", 4U, res);
+        CHECK("K30c STOP list1 -> RES", (l == 2U) && (res[0] == XCP_PID_RES));
+        l = xcp_cmd((const uint8 *)"\xE3\x00\x00\x00", 4U, res);
+        CHECK("K30d CLEAR_DAQ_LIST after STOP -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
+        xcp_settle();
+    }
+#endif
+
+    printf("-- K31. block budget survives a denied write (issue #14 item 4a)\n");
+    {
+        /* test_ram is a 256-byte registered object; a declared 8-element
+           block at +250 fills the object with its 6-element payload and the
+           continuation crosses the registered edge, so the write gate denies
+           it while the first frame succeeded. */
+        g_xcp_channel.runtime_ptr->protection_status
+            &= (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_CAL_PAG);
+        cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+        memcpy(&cmd[4], &(uint32){RAM_ADDR + 250U}, 4U);
+        (void)xcp_cmd(cmd, 8U, res);
+        cmd[0] = 0xF0; cmd[1] = 8U; cmd[2] = 0x71; cmd[3] = 0x72; cmd[4] = 0x73;
+        cmd[5] = 0x74; cmd[6] = 0x75; cmd[7] = 0x76;
+        l = xcp_cmd(cmd, 8U, res);
+        CHECK("K31a block DOWNLOAD silent with remaining 2",
+              (l == 0U)
+              && (g_xcp_channel.runtime_ptr->block_transfer_active == TRUE)
+              && (g_xcp_channel.runtime_ptr->block_transfer_remaining == 2U));
+
+        cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0x77; cmd[3] = 0x78;
+        l = xcp_cmd(cmd, 4U, res);
+        CHECK("K31b denied continuation -> ERR_ACCESS_DENIED",
+              (l == 2U) && (res[1] == XCP_ERR_ACCESS_DENIED));
+        CHECK("K31c budget untouched after the denied frame",
+              (g_xcp_channel.runtime_ptr->block_transfer_active == TRUE)
+              && (g_xcp_channel.runtime_ptr->block_transfer_remaining == 2U));
+        CHECK("K31d first frame data intact",
+              (test_ram[250] == 0x71U) && (test_ram[255] == 0x76U));
+        Xcp_CancelBlockTransfer(&g_xcp_channel);
+    }
+
+    printf("-- K32. lower-layer transmits stay outside the DTO lock (issue #14 items 2-3)\n");
+    {
+        uint8 dto_payload[8] = {0x10U, 0x11U, 0x12U, 0x13U, 0x14U, 0x15U, 0x16U, 0x17U};
+        uint32 enter0;
+        uint32 exit0;
+
+        /* A queued DTO drained by ReportDtoOverload must be transmitted with
+           the lock released. */
+        g_xcp_channel.runtime_ptr->tx_mode = XCP_TX_ON;
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, dto_payload, 8U);
+        CHECK("K32a DTO queued behind a busy pipe",
+              g_xcp_channel.storage_ptr->dto_queue_count == 1U);
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        g_xcp_channel.runtime_ptr->tx.parked = FALSE;
+        test_schm_tx_under_lock = FALSE;
+        Xcp_ReportDtoOverload(&g_xcp_channel);
+        CHECK("K32b ReportDtoOverload transmits outside the critical section",
+              (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U));
+
+        /* SendResponse on an idle pipe transitions tx.state under the lock. */
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        g_xcp_channel.runtime_ptr->tx.parked = FALSE;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        (void)Xcp_SendResponse(dto_payload, 8U);
+        CHECK("K32c SendResponse transitions under the lock, sends outside",
+              ((test_schm_enter_count - enter0) == 1U)
+              && ((test_schm_exit_count - exit0) == 1U)
+              && (test_schm_tx_under_lock == FALSE));
+
+        /* A parked CTO replayed by SendPendingCto behaves the same way. */
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
+        (void)Xcp_SendResponse(dto_payload, 8U);
+        CHECK("K32d busy pipe parks the response",
+              g_xcp_channel.runtime_ptr->tx.parked == TRUE);
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        Xcp_SendPendingCto();
+        CHECK("K32e SendPendingCto transitions under the lock, sends outside",
+              ((test_schm_enter_count - enter0) == 1U)
+              && ((test_schm_exit_count - exit0) == 1U)
+              && (test_schm_tx_under_lock == FALSE));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        xcp_drain_tx();
+    }
 
     printf("================ %d passed, %d failed ================\n",
            pass_count, fail_count);

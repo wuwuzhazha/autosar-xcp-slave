@@ -445,18 +445,26 @@ sint16 Xcp_CmdDownload(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length,
     payload  = (uint8)(cmd_length - 2U);
     written  = (declared < payload) ? declared : payload;
 
-    ret = Xcp_WriteDownloadPayload(ch, cmd_data, written, res);
-
-    if (ret != (sint16)(1U))
-    {
-        return ret;
-    }
-
+    /* Decide the block-mode question before touching memory: a declaration
+       longer than the frame on a build without block transfer is rejected
+       with nothing written (issue #14 item 4b). */
     block = Xcp_ArmDownloadBlock(ch, (uint32)(declared - written));
 
     if (block < (sint16)(0))
     {
         return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
+    }
+
+    ret = Xcp_WriteDownloadPayload(ch, cmd_data, written, res);
+
+    if (ret != (sint16)(1U))
+    {
+        if (block > (sint16)(0))
+        {
+            /* A failed frame must not leave a part-consumed block behind. */
+            Xcp_CancelBlockTransfer(ch);
+        }
+        return ret;
     }
 
     return (block > (sint16)(0)) ? (sint16)(0) : ret;
@@ -468,6 +476,7 @@ sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     uint8  declared;
     uint8  payload;
     uint8  written;
+    uint32 remaining;
     sint16 ret;
 
     /* Byte 1 is the remaining block length including this frame's elements. */
@@ -481,12 +490,9 @@ sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
 
-    if ((uint32)declared != ch->runtime_ptr->block_transfer_remaining)
-    {
-        return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
-    }
+    remaining = ch->runtime_ptr->block_transfer_remaining;
 
-    if (Xcp_ValidateBlockSequence(&g_xcp_channel, XCP_BLOCK_TYPE_DOWNLOAD, written) != E_OK)
+    if ((uint32)declared != remaining)
     {
         return Xcp_ResErr(res, XCP_ERR_SEQUENCE);
     }
@@ -498,7 +504,18 @@ sint16 Xcp_CmdDownloadNext(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
         return ret;
     }
 
-    return (Xcp_IsBlockTransferActive(ch) != FALSE) ? (sint16)(0) : ret;
+    /* Commit the budget only after the payload is written, so a denied frame
+       leaves the block state untouched (issue #14 item 4a). */
+    remaining -= written;
+
+    if (remaining == 0U)
+    {
+        Xcp_InitBlockTransfer(ch);
+        return ret;
+    }
+
+    ch->runtime_ptr->block_transfer_remaining = remaining;
+    return (sint16)(0);
 #else
     (void)ch; (void)cmd_data; (void)cmd_length;
     return Xcp_ResErr(res, XCP_ERR_CMD_UNKNOWN);
@@ -788,42 +805,6 @@ Std_ReturnType Xcp_StartBlockTransfer(Xcp_Channel *ch, uint8 block_type, uint32 
     {
         ch->runtime_ptr->block_transfer_remaining = 0U;
         ch->runtime_ptr->block_transfer_active = FALSE;
-    }
-
-    return E_OK;
-}
-
-Std_ReturnType Xcp_ValidateBlockSequence(Xcp_Channel *ch, uint8 block_type, uint32 data_size)
-{
-    if (ch->runtime_ptr == NULL)
-    {
-        return E_NOT_OK;
-    }
-
-    if (ch->runtime_ptr->block_transfer_active == FALSE)
-    {
-        return E_NOT_OK;
-    }
-
-    if (ch->runtime_ptr->block_transfer_type != block_type)
-    {
-        Xcp_InitBlockTransfer(ch);
-        return E_NOT_OK;
-    }
-
-    if (ch->runtime_ptr->block_transfer_remaining >= data_size)
-    {
-        ch->runtime_ptr->block_transfer_remaining -= data_size;
-    }
-    else
-    {
-        ch->runtime_ptr->block_transfer_remaining = 0U;
-    }
-
-    if (ch->runtime_ptr->block_transfer_remaining == 0U)
-    {
-        ch->runtime_ptr->block_transfer_active = FALSE;
-        ch->runtime_ptr->block_transfer_type = XCP_BLOCK_TYPE_NONE;
     }
 
     return E_OK;
