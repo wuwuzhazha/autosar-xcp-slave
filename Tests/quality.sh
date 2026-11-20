@@ -102,10 +102,13 @@ arm() {
 
 cppcheck_gate() {
     need cppcheck
+    # Define the critical-section hooks empty so older cppcheck parsers do not
+    # reject the function-like macros from Gen/<profile>/Xcp_Cfg.h.
     cppcheck --std=c99 --enable=warning,performance,portability \
         --error-exitcode=1 --inline-suppr \
         --suppress=missingIncludeSystem --suppress=unusedFunction \
         --suppress=normalCheckLevelMaxBranches \
+        -D'XCP_DTO_ENTER_CRITICAL()=' -D'XCP_DTO_EXIT_CRITICAL()=' \
         -IXcp -ITests -ITests/stubs -IGen/can \
         --include=Tests/test_config.h Xcp
 }
