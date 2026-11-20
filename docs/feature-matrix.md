@@ -112,11 +112,20 @@ described in [docs/testing.md](testing.md).
 
 `XcpBlockTransferEnabled=1` enables both directions:
 
-- **Master block download** — `DOWNLOAD_NEXT` / `DOWNLOAD_MAX`
+- **Master block download** — `DOWNLOAD` declares the total block length in
+  byte 1; the payload may be shorter than the declaration. `DOWNLOAD_NEXT`
+  carries the *remaining* block length (including the current frame's
+  elements) in byte 1. The slave stays silent for intermediate frames and
+  answers only the frame that exhausts the block; a frame that claims more
+  than the remaining length is rejected with `ERR_SEQUENCE`. A plain
+  `DOWNLOAD` (declared length equals payload) is a single-frame transfer and
+  does not open a block. `DOWNLOAD_MAX` is likewise single-frame.
 - **Slave block upload** — one `UPLOAD` with more than `MAX_CTO-1` elements
   streams multiple `RES` packets; CONNECT advertises `SLAVE_BLOCK_MODE`.
   `GET_COMM_MODE_INFO` advertises `MASTER_BLOCK_MODE` and the configured
-  `MAX_BS` / `MIN_ST`.
+  `MAX_BS` / `MIN_ST`. `xcpgen` rejects `XcpBlockTransferEnabled=1` with
+  `XcpMaxBs=0` (the "block mode unsupported" value); the default `MIN_ST`
+  is 1 ms so a main-loop slave can drain one frame per cycle.
 
 ## Declared non-goals
 

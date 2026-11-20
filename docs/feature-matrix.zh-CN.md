@@ -113,10 +113,16 @@
 
 `XcpBlockTransferEnabled=1` 同时启用两个方向：
 
-- **主站块下载**——`DOWNLOAD_NEXT` / `DOWNLOAD_MAX`
+- **主站块下载**——`DOWNLOAD` 在 byte 1 声明整块长度，本帧载荷可以短于声明值；
+  `DOWNLOAD_NEXT` 在 byte 1 携带**剩余**块长度（含本帧元素）。从站对中间帧
+  保持静默，只在耗尽整块的最后一帧应答；声明值超过剩余长度的帧返回
+  `ERR_SEQUENCE`。普通 `DOWNLOAD`（声明值等于载荷）是单帧传输，不开启块。
+  `DOWNLOAD_MAX` 同样是单帧命令。
 - **从站块上传**——单个 `UPLOAD` 请求超过 `MAX_CTO-1` 个元素时，从站连续发送
   多个 `RES` 包；CONNECT 通告 `SLAVE_BLOCK_MODE`。`GET_COMM_MODE_INFO`
-  通告 `MASTER_BLOCK_MODE` 及配置的 `MAX_BS` / `MIN_ST`。
+  通告 `MASTER_BLOCK_MODE` 及配置的 `MAX_BS` / `MIN_ST`。xcpgen 拒绝
+  `XcpBlockTransferEnabled=1` 且 `XcpMaxBs=0`（"不支持块模式"值）的配置；
+  `MIN_ST` 默认 1 ms，使主循环型从站每个周期处理一帧。
 
 ## 声明的非目标
 
