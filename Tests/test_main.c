@@ -687,6 +687,28 @@ int main(void)
     CHECK("C8b DOWNLOAD_NEXT wrote C0 DE at +43",
           (test_ram[43] == 0xC0U) && (test_ram[44] == 0xDEU));
 
+    /* UPLOAD cancels the armed download block; DOWNLOAD_MAX alone must re-arm
+       it so a following DOWNLOAD_NEXT is accepted (issue #9 item 1). */
+    cmd[0] = 0xF4; cmd[1] = 1U; cmd[2] = 0; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){RAM_ADDR + 80U}, 4U);
+    l = xcp_cmd(cmd, 8U, res);
+    CHECK("C8d UPLOAD cancels download block", (l >= 1U) && (res[0] == XCP_PID_RES));
+
+    cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){RAM_ADDR + 84U}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    cmd[0] = 0xEE; cmd[1] = 0xA1; cmd[2] = 0xA2; cmd[3] = 0xA3; cmd[4] = 0xA4;
+    cmd[5] = 0xA5; cmd[6] = 0xA6; cmd[7] = 0xA7;
+    l = xcp_cmd(cmd, 8U, res);
+    CHECK("C8e DOWNLOAD_MAX after cancel -> RES",
+          (l == 1U) && (res[0] == XCP_PID_RES)
+          && (test_ram[84] == 0xA1U) && (test_ram[90] == 0xA7U));
+    cmd[0] = 0xEF; cmd[1] = 2U; cmd[2] = 0xB1; cmd[3] = 0xB2;
+    l = xcp_cmd(cmd, 4U, res);
+    CHECK("C8f DOWNLOAD_NEXT after MAX alone -> RES",
+          (l == 1U) && (res[0] == XCP_PID_RES)
+          && (test_ram[91] == 0xB1U) && (test_ram[92] == 0xB2U));
+
     cmd[0] = 0xED; cmd[1] = 1U; cmd[2] = 0; cmd[3] = 0;
     memcpy(&cmd[4], &(uint32){RAM_ADDR + 60U}, 4U);
     l = xcp_cmd(cmd, 8U, res);
@@ -811,11 +833,11 @@ int main(void)
     CHECK("E3 GET_DAQ_EVENT_INFO ch0: DAQ|STIM, ODT consistency, 10 x 1ms",
           frame_is(res, l, (const uint8[]){ 0xFF, 0x0C, 0xFF, 0x00, 10U, 0x06, 0x00 }, 7U));
     l = xcp_cmd((const uint8 *)"\xD7\x00\x02\x00", 4U, res);
-    CHECK("E3a GET_DAQ_EVENT_INFO ch2: DAQ only, DAQ consistency",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x44, 0xFF, 0x00, 100U, 0x06, 0x02 }, 7U));
+    CHECK("E3a GET_DAQ_EVENT_INFO ch2: DAQ only, ODT consistency",
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x04, 0xFF, 0x00, 100U, 0x06, 0x02 }, 7U));
     l = xcp_cmd((const uint8 *)"\xD7\x00\x03\x00", 4U, res);
-    CHECK("E3b GET_DAQ_EVENT_INFO ch3: STIM only, EVENT consistency",
-          frame_is(res, l, (const uint8[]){ 0xFF, 0x88, 0xFF, 0x00, 0x00, 0x06, 0x03 }, 7U));
+    CHECK("E3b GET_DAQ_EVENT_INFO ch3: STIM only, ODT consistency",
+          frame_is(res, l, (const uint8[]){ 0xFF, 0x08, 0xFF, 0x00, 0x00, 0x06, 0x03 }, 7U));
 
     l = xcp_cmd((const uint8 *)"\xD6", 1U, res);
     CHECK("E4 FREE_DAQ -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
