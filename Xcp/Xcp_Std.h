@@ -48,8 +48,6 @@ void Xcp_InitBlockTransfer(Xcp_Channel *ch);
 
 Std_ReturnType Xcp_StartBlockTransfer(Xcp_Channel *ch, uint8 block_type, uint32 total_size, uint32 first_packet_size);
 
-Std_ReturnType Xcp_ValidateBlockSequence(Xcp_Channel *ch, uint8 block_type, uint32 data_size);
-
 void Xcp_CancelBlockTransfer(Xcp_Channel *ch);
 
 boolean Xcp_IsBlockTransferActive(Xcp_Channel *ch);
