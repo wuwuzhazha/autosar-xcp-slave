@@ -142,6 +142,10 @@ void Xcp_Init(const Xcp_ConfigType *Xcp_ConfigPtr)
     g_xcp_channel.runtime_ptr->tx_mode  = XCP_TX_ON;
     g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
 
+#if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP) && (XCP_TIMESTAMP_SOURCE_OS == STD_ON)
+    (void)GetCounterValue(XCP_OS_COUNTER, &g_xcp_channel.runtime_ptr->os_last_tick);
+#endif
+
 #if (XCP_ON_CAN_ENABLED == STD_ON) && (XCP_DEV_ERROR_DETECT == STD_ON)
 
     if (g_xcp_channel.config_ptr->xcp_rx_pdu_id == g_xcp_channel.config_ptr->xcp_tx_pdu_id)
@@ -411,7 +415,7 @@ void Xcp_MainFunction(void)
             {
                 Xcp_Event(event_cfg->event_channel_number);
 
-                g_xcp_channel.runtime_ptr->event_channel_counter[i] -= cycle_ms;
+                g_xcp_channel.runtime_ptr->event_channel_counter[i] %= cycle_ms;
             }
         }
     }
