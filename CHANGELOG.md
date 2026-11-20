@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advisory MISRA report from cppcheck in `Tests/quality.sh`; CI uploads it as
   an artifact. It is not a compliance gate.
 
+### Changed
+- GitHub Actions `checkout`, `setup-python` and `upload-artifact` updated to
+  current Node 24 releases
+
 ### Fixed
 - Starting a block UPLOAD now cancels any block transfer left active by a
   previous download, instead of returning `ERR_SEQUENCE`
