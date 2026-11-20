@@ -117,3 +117,11 @@ jobs:
             Tests/integration/.build/coverage/coverage.xml
             Tests/integration/.build/coverage/coverage*.html
           if-no-files-found: error
+
+      - name: Upload MISRA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: misra-report
+          path: Tests/integration/.build/quality/misra/misra.txt
+          if-no-files-found: warn

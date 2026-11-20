@@ -123,11 +123,13 @@ DAQ/STIM 配置和 Flash 编程。虚拟总线不建模 CAN 位时序；方法�
 | 覆盖率 | `Tests/quality.sh coverage` | `Xcp/` 行覆盖 ≥80%、函数覆盖 ≥90%；XML/HTML 位于 `Tests/integration/.build/coverage` |
 | ARM 交叉编译 | `Tests/quality.sh arm` | Cortex-M0 与 Cortex-M4 32 位构建在 `-Werror` 下通过 |
 | 静态分析 | `Tests/quality.sh cppcheck` | cppcheck warning/performance/portability 门禁 |
+| MISRA 报告 | `Tests/quality.sh misra` | cppcheck MISRA 提示性结果，位于 `Tests/integration/.build/quality/misra` |
 
-`Tests/quality.sh all` 依次运行全部门禁。它需要 `clang`、`gcc`、`gcovr`、
-`arm-none-eabi-gcc` 和 `cppcheck`；CI 会显式安装。项目不声称 MISRA 合规：
-cppcheck 的 MISRA addon 与经过评审的 deviation 列表是独立的合规工作，
-不是这个脚本能诚实地一键打开的门禁。
+`Tests/quality.sh all` 依次运行全部阻断门禁，并生成提示性 MISRA 报告。
+它需要 `clang`、`gcc`、`gcovr`、`arm-none-eabi-gcc` 和 `cppcheck`；
+CI 会显式安装。MISRA 报告不构成合规声明：它使用 cppcheck addon，抑制了
+依赖配置的消息，仓库也没有维护经过评审的 deviation 列表。应把报告视为
+候选问题来源，而不是通过/失败门禁。
 
 ## CI
 
@@ -138,7 +140,7 @@ cppcheck 的 MISRA addon 与经过评审的 deviation 列表是独立的合规�
 - pyxcp 冒烟、功能与特性变体套件
 - pyxcp 性能（`XCP_PERF_SCALE=0.5`），JSON 报告作为构建产物上传
 - Ubuntu `quality` job：clang 主机 + 变体矩阵、ASan/UBSan、覆盖率门禁、
-  Cortex-M0/M4 交叉编译和 cppcheck
+  Cortex-M0/M4 交叉编译和 cppcheck；提示性 MISRA 报告作为构建产物上传
 
 实时状态见 README 的 CI 徽章。文档不固定断言数量与耗时，因为它们随每次
 提交变化；以 workflow 运行结果为准。

@@ -135,11 +135,14 @@ the default CAN profile's C paths.
 | Coverage | `Tests/quality.sh coverage` | line ≥80% and functions ≥90% for `Xcp/`; XML/HTML under `Tests/integration/.build/coverage` |
 | ARM cross-compile | `Tests/quality.sh arm` | Cortex-M0 and Cortex-M4 32-bit builds compile with `-Werror` |
 | Static analysis | `Tests/quality.sh cppcheck` | cppcheck warning/performance/portability gate |
+| MISRA report | `Tests/quality.sh misra` | advisory cppcheck MISRA findings under `Tests/integration/.build/quality/misra` |
 
-`Tests/quality.sh all` runs every gate. It requires `clang`, `gcc`, `gcovr`,
-`arm-none-eabi-gcc` and `cppcheck`; CI installs them explicitly. MISRA is not
-claimed: cppcheck's MISRA addon and a reviewed deviation list are a separate
-compliance track, not a switch that this runner can honestly flip.
+`Tests/quality.sh all` runs every blocking gate plus the advisory MISRA report.
+It requires `clang`, `gcc`, `gcovr`, `arm-none-eabi-gcc` and `cppcheck`; CI
+installs them explicitly. The MISRA report is not a compliance claim: it uses
+cppcheck's addon with configuration-dependent messages suppressed, and the
+repository does not maintain a reviewed deviation list. Treat it as a source
+of candidate findings, not as a pass/fail gate.
 
 ## CI
 
@@ -151,7 +154,8 @@ compliance track, not a switch that this runner can honestly flip.
 - pyxcp performance at `XCP_PERF_SCALE=0.5`; the JSON report is uploaded as a
   build artifact
 - an Ubuntu `quality` job: clang host + variant matrix, ASan/UBSan, coverage
-  gates, Cortex-M0/M4 cross-compile and cppcheck
+  gates, Cortex-M0/M4 cross-compile and cppcheck; the advisory MISRA report is
+  uploaded as an artifact
 
 Live status is the CI badge in the README. Pass counts and timings are
 deliberately not pinned in documentation because they change with every

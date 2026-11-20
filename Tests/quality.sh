@@ -24,7 +24,7 @@ CFLAGS=(
 )
 
 usage() {
-    echo "usage: $0 [host|matrix|sanitize|coverage|arm|cppcheck|all]" >&2
+    echo "usage: $0 [host|matrix|sanitize|coverage|arm|cppcheck|misra|all]" >&2
 }
 
 need() {
@@ -113,6 +113,25 @@ cppcheck_gate() {
         --include=Tests/test_config.h Xcp
 }
 
+misra_report() {
+    need cppcheck
+    local raw="$BUILD/misra/cppcheck.txt"
+    local report="$BUILD/misra/misra.txt"
+    mkdir -p "$(dirname "$report")"
+    # Advisory report: no --error-exitcode. Configuration-dependent messages are
+    # suppressed because the repository does not carry a reviewed MISRA config.
+    cppcheck --std=c99 --enable=warning,style,performance,portability \
+        --addon=misra --inline-suppr \
+        --suppress=missingIncludeSystem --suppress=unusedFunction \
+        --suppress=normalCheckLevelMaxBranches --suppress=misra-config \
+        -D'XCP_DTO_ENTER_CRITICAL()=' -D'XCP_DTO_EXIT_CRITICAL()=' \
+        -IXcp -ITests -ITests/stubs -IGen/can \
+        --include=Tests/test_config.h \
+        --output-file="$raw" Xcp
+    grep 'misra-c2012' "$raw" > "$report" || true
+    echo "misra: advisory report: $report ($(wc -l < "$report") findings)"
+}
+
 case "${1:-all}" in
     host) host ;;
     matrix) matrix ;;
@@ -120,6 +139,7 @@ case "${1:-all}" in
     coverage) coverage ;;
     arm) arm ;;
     cppcheck) cppcheck_gate ;;
+    misra) misra_report ;;
     all)
         CC=clang
         host
@@ -128,6 +148,7 @@ case "${1:-all}" in
         coverage
         arm
         cppcheck_gate
+        misra_report
         ;;
     *) usage; exit 2 ;;
 esac
