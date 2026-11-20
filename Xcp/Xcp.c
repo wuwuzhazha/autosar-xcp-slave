@@ -231,11 +231,25 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
 {
     Xcp_Channel     *ch = &g_xcp_channel;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
+    Xcp_TxStateType  confirmed = XCP_TX_IDLE;
+
+    XCP_DTO_ENTER_CRITICAL();
 
     if (runtime->tx.state == XCP_TX_DTO)
     {
         runtime->tx.state = XCP_TX_IDLE;
+        confirmed = XCP_TX_DTO;
+    }
+    else if (runtime->tx.state == XCP_TX_CTO)
+    {
+        runtime->tx.state = XCP_TX_IDLE;
+        confirmed = XCP_TX_CTO;
+    }
 
+    XCP_DTO_EXIT_CRITICAL();
+
+    if (confirmed == XCP_TX_DTO)
+    {
         if (result == E_OK)
         {
 
@@ -268,10 +282,8 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         return;
     }
 
-    if (runtime->tx.state == XCP_TX_CTO)
+    if (confirmed == XCP_TX_CTO)
     {
-        runtime->tx.state = XCP_TX_IDLE;
-
         if (result == E_OK)
         {
             runtime->tx.last_error = 0U;
@@ -298,10 +310,7 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
             Xcp_DtoSendNext(&g_xcp_channel);
 #endif
         }
-
-        return;
     }
-
 }
 
 Std_ReturnType Xcp_HandleTriggerTransmit(PduInfoType *pdu_info_ptr)
