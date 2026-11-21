@@ -44,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ERR_DAQ_ACTIVE`, and starting an unconfigured list returns
   `ERR_DAQ_CONFIG`, so a running list's absolute PID can no longer shift
   mid-stream; `SET_DAQ_LIST_MODE` on a live list still tunes the
-  prescaler but rejects moving the list to another event channel
+  prescaler but rejects moving the list to another event channel,
+  flipping its direction or toggling its timestamp bit, all of which
+  would reshape the running stream
 - Block mode is usable out of the box: `xcpgen` rejects
   `XcpBlockTransferEnabled=1` with `XcpMaxBs=0`, and the defaults are
   `MAX_BS=4` and `MIN_ST=1 ms` (one main-loop cycle per block frame)

@@ -50,8 +50,6 @@ Std_ReturnType Xcp_StartBlockTransfer(Xcp_Channel *ch, uint8 block_type, uint32 
 
 void Xcp_CancelBlockTransfer(Xcp_Channel *ch);
 
-boolean Xcp_IsBlockTransferActive(Xcp_Channel *ch);
-
 boolean Xcp_IsBlockUploadActive(Xcp_Channel *ch);
 
 uint32 Xcp_GetBlockTransferRemaining(Xcp_Channel *ch);
