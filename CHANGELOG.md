@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Host regression checks for every fix below; each was confirmed to fail
   against the unfixed sources
+- K33i pins that confirming a CTO resumes a queued ODT burst in the same
+  confirmation, instead of leaving it until the next main-function period
 - pyxcp `push()` end-to-end test covering a multi-block download
 
 ### Fixed
