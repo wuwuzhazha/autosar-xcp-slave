@@ -160,11 +160,6 @@ void Xcp_TransmitDto(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no)
 
     local_buffer_length = buffer_idx;
 
-    if (local_buffer_length < XCP_MAX_DTO)
-    {
-        local_buffer_length = XCP_MAX_DTO;
-    }
-
     Xcp_DtoSendOrQueue(&g_xcp_channel, local_dto_buffer, local_buffer_length);
 }
 
@@ -210,11 +205,9 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length
     if (storage->dto_queue_count < (uint8) XCP_DTO_QUEUE_DEPTH)
     {
         uint8 head = storage->dto_queue_head;
-        (void) memcpy(storage->dto_queue[head], dto_data, (dto_length < (uint8) XCP_MAX_DTO) ? dto_length : (uint8) XCP_MAX_DTO);
-        if (dto_length < (uint8) XCP_MAX_DTO)
-        {
-            (void) memset(&storage->dto_queue[head][dto_length], 0x00, (uint8) XCP_MAX_DTO - dto_length);
-        }
+
+        (void) memcpy(storage->dto_queue[head], dto_data, dto_length);
+        storage->dto_queue_len[head] = dto_length;
         storage->dto_queue_head = (head + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
         storage->dto_queue_count++;
     }
@@ -237,6 +230,7 @@ void Xcp_DtoSendNext(Xcp_Channel *ch)
 
     uint8  dto_copy[XCP_MAX_DTO];
     uint8  tail = 0U;
+    uint8  dto_len = 0U;
     boolean send_now = FALSE;
 
     XCP_DTO_ENTER_CRITICAL();
@@ -248,7 +242,8 @@ void Xcp_DtoSendNext(Xcp_Channel *ch)
         && (storage->dto_queue_count > 0U))
     {
         tail = storage->dto_queue_tail;
-        (void)memcpy(dto_copy, storage->dto_queue[tail], (uint8) XCP_MAX_DTO);
+        dto_len = storage->dto_queue_len[tail];
+        (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
         storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
         storage->dto_queue_count--;
 
@@ -261,7 +256,7 @@ void Xcp_DtoSendNext(Xcp_Channel *ch)
 
     if (send_now != FALSE)
     {
-        if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) == E_OK)
+        if (Xcp_Tl_SendDto(dto_copy, dto_len) == E_OK)
         {
             return;
         }
@@ -282,6 +277,7 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
     uint8            dto_copy[XCP_MAX_DTO];
     uint8            tail = 0U;
+    uint8            dto_len = 0U;
     boolean          send_parked = FALSE;
     boolean          send_dto = FALSE;
 
@@ -319,7 +315,8 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
         else if (storage->dto_queue_count > 0U)
         {
             tail = storage->dto_queue_tail;
-            (void)memcpy(dto_copy, storage->dto_queue[tail], (uint8) XCP_MAX_DTO);
+            dto_len = storage->dto_queue_len[tail];
+            (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
             storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
             storage->dto_queue_count--;
 
@@ -337,7 +334,7 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
     }
     else if (send_dto != FALSE)
     {
-        if (Xcp_Tl_SendDto(dto_copy, (uint8) XCP_MAX_DTO) != E_OK)
+        if (Xcp_Tl_SendDto(dto_copy, dto_len) != E_OK)
         {
             XCP_DTO_ENTER_CRITICAL();
             runtime->tx.dto_latch = FALSE;

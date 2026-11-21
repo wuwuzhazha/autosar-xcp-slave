@@ -63,6 +63,12 @@ to publish the ID string address.
   actually fires (e.g. "new cam sync"), or rely on the periodic scheduler.
 - `Xcp_DtoSendOrQueue` is the **single** DTO egress — never call `Xcp_Tl_SendDto`
   yourself; always go through it so the queue + busy-watchdog + overload event work.
+  The frame length is the ODT's own length; the transport pads its DLC.
+- `XcpDtoQueueDepth` must be at least `XcpOdtCount`. A busy mailbox queues
+  every ODT of the event, and one frame already on the wire does not occupy
+  a slot. With interleaved mode off, a parked command response is sent
+  before any queued DTO: the slave may not emit a DTO between a command and
+  its response.
 
 ## Cal Page segments
 

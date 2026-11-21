@@ -159,6 +159,8 @@ def main():
              ("XcpInterleavedModeEnabled=1", "XcpBlockTransferEnabled=0")),
             ("block w/ maxbs 0", "requires XcpMaxBs>0",
              ("XcpBlockTransferEnabled=1", "XcpMaxBs=0")),
+            ("queue shorter than burst", "must be >= XcpOdtCount",
+             ("XcpDtoQueueDepth=1",)),
             ("enum bogus", "not in", ("XcpTimestampType=BOGUS",)),
         ]
         for name, needle, sets in NEG:
