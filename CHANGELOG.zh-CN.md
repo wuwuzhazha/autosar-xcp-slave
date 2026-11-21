@@ -34,8 +34,9 @@
 - 任一 DAQ 列表运行时冻结配置：`FREE_DAQ`、`CLEAR_DAQ_LIST` 与
   `ALLOC_ODT`/`ALLOC_ODT_ENTRY` 返回 `ERR_DAQ_ACTIVE`，启动未配置
   列表返回 `ERR_DAQ_CONFIG`；运行中列表的绝对 PID 不再中途漂移；
-  运行中 `SET_DAQ_LIST_MODE` 仍可调 prescaler，但迁移事件通道或
-  翻转方向返回 `ERR_DAQ_ACTIVE`
+  运行中 `SET_DAQ_LIST_MODE` 仍可调 prescaler，但迁移事件通道、
+  翻转方向或切换时间戳位返回 `ERR_DAQ_ACTIVE`——这些都会改变
+  运行中的帧布局
 - 块模式开箱可用：xcpgen 拒绝 `XcpBlockTransferEnabled=1` 且
   `XcpMaxBs=0`；默认值为 `MAX_BS=4`、`MIN_ST=1 ms`（每个块帧
   一个主循环周期）

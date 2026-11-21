@@ -3419,6 +3419,54 @@ int main(void)
         CHECK("K30c STOP list1 -> RES", (l == 2U) && (res[0] == XCP_PID_RES));
         l = xcp_cmd((const uint8 *)"\xE3\x00\x00\x00", 4U, res);
         CHECK("K30d CLEAR_DAQ_LIST after STOP -> RES", (l == 1U) && (res[0] == XCP_PID_RES));
+
+#if (XCP_TIMESTAMP_TYPE != XCP_NO_TIME_STAMP)
+        /* Flipping the timestamp bit on a live list moves ODT0's payload by
+           the timestamp size (issue #16 item 1). */
+        (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x01", 5U, res);
+        (void)xcp_cmd((const uint8 *)"\xD3\x00\x00\x00\x00\x01", 6U, res);
+        cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0;
+        (void)xcp_cmd(cmd, 6U, res);
+        test_ram_var32 = 0xA5A5F00DUL;
+        cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
+        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
+        (void)xcp_cmd(cmd, 8U, res);
+        cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 0; cmd[3] = 0; cmd[4] = 2;
+        cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+        (void)xcp_cmd(cmd, 8U, res);
+        (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
+        xcp_drain_tx();
+        Xcp_Event(2U);
+        {
+            uint8  dto[64];
+            uint32 dl;
+            boolean no_ts = (test_tx_pop(dto, &dl) > 0U)
+                            && (dto[0] == 0U) && (dto[1] == 0x0DU) && (dto[2] == 0xF0U);
+            CHECK("K30f1 live list DTO without timestamp: payload at [1]", no_ts);
+        }
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        xcp_drain_tx();
+
+        cmd[0] = 0xE0; cmd[1] = 0x10; cmd[2] = 0; cmd[3] = 0; cmd[4] = 2;
+        cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+        l = xcp_cmd(cmd, 8U, res);
+        CHECK("K30f2 toggling the timestamp bit while running -> ERR_DAQ_ACTIVE",
+              (l == 2U) && (res[1] == XCP_ERR_DAQ_ACTIVE));
+
+        xcp_drain_tx();
+        Xcp_Event(2U);
+        {
+            uint8  dto[64];
+            uint32 dl;
+            boolean stable = (test_tx_pop(dto, &dl) > 0U)
+                             && (dto[0] == 0U) && (dto[1] == 0x0DU) && (dto[2] == 0xF0U)
+                             && (dto[5] == 0x00U);
+            CHECK("K30f3 DTO layout unchanged after the rejected flip", stable);
+        }
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        xcp_drain_tx();
+        (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
+#endif
         xcp_settle();
     }
 #endif

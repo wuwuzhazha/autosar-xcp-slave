@@ -71,8 +71,9 @@ described in [docs/testing.md](testing.md).
 `CLEAR_DAQ_LIST` return `ERR_DAQ_ACTIVE`, and starting a list without
 ODTs returns `ERR_DAQ_CONFIG` — the absolute-PID layout cannot change
 under a running acquisition. `SET_DAQ_LIST_MODE` on a live list accepts
-prescaler/mode-bit updates but rejects moving the list to another event
-channel or flipping its direction with `ERR_DAQ_ACTIVE`.
+prescaler updates but rejects moving the list to another event channel,
+flipping its direction, or toggling its timestamp bit with
+`ERR_DAQ_ACTIVE` — those change the frame layout mid-stream.
 
 ## Flash programming (PGM)
 
