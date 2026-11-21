@@ -3459,8 +3459,9 @@ int main(void)
             uint8  dto[64];
             uint32 dl;
             boolean stable = (test_tx_pop(dto, &dl) > 0U)
+                             && (dl >= 5U)
                              && (dto[0] == 0U) && (dto[1] == 0x0DU) && (dto[2] == 0xF0U)
-                             && (dto[5] == 0x00U);
+                             && (dto[3] == 0xA5U) && (dto[4] == 0xA5U);
             CHECK("K30f3 DTO layout unchanged after the rejected flip", stable);
         }
         Xcp_Tl_TxConfirmation(0U, E_OK);
@@ -3552,6 +3553,130 @@ int main(void)
         Xcp_Tl_TxConfirmation(0U, E_OK);
         xcp_drain_tx();
     }
+
+#if (XCP_DAQ_ENABLED == STD_ON) && (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
+    printf("-- K33. DTO wire length and CTO insertion (issue #18)\n");
+    {
+        uint8  dto[64];
+        uint32 dl;
+        uint8  odt;
+        uint16 ei;
+        const uint32 real_len = (uint32)XCP_TST_ID_LEN + 1U;
+
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
+        (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
+        xcp_pump(8U);
+        xcp_settle();
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x03", 5U, res);
+        test_ram[0] = 0x5AU;
+        for (odt = 0U; odt < 3U; odt++)
+        {
+            cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = odt; cmd[5] = 1;
+            (void)xcp_cmd(cmd, 6U, res);
+            cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = odt; cmd[5] = 0;
+            (void)xcp_cmd(cmd, 6U, res);
+            cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 1; cmd[3] = 0;
+            memcpy(&cmd[4], &(uint32){RAM_ADDR}, 4U);
+            (void)xcp_cmd(cmd, 8U, res);
+        }
+        cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 0; cmd[3] = 0; cmd[4] = 2;
+        cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+        (void)xcp_cmd(cmd, 8U, res);
+        (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
+        xcp_pump(4U);
+        xcp_settle();
+
+        Xcp_Event(2U);
+        CHECK("K33a immediate DTO uses the ODT length, not MAX_DTO",
+              (test_tx_pop(dto, &dl) > 0U) && (dl == real_len)
+              && (dto[0] == 0U) && (dto[1] == 0x5AU));
+        xcp_pump(8U);
+        xcp_settle();
+
+        test_sim_dto_inflight();
+        Xcp_Event(2U);
+        CHECK("K33b a busy pipe queues the whole 3-ODT burst",
+              g_xcp_channel.storage_ptr->dto_queue_count == 3U);
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        CHECK("K33c a queued DTO is drained at the ODT length",
+              (test_tx_pop(dto, &dl) > 0U) && (dl == real_len) && (dto[0] == 0U));
+        xcp_pump(8U);
+        xcp_settle();
+
+        /* Non-interleaved mode must answer the command before sending any
+           further DTO. The confirmation of the in-flight frame therefore
+           emits the parked CTO while the burst is still queued. */
+        for (ei = 0U; ei < XCP_MAX_EVENT_CHANNEL; ei++)
+        {
+            g_xcp_channel.runtime_ptr->event_channel_counter[ei] = 0U;
+        }
+        test_sim_dto_inflight();
+        Xcp_Event(2U);
+        xcp_inject((const uint8 *)"\xFD", 1U);
+        Xcp_MainFunction();
+        CHECK("K33d GET_STATUS parks while the burst is queued",
+              (g_xcp_channel.runtime_ptr->tx.parked == TRUE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 3U));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K33e the parked CTO goes out before the queued ODTs",
+              (test_tx_pop(dto, &dl) > 0U) && (dto[0] == XCP_PID_RES)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 3U));
+        xcp_pump(8U);
+        xcp_settle();
+
+        (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
+        cmd[0] = 0xD4; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = (uint8)XCP_MAX_ODT;
+        (void)xcp_cmd(cmd, 5U, res);
+        for (odt = 0U; odt < (uint8)XCP_MAX_ODT; odt++)
+        {
+            cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = odt; cmd[5] = 1;
+            (void)xcp_cmd(cmd, 6U, res);
+            cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = odt; cmd[5] = 0;
+            (void)xcp_cmd(cmd, 6U, res);
+            cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 1; cmd[3] = 0;
+            memcpy(&cmd[4], &(uint32){RAM_ADDR}, 4U);
+            (void)xcp_cmd(cmd, 8U, res);
+        }
+        cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 0; cmd[3] = 0; cmd[4] = 2;
+        cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+        (void)xcp_cmd(cmd, 8U, res);
+        (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
+        xcp_pump(8U);
+        xcp_settle();
+
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        Xcp_Event(2U);
+        CHECK("K33f an idle pipe keeps one ODT in flight and queues the rest",
+              (g_xcp_channel.storage_ptr->dto_queue_count == (uint8)(XCP_MAX_ODT - 1U))
+              && (g_xcp_channel.storage_ptr->dto_overload_pending == FALSE));
+        xcp_pump(8U);
+        xcp_settle();
+
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        test_sim_dto_inflight();
+        Xcp_Event(2U);
+        CHECK("K33g a busy pipe holds one full burst when depth equals MAX_ODT",
+              (g_xcp_channel.storage_ptr->dto_queue_count == (uint8)XCP_MAX_ODT)
+              && (g_xcp_channel.storage_ptr->dto_overload_pending == FALSE));
+        Xcp_Event(2U);
+        CHECK("K33h a second burst finds no free slot and is dropped",
+              (g_xcp_channel.storage_ptr->dto_overload_pending == TRUE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count
+                  == (uint8)XCP_DTO_QUEUE_DEPTH));
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        g_xcp_channel.storage_ptr->dto_queue_count = 0U;
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
+        xcp_settle();
+    }
+#endif
 
     printf("================ %d passed, %d failed ================\n",
            pass_count, fail_count);

@@ -319,6 +319,8 @@ def normalize(cfg, sets):
         errs.append("XcpInterleavedModeEnabled requires XcpBlockTransferEnabled")
     if vals["XcpBlockTransferEnabled"] and vals["XcpMaxBs"] == 0:
         errs.append("XcpBlockTransferEnabled requires XcpMaxBs>0")
+    if vals["XcpDaqEnabled"] and vals["XcpDtoQueueDepth"] < vals["XcpOdtCount"]:
+        errs.append("XcpDtoQueueDepth must be >= XcpOdtCount")
 
     t = {k: cfg.get(k, []) for k in TABLE_KEYS}
     t["pdu"] = cfg.get("pdu", {"rx": 0, "tx": 1})

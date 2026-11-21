@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Block mode is usable out of the box: `xcpgen` rejects
   `XcpBlockTransferEnabled=1` with `XcpMaxBs=0`, and the defaults are
   `MAX_BS=4` and `MIN_ST=1 ms` (one main-loop cycle per block frame)
+- A DTO is transmitted at the length of its ODT (identification field,
+  optional timestamp and entries), not padded to `XCP_MAX_DTO`. The queue
+  stores that length and both drain paths use it. `XcpDtoQueueDepth` must
+  be at least `XcpOdtCount`, because a busy pipe queues the whole burst
 
 ## [0.3.2] — 2026-11-20
 

@@ -40,6 +40,10 @@
 - 块模式开箱可用：xcpgen 拒绝 `XcpBlockTransferEnabled=1` 且
   `XcpMaxBs=0`；默认值为 `MAX_BS=4`、`MIN_ST=1 ms`（每个块帧
   一个主循环周期）
+- DTO 按 ODT 的实际长度发送（标识域、可选时间戳和条目），不再填充到
+  `XCP_MAX_DTO`。队列记下该长度，两条出队路径都使用它。
+  `XcpDtoQueueDepth` 必须不小于 `XcpOdtCount`，因为管道忙时整段突发
+  都会入队
 
 ## [0.3.2] — 2026-11-20
 
