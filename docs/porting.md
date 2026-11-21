@@ -66,9 +66,12 @@ to publish the ID string address.
   The frame length is the ODT's own length; the transport pads its DLC.
 - `XcpDtoQueueDepth` must be at least `XcpOdtCount`. A busy mailbox queues
   every ODT of the event, and one frame already on the wire does not occupy
-  a slot. With interleaved mode off, a parked command response is sent
-  before any queued DTO: the slave may not emit a DTO between a command and
-  its response.
+  a slot.
+- A parked command response is sent before any queued DTO. This is a
+  scheduling choice, not a wire-format rule: it bounds the response latency
+  to one frame time, and resuming the queue on every confirmation path
+  bounds the burst disruption to the same. What matters is that every
+  confirmation path resumes the queue, not which of the two goes first.
 
 ## Cal Page segments
 
@@ -107,7 +110,9 @@ Concurrency contract:
 - A second command that arrives before the main loop processed the first is
   answered `ERR_CMD_BUSY`. Block-mode masters must pace their frames with
   the advertised `MIN_ST` (1 ms by default); `XcpInterleavedModeEnabled`
-  queues commands instead of answering busy.
+  queues commands instead of answering busy. In this stack the flag changes
+  only that hand-off: the DTO frame layout and the CTO/DTO ordering are the
+  same with it on or off.
 
 ## Session lifecycle
 
