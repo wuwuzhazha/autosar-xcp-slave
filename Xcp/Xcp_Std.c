@@ -815,16 +815,6 @@ void Xcp_CancelBlockTransfer(Xcp_Channel *ch)
     Xcp_InitBlockTransfer(ch);
 }
 
-boolean Xcp_IsBlockTransferActive(Xcp_Channel *ch)
-{
-    if (ch->runtime_ptr == NULL)
-    {
-        return FALSE;
-    }
-
-    return ch->runtime_ptr->block_transfer_active;
-}
-
 boolean Xcp_IsBlockUploadActive(Xcp_Channel *ch)
 {
     if (ch->runtime_ptr == NULL)
