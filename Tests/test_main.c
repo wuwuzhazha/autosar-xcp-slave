@@ -3625,6 +3625,15 @@ int main(void)
         CHECK("K33e the parked CTO goes out before the queued ODTs",
               (test_tx_pop(dto, &dl) > 0U) && (dto[0] == XCP_PID_RES)
               && (g_xcp_channel.storage_ptr->dto_queue_count == 3U));
+        /* Confirming that CTO must resume the burst now. Dropping the
+           resume leaves the ODTs queued until the next main-function
+           period, which is the stall a port hit by editing one copy of
+           this decision and not the others. */
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K33i CTO confirmation resumes the queued ODT burst",
+              (test_tx_pop(dto, &dl) > 0U) && (dl == real_len)
+              && (dto[0] == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 2U));
         xcp_pump(8U);
         xcp_settle();
 
