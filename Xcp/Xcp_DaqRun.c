@@ -290,7 +290,7 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
     uint8            dto_copy[XCP_MAX_DTO];
     uint8            tail = 0U;
     uint8            dto_len = 0U;
-    boolean          send_parked = FALSE;
+    boolean          send_pending_cto = FALSE;
     boolean          send_dto = FALSE;
 
     XCP_DTO_ENTER_CRITICAL();
@@ -320,9 +320,9 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
 
     if ((runtime->tx_mode == XCP_TX_ON) && (runtime->tx.state == XCP_TX_IDLE))
     {
-        if (runtime->tx.parked != FALSE)
+        if (runtime->tx.cto_count > 0U)
         {
-            send_parked = TRUE;
+            send_pending_cto = TRUE;
         }
         else if (storage->dto_queue_count > 0U)
         {
@@ -341,7 +341,7 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
 
     XCP_DTO_EXIT_CRITICAL();
 
-    if (send_parked != FALSE)
+    if (send_pending_cto != FALSE)
     {
         Xcp_SendPendingCto();
     }

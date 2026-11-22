@@ -10,6 +10,8 @@ unsigned int test_mem_register(void *ptr, unsigned int size);
 extern uint32 test_schm_enter_count;
 extern uint32 test_schm_exit_count;
 extern uint32 test_schm_depth;
+extern uint32 test_schm_nested_count;
 extern boolean test_schm_tx_under_lock;
+extern uint32 test_tx_fail_count;
 
 #endif

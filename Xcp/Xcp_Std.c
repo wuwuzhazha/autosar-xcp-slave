@@ -302,7 +302,7 @@ boolean Xcp_ContinueBlockUpload(Xcp_Channel *ch)
         return FALSE;
     }
 
-    if ((runtime->tx.state != XCP_TX_IDLE) || (runtime->tx.parked != FALSE))
+    if ((runtime->tx.state != XCP_TX_IDLE) || (runtime->tx.cto_count > 0U))
     {
         return FALSE;
     }

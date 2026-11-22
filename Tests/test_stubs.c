@@ -24,6 +24,7 @@ uint8  test_tx_tail = 0;
 uint32 test_tx_count = 0;
 uint32 test_tx_drop  = 0;
 boolean test_tx_fail_next = FALSE;
+uint32  test_tx_fail_count = 0U;
 
 /* SchM probe state; defined next to the SchM stubs below. */
 extern uint32   test_schm_depth;
@@ -36,9 +37,16 @@ Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_p
     {
         test_schm_tx_under_lock = TRUE;
     }
-    if (test_tx_fail_next)
+    if ((test_tx_fail_next) || (test_tx_fail_count > 0U))
     {
-        test_tx_fail_next = FALSE;
+        if (test_tx_fail_next)
+        {
+            test_tx_fail_next = FALSE;
+        }
+        else
+        {
+            test_tx_fail_count--;
+        }
         test_tx_drop++;
         return E_NOT_OK;
     }
@@ -352,12 +360,17 @@ Std_ReturnType XCP_CDD_TRANSMIT_NAME(PduIdType pdu_id, const PduInfoType *pdu_in
 uint32 test_schm_enter_count = 0U;
 uint32 test_schm_exit_count  = 0U;
 uint32 test_schm_depth       = 0U;
+uint32 test_schm_nested_count = 0U;
 boolean test_schm_tx_under_lock = FALSE;
 
 void SchM_Enter_Xcp(uint8 exclusive_area)
 {
     (void)exclusive_area;
     test_schm_enter_count++;
+    if (test_schm_depth > 0U)
+    {
+        test_schm_nested_count++;
+    }
     test_schm_depth++;
 }
 

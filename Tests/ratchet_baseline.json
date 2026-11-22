@@ -1,9 +1,9 @@
 {
   "version": 1,
   "g_xcp_channel": {
-    "total": 170,
+    "total": 141,
     "files": {
-      "Xcp/Xcp.c": 99,
+      "Xcp/Xcp.c": 70,
       "Xcp/XcpOnCan.c": 2,
       "Xcp/XcpOnCdd.c": 2,
       "Xcp/XcpOnEth.c": 7,

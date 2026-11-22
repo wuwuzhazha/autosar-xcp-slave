@@ -29,8 +29,120 @@ Xcp_StorageType g_xcp_storage;
 Xcp_RuntimeType g_xcp_runtime;
 Xcp_Channel g_xcp_channel;
 
+/* Locked. Reserve the room one response needs before its command runs, so a
+   command is never consumed when the pipe cannot take the answer. */
+static boolean Xcp_CtoReserveLocked(Xcp_RuntimeType *runtime)
+{
+    Xcp_TxPipe *tx = &runtime->tx;
+
+    if (runtime->tx_mode != XCP_TX_ON)
+    {
+        return TRUE;
+    }
+
+    if ((tx->cto_count + tx->cto_claimed) >= XCP_CTO_QUEUE_DEPTH)
+    {
+        return FALSE;
+    }
+
+    tx->cto_claimed++;
+    return TRUE;
+}
+
+/* Locked. Hand a reservation back when its response was never stored. */
+static void Xcp_CtoReleaseLocked(Xcp_TxPipe *tx)
+{
+    if (tx->cto_claimed > 0U)
+    {
+        tx->cto_claimed--;
+    }
+}
+
+/* Locked. Append one response, spending the caller's reservation if it holds
+   one, so responses leave in the order the commands produced them. */
+static boolean Xcp_CtoStoreLocked(Xcp_TxPipe *tx, const uint8 *res_data, uint8 res_length)
+{
+    uint8 slot;
+
+    if (tx->cto_claimed > 0U)
+    {
+        tx->cto_claimed--;
+    }
+    else if (tx->cto_count >= XCP_CTO_QUEUE_DEPTH)
+    {
+        return FALSE;
+    }
+
+    slot = tx->cto_tail;
+    (void)memcpy(tx->cto_data[slot], res_data, res_length);
+    tx->cto_len[slot] = res_length;
+    tx->cto_tail = (uint8)((slot + 1U) % XCP_CTO_QUEUE_DEPTH);
+    tx->cto_count++;
+    return TRUE;
+}
+
+static boolean Xcp_CtoReserve(void)
+{
+    boolean reserved;
+
+    XCP_DTO_ENTER_CRITICAL();
+    reserved = Xcp_CtoReserveLocked(g_xcp_channel.runtime_ptr);
+    XCP_DTO_EXIT_CRITICAL();
+
+    return reserved;
+}
+
+static void Xcp_CtoRelease(void)
+{
+    XCP_DTO_ENTER_CRITICAL();
+    Xcp_CtoReleaseLocked(&g_xcp_channel.runtime_ptr->tx);
+    XCP_DTO_EXIT_CRITICAL();
+}
+
+/* Copy the oldest queued command out of the queue. The command runs from the
+   caller's copy, so the producer may wrap around and reuse the slot while the
+   handler still holds the bytes. */
+static boolean Xcp_CmdTake(uint8 *cmd_copy, uint8 *cmd_length)
+{
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    boolean          taken   = FALSE;
+
+    XCP_DTO_ENTER_CRITICAL();
+
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
+
+    if (runtime->cmd_queue_count > 0U)
+    {
+        uint8 head = runtime->cmd_queue_head;
+
+        *cmd_length = runtime->cmd_queue_len[head];
+        (void)memcpy(cmd_copy, runtime->cmd_queue[head], *cmd_length);
+        runtime->cmd_queue_head = (uint8)((head + 1U) % XCP_CMD_QUEUE_SIZE);
+        runtime->cmd_queue_count--;
+        taken = TRUE;
+    }
+
+#else
+
+    if (runtime->cmd_pending != FALSE)
+    {
+        *cmd_length = runtime->cmd_queue_length;
+        (void)memcpy(cmd_copy, runtime->cmd_queue_buffer, *cmd_length);
+        runtime->cmd_pending = FALSE;
+        taken = TRUE;
+    }
+
+#endif
+
+    XCP_DTO_EXIT_CRITICAL();
+
+    return taken;
+}
+
 void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length)
 {
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+
     if ((cmd_data == NULL) || (cmd_length == 0U)
 #if (XCP_MAX_CTO < 255U)
         || (cmd_length > XCP_MAX_CTO)
@@ -40,98 +152,96 @@ void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length)
         return;
     }
 
+    XCP_DTO_ENTER_CRITICAL();
+
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
 
-    if (g_xcp_channel.runtime_ptr->cmd_queue_count >= XCP_CMD_QUEUE_SIZE)
+    if (runtime->cmd_queue_count >= XCP_CMD_QUEUE_SIZE)
     {
-        g_xcp_channel.runtime_ptr->busy_pending = TRUE;
+        runtime->busy_pending = TRUE;
+        XCP_DTO_EXIT_CRITICAL();
         return;
     }
 
-    (void)memcpy(g_xcp_channel.runtime_ptr->cmd_queue[g_xcp_channel.runtime_ptr->cmd_queue_tail],
-                 cmd_data, cmd_length);
-    g_xcp_channel.runtime_ptr->cmd_queue_len[g_xcp_channel.runtime_ptr->cmd_queue_tail] = cmd_length;
+    (void)memcpy(runtime->cmd_queue[runtime->cmd_queue_tail], cmd_data, cmd_length);
+    runtime->cmd_queue_len[runtime->cmd_queue_tail] = cmd_length;
 
-    g_xcp_channel.runtime_ptr->cmd_queue_tail =
-        (g_xcp_channel.runtime_ptr->cmd_queue_tail + 1U) % XCP_CMD_QUEUE_SIZE;
-    g_xcp_channel.runtime_ptr->cmd_queue_count++;
-    g_xcp_channel.runtime_ptr->cmd_pending = TRUE;
+    runtime->cmd_queue_tail = (uint8)((runtime->cmd_queue_tail + 1U) % XCP_CMD_QUEUE_SIZE);
+    runtime->cmd_queue_count++;
+    runtime->cmd_pending = TRUE;
 
 #else
 
-    if (g_xcp_channel.runtime_ptr->cmd_pending == TRUE)
+    if (runtime->cmd_pending == TRUE)
     {
 
-        g_xcp_channel.runtime_ptr->busy_pending = TRUE;
+        runtime->busy_pending = TRUE;
+        XCP_DTO_EXIT_CRITICAL();
         return;
     }
 
-    (void)memcpy(g_xcp_channel.runtime_ptr->cmd_queue_buffer, cmd_data, cmd_length);
-    g_xcp_channel.runtime_ptr->cmd_queue_length = cmd_length;
-    g_xcp_channel.runtime_ptr->cmd_pending      = TRUE;
+    (void)memcpy(runtime->cmd_queue_buffer, cmd_data, cmd_length);
+    runtime->cmd_queue_length = cmd_length;
+    runtime->cmd_pending      = TRUE;
 #endif
+
+    XCP_DTO_EXIT_CRITICAL();
 }
 
 void Xcp_ProcessCommandQueue(void)
 {
-    uint8 *cmd_data;
-    uint8  cmd_length;
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    uint8            cmd_copy[XCP_MAX_CTO];
+    uint8            cmd_length;
+    uint8            budget;
 
-    if (g_xcp_channel.runtime_ptr->busy_pending == TRUE)
+    if (runtime->busy_pending != FALSE)
     {
-        if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE))
+        if (Xcp_CtoReserve() != FALSE)
         {
             Xcp_SendErrorResponse(XCP_ERR_CMD_BUSY);
 
-            g_xcp_channel.runtime_ptr->busy_pending = FALSE;
+            runtime->busy_pending = FALSE;
+            Xcp_CtoRelease();
         }
 
         return;
     }
 
+    /* A command costs one response slot. Running out of slots ends the call
+       with the command still queued and its side effects unapplied. */
+    for (budget = (uint8)XCP_CMD_QUEUE_SIZE; budget > 0U; budget--)
     {
-        Xcp_Channel *ch = &g_xcp_channel;
-
-        if ((ch->runtime_ptr->cmd_pending == TRUE)
-            && (Xcp_IsBlockUploadActive(ch) != FALSE))
+        if (Xcp_CtoReserve() == FALSE)
         {
-            Xcp_CancelBlockTransfer(ch);
+            break;
         }
+
+        if (Xcp_CmdTake(cmd_copy, &cmd_length) == FALSE)
+        {
+            Xcp_CtoRelease();
+            break;
+        }
+
+        if (Xcp_IsBlockUploadActive(&g_xcp_channel) != FALSE)
+        {
+            Xcp_CancelBlockTransfer(&g_xcp_channel);
+        }
+
+        Xcp_ProcessCommand(cmd_copy, cmd_length);
+
+        Xcp_CtoRelease();
     }
 
-    if (g_xcp_channel.runtime_ptr->cmd_pending == TRUE)
+    /* The flag follows the hand-off, not one handler run: while the queue
+       still holds a command the confirmation path must not start a
+       block-upload frame in the middle of the burst. */
+    XCP_DTO_ENTER_CRITICAL();
+    if (Xcp_CmdQueueEmpty(runtime) != FALSE)
     {
-        if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE))
-        {
-#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-            if (g_xcp_channel.runtime_ptr->cmd_queue_count > 0U)
-            {
-                cmd_data   = g_xcp_channel.runtime_ptr->cmd_queue[g_xcp_channel.runtime_ptr->cmd_queue_head];
-                cmd_length = g_xcp_channel.runtime_ptr->cmd_queue_len[g_xcp_channel.runtime_ptr->cmd_queue_head];
-
-                Xcp_ProcessCommand(cmd_data, cmd_length);
-
-                g_xcp_channel.runtime_ptr->cmd_queue_head =
-                    (g_xcp_channel.runtime_ptr->cmd_queue_head + 1U) % XCP_CMD_QUEUE_SIZE;
-                g_xcp_channel.runtime_ptr->cmd_queue_count--;
-
-                if (g_xcp_channel.runtime_ptr->cmd_queue_count == 0U)
-                {
-                    g_xcp_channel.runtime_ptr->cmd_pending = FALSE;
-                }
-            }
-#else
-            cmd_data   = g_xcp_channel.runtime_ptr->cmd_queue_buffer;
-            cmd_length = g_xcp_channel.runtime_ptr->cmd_queue_length;
-
-            Xcp_ProcessCommand(cmd_data, cmd_length);
-
-            g_xcp_channel.runtime_ptr->cmd_pending = FALSE;
-#endif
-        }
+        runtime->cmd_pending = FALSE;
     }
+    XCP_DTO_EXIT_CRITICAL();
 }
 
 void Xcp_Init(const Xcp_ConfigType *Xcp_ConfigPtr)
@@ -253,7 +363,7 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         if (result == E_OK)
         {
 
-            if (runtime->tx.parked != FALSE)
+            if (runtime->tx.cto_count > 0U)
             {
                 Xcp_SendPendingCto();
             }
@@ -269,7 +379,7 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         {
             runtime->tx.dto_latch = FALSE;
 
-            if (runtime->tx.parked != FALSE)
+            if (runtime->tx.cto_count > 0U)
             {
                 Xcp_SendPendingCto();
             }
@@ -300,7 +410,7 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
             return;
         }
 
-        if (runtime->tx.parked != FALSE)
+        if (runtime->tx.cto_count > 0U)
         {
             Xcp_SendPendingCto();
         }
@@ -475,6 +585,7 @@ void Xcp_SendErrorResponse(uint8 error_code)
 Std_ReturnType Xcp_SendResponse(const uint8 *res_data, uint8 res_length)
 {
     Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    Xcp_TxPipe      *tx      = &runtime->tx;
     Std_ReturnType   ret_val;
 
     if (runtime->tx_mode != XCP_TX_ON)
@@ -484,9 +595,9 @@ Std_ReturnType Xcp_SendResponse(const uint8 *res_data, uint8 res_length)
 
     XCP_DTO_ENTER_CRITICAL();
 
-    if (runtime->tx.state == XCP_TX_IDLE)
+    if ((tx->cto_count == 0U) && (tx->state == XCP_TX_IDLE))
     {
-        runtime->tx.state = XCP_TX_CTO;
+        tx->state = XCP_TX_CTO;
         XCP_DTO_EXIT_CRITICAL();
 
         ret_val = Xcp_Tl_SendCto(res_data, res_length);
@@ -494,55 +605,60 @@ Std_ReturnType Xcp_SendResponse(const uint8 *res_data, uint8 res_length)
         if (ret_val != E_OK)
         {
             XCP_DTO_ENTER_CRITICAL();
-            runtime->tx.state = XCP_TX_IDLE;
+            tx->state  = XCP_TX_IDLE;
+            ret_val    = (Xcp_CtoStoreLocked(tx, res_data, res_length) != FALSE) ? E_OK : E_NOT_OK;
             XCP_DTO_EXIT_CRITICAL();
         }
 
         return ret_val;
     }
 
-    if (runtime->tx.parked == FALSE)
+    if (Xcp_CtoStoreLocked(tx, res_data, res_length) == FALSE)
     {
-        (void)memcpy(runtime->tx.parked_data, res_data, res_length);
-        runtime->tx.parked_len = res_length;
-        runtime->tx.parked     = TRUE;
         XCP_DTO_EXIT_CRITICAL();
-        return E_OK;
+        return E_NOT_OK;
     }
 
     XCP_DTO_EXIT_CRITICAL();
-    return E_NOT_OK;
+    return E_OK;
 }
 
 void Xcp_SendPendingCto(void)
 {
     Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+    Xcp_TxPipe      *tx      = &runtime->tx;
     uint8            pend_copy[XCP_MAX_CTO];
     uint8            pend_len;
 
     XCP_DTO_ENTER_CRITICAL();
 
-    if ((runtime->tx.parked == FALSE) || (runtime->tx_mode != XCP_TX_ON)
-        || (runtime->tx.state != XCP_TX_IDLE))
+    if ((tx->cto_count == 0U) || (tx->cto_inflight != FALSE)
+        || (runtime->tx_mode != XCP_TX_ON) || (tx->state != XCP_TX_IDLE))
     {
         XCP_DTO_EXIT_CRITICAL();
         return;
     }
 
-    pend_len = runtime->tx.parked_len;
-    (void)memcpy(pend_copy, runtime->tx.parked_data, pend_len);
-    runtime->tx.parked = FALSE;
-    runtime->tx.state  = XCP_TX_CTO;
+    pend_len = tx->cto_len[tx->cto_head];
+    (void)memcpy(pend_copy, tx->cto_data[tx->cto_head], pend_len);
+    tx->cto_inflight = TRUE;
+    tx->state        = XCP_TX_CTO;
 
     XCP_DTO_EXIT_CRITICAL();
 
-    if (Xcp_Tl_SendCto(pend_copy, pend_len) != E_OK)
+    if (Xcp_Tl_SendCto(pend_copy, pend_len) == E_OK)
     {
         XCP_DTO_ENTER_CRITICAL();
-        runtime->tx.state = XCP_TX_IDLE;
-        (void)memcpy(runtime->tx.parked_data, pend_copy, pend_len);
-        runtime->tx.parked_len = pend_len;
-        runtime->tx.parked     = TRUE;
+        tx->cto_head     = (uint8)((tx->cto_head + 1U) % XCP_CTO_QUEUE_DEPTH);
+        tx->cto_count--;
+        tx->cto_inflight = FALSE;
+        XCP_DTO_EXIT_CRITICAL();
+    }
+    else
+    {
+        XCP_DTO_ENTER_CRITICAL();
+        tx->cto_inflight = FALSE;
+        tx->state        = XCP_TX_IDLE;
         XCP_DTO_EXIT_CRITICAL();
     }
 }
@@ -570,8 +686,11 @@ void Xcp_SessionClose(void)
     Xcp_FreeDaqLists(&g_xcp_channel);
 #endif
 
-    runtime->tx.parked     = FALSE;
-    runtime->tx.parked_len = 0U;
+    runtime->tx.cto_head     = 0U;
+    runtime->tx.cto_tail     = 0U;
+    runtime->tx.cto_count    = 0U;
+    runtime->tx.cto_claimed  = 0U;
+    runtime->tx.cto_inflight = FALSE;
     Xcp_CancelBlockTransfer(&g_xcp_channel);
     runtime->connection_state = XCP_DISCONNECTED;
 
