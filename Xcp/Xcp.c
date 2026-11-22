@@ -365,6 +365,11 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         if (result != E_OK)
         {
             runtime->tx.dto_latch = FALSE;
+#if (XCP_DAQ_ENABLED == STD_ON) && (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
+            /* That frame never reached the bus, so it is one lost DTO no
+               matter what the pipe does with the next one. */
+            ch->storage_ptr->dropped_dto_counter++;
+#endif
         }
 
         confirmed = XCP_TX_DTO;
@@ -377,35 +382,8 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
 
     XCP_DTO_EXIT_CRITICAL();
 
-    if (confirmed == XCP_TX_DTO)
+    if (confirmed == XCP_TX_IDLE)
     {
-        if (result == E_OK)
-        {
-
-            if (runtime->tx.cto_count > 0U)
-            {
-                Xcp_SendPendingCto();
-            }
-            else if ((runtime->cmd_pending != FALSE)
-                     || (Xcp_ContinueBlockUpload(ch) == FALSE))
-            {
-#if (XCP_DAQ_ENABLED == STD_ON)
-                Xcp_DtoSendNext(&g_xcp_channel);
-#endif
-            }
-        }
-        else
-        {
-            if (runtime->tx.cto_count > 0U)
-            {
-                Xcp_SendPendingCto();
-            }
-            else if (runtime->cmd_pending == FALSE)
-            {
-                (void)Xcp_ContinueBlockUpload(ch);
-            }
-        }
-
         return;
     }
 
@@ -420,23 +398,21 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
             runtime->tx.last_error = 1U;
             Xcp_CancelBlockTransfer(ch);
         }
+    }
 
-        if ((runtime->cmd_pending == FALSE)
-            && (Xcp_ContinueBlockUpload(ch) != FALSE))
-        {
-            return;
-        }
-
-        if (runtime->tx.cto_count > 0U)
-        {
-            Xcp_SendPendingCto();
-        }
-        else
-        {
+    /* Which frame was confirmed and how it ended do not decide what goes out
+       next: the answers already accepted keep priority, then the block
+       upload, then the queued DTOs. */
+    if (runtime->tx.cto_count > 0U)
+    {
+        Xcp_SendPendingCto();
+    }
+    else if ((runtime->cmd_pending != FALSE)
+             || (Xcp_ContinueBlockUpload(ch) == FALSE))
+    {
 #if (XCP_DAQ_ENABLED == STD_ON)
-            Xcp_DtoSendNext(&g_xcp_channel);
+        Xcp_DtoSendNext(&g_xcp_channel);
 #endif
-        }
     }
 }
 

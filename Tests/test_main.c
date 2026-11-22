@@ -251,6 +251,43 @@ static void test_sim_dto_inflight(void)
     g_xcp_channel.runtime_ptr->tx.state = XCP_TX_DTO;
 }
 
+#if (XCP_DAQ_ENABLED == STD_ON)
+/* An empty DTO pipe on a quiet bus: nothing in flight, nothing queued and no
+   event channel left that could push a frame in behind the test's own frames. */
+static void test_dto_pipe_reset(void)
+{
+    uint8  tmp[64];
+    uint32 l;
+    uint16 i;
+
+    while (test_tx_pop(tmp, &l) > 0U)
+    {
+    }
+
+    for (i = 0U; i < (uint16)XCP_MAX_DAQ; i++)
+    {
+        g_xcp_channel.storage_ptr->daq_list[i].state = (uint8)XCP_DAQ_STATE_STOPPED;
+    }
+    Xcp_RebuildActiveDaqList(&g_xcp_channel);
+
+    g_xcp_channel.runtime_ptr->tx_mode             = XCP_TX_ON;
+    g_xcp_channel.runtime_ptr->tx.state            = XCP_TX_IDLE;
+    g_xcp_channel.runtime_ptr->tx.dto_latch        = FALSE;
+    g_xcp_channel.runtime_ptr->tx.dto_in_flight    = FALSE;
+    g_xcp_channel.runtime_ptr->tx.cto_count        = 0U;
+    g_xcp_channel.runtime_ptr->tx.cto_inflight     = FALSE;
+    g_xcp_channel.runtime_ptr->cmd_pending         = FALSE;
+    g_xcp_channel.storage_ptr->dto_queue_count     = 0U;
+    g_xcp_channel.storage_ptr->dto_queue_head      = 0U;
+    g_xcp_channel.storage_ptr->dto_queue_tail      = 0U;
+    g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+    g_xcp_channel.storage_ptr->dto_busy_watchdog_cnt = 0U;
+    (void)memset(&g_xcp_channel.storage_ptr->dto_queued[0], 0,
+                 sizeof(g_xcp_channel.storage_ptr->dto_queued));
+    test_tx_fail_next = FALSE;
+}
+#endif
+
 static void xcp_settle(void)
 {
     uint32 i;
@@ -4209,16 +4246,16 @@ int main(void)
         {
         }
 
-        /* A direct send the lower layer accepts owns the pipe and one frame.
+        /* A DTO send the lower layer accepts owns the pipe and one frame.
            Both lock scopes are paired and the transmit stays outside them. */
         enter0 = test_schm_enter_count;
         exit0  = test_schm_exit_count;
         test_schm_tx_under_lock = FALSE;
         Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
         got = test_tx_pop(popped, &popped_len);
-        CHECK("K38a a direct DTO send pairs every lock and transmits outside them",
-              ((test_schm_enter_count - enter0) == 2U)
-              && ((test_schm_exit_count - exit0) == 2U)
+        CHECK("K38a a DTO send pairs every lock and transmits outside them",
+              ((test_schm_enter_count - enter0) == 3U)
+              && ((test_schm_exit_count - exit0) == 3U)
               && (test_schm_depth == 0U)
               && (test_schm_tx_under_lock == FALSE)
               && (got == (uint32)sizeof(first))
@@ -4372,8 +4409,8 @@ int main(void)
               && (frame_len[1] == (uint32)sizeof(second))
               && (frames[1][0] == second[0]));
 
-        /* The same interleaving on the direct path: the queued frame must go
-           out exactly once, after the direct one. */
+        /* The same interleaving when the later frame arrives through the
+           queue: the frame queued first must still leave first. */
         test_sim_dto_inflight();
         Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, second, (uint8)sizeof(second));
         g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
@@ -4390,7 +4427,7 @@ int main(void)
         {
             nframes++;
         }
-        CHECK("K38l an in-call confirmation during a direct send drains once, in order",
+        CHECK("K38l an in-call confirmation drains once, in queue order",
               ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
               && (test_schm_depth == 0U)
               && (test_schm_tx_under_lock == FALSE)
@@ -4399,10 +4436,10 @@ int main(void)
               && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
               && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
               && (nframes == 2U)
-              && (frame_len[0] == (uint32)sizeof(first))
-              && (frames[0][0] == first[0])
-              && (frame_len[1] == (uint32)sizeof(second))
-              && (frames[1][0] == second[0]));
+              && (frame_len[0] == (uint32)sizeof(second))
+              && (frames[0][0] == second[0])
+              && (frame_len[1] == (uint32)sizeof(first))
+              && (frames[1][0] == first[0]));
 
         /* A producer that runs while the lower layer still holds the frame must
            not overwrite the slot the failed drain keeps, and must not push the
@@ -4433,6 +4470,128 @@ int main(void)
               && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
 
         g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+    }
+#endif
+
+#if (XCP_DAQ_ENABLED == STD_ON)
+    printf("-- T. issue #28: one FIFO, the failed confirmation and the busy latch\n");
+    {
+        static const uint8 f_a[4] = {0xA0U, 0xA1U, 0xA2U, 0xA3U};
+        static const uint8 f_b[4] = {0xB0U, 0xB1U, 0xB2U, 0xB3U};
+        static const uint8 f_c[4] = {0xC0U, 0xC1U, 0xC2U, 0xC3U};
+        uint8  dto[64];
+        uint8  order[4];
+        uint32 dl;
+        uint8  n;
+        uint32 wi;
+#if (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
+        uint32 drop0;
+#endif
+
+        /* T1: a later frame may never overtake an earlier one. A send the
+           lower layer refuses leaves its frame at the head of the queue while
+           the pipe is idle, and the frame that follows must join that queue
+           instead of leaving first. */
+        test_dto_pipe_reset();
+        test_tx_fail_next = TRUE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_a, (uint8)sizeof(f_a));
+        CHECK("T1a a refused frame keeps its FIFO place with the pipe idle",
+              (g_xcp_channel.storage_ptr->dto_queue_count == 1U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_b, (uint8)sizeof(f_b));
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_c, (uint8)sizeof(f_c));
+
+        n = 0U;
+        for (wi = 0U; (wi < 8U) && (n < 3U); wi++)
+        {
+            while ((n < 3U) && (test_tx_pop(dto, &dl) > 0U))
+            {
+                order[n] = dto[0];
+                n++;
+            }
+            Xcp_Tl_TxConfirmation(0U, E_OK);
+        }
+        CHECK("T1b the frames leave the port in the order they were queued",
+              (n == 3U) && (order[0] == f_a[0]) && (order[1] == f_b[0])
+              && (order[2] == f_c[0]));
+
+        /* T2: a frame the lower layer could not put on the bus is gone, so the
+           confirmation of a failed DTO must hand the pipe to the next queued
+           frame and count the loss, not wait for the next main tick. */
+        test_dto_pipe_reset();
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_a, (uint8)sizeof(f_a));
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_b, (uint8)sizeof(f_b));
+        CHECK("T2a the burst waits behind the in-flight frame",
+              g_xcp_channel.storage_ptr->dto_queue_count == 2U);
+#if (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
+        drop0 = g_xcp_channel.storage_ptr->dropped_dto_counter;
+#endif
+        Xcp_Tl_TxConfirmation(0U, E_NOT_OK);
+        CHECK("T2b the failed confirmation itself sends the next queued frame",
+              (test_tx_pop(dto, &dl) == (uint32)sizeof(f_a)) && (dto[0] == f_a[0])
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 1U));
+#if (XCP_ENABLE_DTO_DROP_STATS == STD_ON)
+        CHECK("T2c the lost frame is counted as a dropped DTO",
+              g_xcp_channel.storage_ptr->dropped_dto_counter == (drop0 + 1U));
+#endif
+
+        /* T3: a drain that finds the pipe busy must not release the latch of
+           the frame that owns it; the watchdog is the only way back when that
+           frame never confirms. */
+        test_dto_pipe_reset();
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_a, (uint8)sizeof(f_a));
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_b, (uint8)sizeof(f_b));
+        CHECK("T3a the frames wait behind the in-flight one",
+              g_xcp_channel.storage_ptr->dto_queue_count == 2U);
+        Xcp_DtoSendNext(&g_xcp_channel);
+        CHECK("T3b draining a busy pipe keeps the in-flight latch",
+              (g_xcp_channel.runtime_ptr->tx.dto_latch == TRUE)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO));
+
+        for (wi = 0U; wi < (uint32)XCP_DTO_BUSY_TIMEOUT_CYCLES; wi++)
+        {
+            Xcp_MainFunction();
+        }
+        CHECK("T3c the watchdog leaves a frame inside its window alone",
+              (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == TRUE)
+              && (test_tx_pending() == 0U));
+
+        for (wi = 0U; wi < 2U; wi++)
+        {
+            Xcp_MainFunction();
+        }
+        CHECK("T3d the watchdog recovers the pipe and hands out the frame it kept",
+              (test_tx_pop(dto, &dl) == (uint32)sizeof(f_a)) && (dto[0] == f_a[0]));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("T3e the next queued frame follows it",
+              (test_tx_pop(dto, &dl) == (uint32)sizeof(f_b)) && (dto[0] == f_b[0])
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U));
+
+        /* Only a busy pipe keeps the latch. With the pipe idle no frame owns
+           it, so a drain must release it even while transmission is off, and
+           the frame it could not send keeps its place for when TX resumes. */
+        test_dto_pipe_reset();
+        test_tx_fail_next = TRUE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_a, (uint8)sizeof(f_a));
+        g_xcp_channel.runtime_ptr->tx_mode      = XCP_TX_OFF;
+        g_xcp_channel.runtime_ptr->tx.dto_latch = TRUE;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        CHECK("T3f an idle pipe drops a stale latch while TX is off",
+              (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 1U)
+              && (test_tx_pending() == 0U));
+        g_xcp_channel.runtime_ptr->tx_mode = XCP_TX_ON;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        CHECK("T3g the kept frame leaves once TX is back on",
+              (test_tx_pop(dto, &dl) == (uint32)sizeof(f_a)) && (dto[0] == f_a[0]));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+
+        test_dto_pipe_reset();
     }
 #endif
 

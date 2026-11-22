@@ -1,0 +1,27 @@
+# Issue #28 reproduction profile: CAN FD, one DAQ list, 11 ODTs, 5 ms event,
+# 5 ms main function, 30-entry DTO queue, absolute PID.
+# The event channel time_cycle is 0 so Xcp_MainFunction never fires the event
+# itself: the simulation owns the event task and the main-function task and can
+# shift their phases independently.
+extends = "../../Config/xcp_base.toml"
+
+[general]
+LinkType = "CAN"
+XcpMaxCto = 8
+XcpMaxDto = 64
+XcpMaxDaq = 8
+XcpOdtCount = 11
+XcpOdtEntriesCount = 7
+XcpMaxEventChannel = 1
+XcpDtoQueueDepth = 30
+XcpMainFunctionPeriod = 5
+XcpDtoBusyTimeoutCycles = 200
+
+[[event_channels]]
+event_channel_number = 0
+event_channel_priority = 0
+max_daq_list = 255
+time_cycle = 0
+time_unit = "XCP_TIMESTAMP_UNIT_1MS"
+event_channel_type = "0x0C"
+consistency = "0x00"
