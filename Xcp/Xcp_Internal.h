@@ -354,6 +354,8 @@ void Xcp_SessionOpen(void);
 
 void Xcp_SessionClose(void);
 
+void Xcp_SessionLinkDown(void);
+
 void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length);
 
 void Xcp_ProcessCommandQueue(void);

@@ -145,6 +145,12 @@ Concurrency contract:
 - `Xcp_SessionOpen` / `Xcp_SessionClose` — called by `CONNECT`/`DISCONNECT`; you can
   also call them directly when the socket opens/closes (see `Xcp_SoAdConnectionClosed`
   for the Ethernet case).
+- `Xcp_SessionClose` ends the session but leaves the CTO pipe alone: the answers
+  of the commands that were already accepted still leave, in command order, so
+  a `DISCONNECT` answer does not drop the answers that preceded it.
+- `Xcp_SessionLinkDown` drops what is still queued before it closes the session
+  — call it when the transport itself is gone (`Xcp_SoAdConnectionClosed` does),
+  because nothing queued can reach the master any more.
 - `Xcp_HandleRxIndication(pdu)` — feed every received frame here; PID ≥ 0xC0 is a
   command, PID < 0xC0 is a STIM DTO.
 - `Xcp_HandleTxConfirmation(result)` — call when the lower layer confirms a TX.

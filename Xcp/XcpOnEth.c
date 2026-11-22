@@ -127,7 +127,7 @@ boolean Xcp_SoAdConnectionClosed(void)
     {
         return FALSE;
     }
-    Xcp_SessionClose();
+    Xcp_SessionLinkDown();
     return TRUE;
 }
 

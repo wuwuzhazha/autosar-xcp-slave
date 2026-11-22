@@ -129,6 +129,10 @@ RX 与 TX 确认回调与主函数任务都会进入这对宏，因此它必须�
 - `Xcp_SessionOpen` / `Xcp_SessionClose` ——由 `CONNECT`/`DISCONNECT` 调用；
   当 socket 打开/关闭时你也可以直接调用它们（Ethernet 场景参见
   `Xcp_SoAdConnectionClosed`）。
+- `Xcp_SessionClose` 结束会话但保留 CTO 管道：此前已被接受的命令的应答仍按
+  命令顺序发出，因此 `DISCONNECT` 的应答不会连带丢弃它之前的应答。
+- `Xcp_SessionLinkDown` 在结束会话前丢弃尚在排队的内容——传输链路本身消失时
+  使用它（`Xcp_SoAdConnectionClosed` 即是），因为队列中的内容已无法送达主站。
 - `Xcp_HandleRxIndication(pdu)` ——把每个收到的帧送入这里；PID ≥ 0xC0 是
   命令，PID < 0xC0 是 STIM DTO。
 - `Xcp_HandleTxConfirmation(result)` ——当下层确认一次 TX 时调用。

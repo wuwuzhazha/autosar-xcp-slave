@@ -4342,6 +4342,110 @@ int main(void)
     }
 #endif
 
+    printf("-- K39. DISCONNECT keeps the answers it already accepted (issue #24)\n");
+    {
+        static const uint8 gs_cmd[1]  = {0xFDU};
+        static const uint8 dis_cmd[1] = {0xFEU};
+        uint8  f[64];
+        uint32 enter0;
+        uint32 exit0;
+        uint8  i;
+
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        /* A frame is on the wire and unconfirmed, so the next answers are
+           accepted into the pipe. Closing the session must not take the answer
+           that was accepted before the DISCONNECT down with it. */
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
+        xcp_inject(gs_cmd, 1U);
+        Xcp_MainFunction();
+        CHECK("K39a an answer accepted behind a busy mailbox waits in the pipe",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 1U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_CTO));
+
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        xcp_inject(dis_cmd, 1U);
+        Xcp_MainFunction();
+        CHECK("K39b DISCONNECT closes the session and keeps both answers queued",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 2U)
+              && (g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED)
+              && ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE));
+
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        Xcp_SendPendingCto();
+        CHECK("K39c the answer accepted before DISCONNECT leaves first",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39d the DISCONNECT answer follows it, in command order",
+              (xcp_pop_cto(f) == 1U) && (f[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        /* The same burst while a DTO owns the mailbox. */
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        g_xcp_channel.runtime_ptr->tx.dto_latch = TRUE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_DTO;
+        xcp_inject(gs_cmd, 1U);
+        Xcp_MainFunction();
+        xcp_inject(dis_cmd, 1U);
+        Xcp_MainFunction();
+        CHECK("K39e a DTO in flight keeps both answers queued as well",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 2U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO)
+              && (g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED));
+
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39f the DTO confirmation resumes the pipe from its head",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39g and the DISCONNECT answer still follows it",
+              (xcp_pop_cto(f) == 1U) && (f[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        /* A confirmation that lands inside the transmit call: the frame that
+           call owns leaves exactly once and the answer behind it is not lost
+           with the wakeup. */
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
+        for (i = 0U; i < 2U; i++)
+        {
+            xcp_inject(gs_cmd, 1U);
+            Xcp_MainFunction();
+        }
+        CHECK("K39h two answers wait in the pipe",
+              g_xcp_channel.runtime_ptr->tx.cto_count == 2U);
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+
+        test_tx_confirm_in_send = TRUE;
+        Xcp_SendPendingCto();
+        test_tx_confirm_in_send = FALSE;
+        CHECK("K39i an in-call confirmation sends the frame once and keeps the next",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES)
+              && (xcp_pop_cto(f) == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE));
+        Xcp_SendPendingCto();
+        CHECK("K39j the retained answer leaves on the retry, unchanged",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        xcp_settle();
+    }
+
     printf("-- L. protocol state gates in a fresh session\n");
     Xcp_Init(NULL_PTR);
     (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);

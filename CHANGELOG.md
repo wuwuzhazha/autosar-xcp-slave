@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drain keeps the head slot and its FIFO place, and a confirmation or a
   producer that lands inside the lower-layer call neither resends nor
   overwrites that slot
+- K39 pins the session boundary: a `DISCONNECT` accepted behind earlier
+  answers leaves the pipe intact, and both a busy CTO and a busy DTO resume it
+  in command order
 
 ### Changed
 - A command burst is answered at bus speed instead of one command per
@@ -44,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one on an idle mailbox — stays at the head of the pipe and is retried by the
   next confirmation or main-function call instead of being discarded after its
   command already ran
+- `DISCONNECT` no longer drops answers it did not produce: ending the session
+  leaves the CTO pipe alone, so the answers of commands the slave had already
+  accepted still leave in command order, the DISCONNECT answer included. The
+  same applies to a failed `UNLOCK` and to `PROGRAM_RESET`. Only a closed
+  transport drops what is queued (`Xcp_SoAdConnectionClosed` now calls
+  `Xcp_SessionLinkDown`), because nothing queued can still reach the master
 - `DISCONNECT` is rejected with `ERR_PGM_ACTIVE` while a programming
   sequence is open, so a master cannot silently drop the programming
   session; other status and query commands remain available in that state

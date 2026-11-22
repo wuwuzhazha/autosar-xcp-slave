@@ -81,21 +81,21 @@ static boolean Xcp_CtoStoreLocked(Xcp_TxPipe *tx, const uint8 *res_data, uint8 r
     return TRUE;
 }
 
-static boolean Xcp_CtoReserve(void)
+static boolean Xcp_CtoReserve(Xcp_RuntimeType *runtime)
 {
     boolean reserved;
 
     XCP_DTO_ENTER_CRITICAL();
-    reserved = Xcp_CtoReserveLocked(g_xcp_channel.runtime_ptr);
+    reserved = Xcp_CtoReserveLocked(runtime);
     XCP_DTO_EXIT_CRITICAL();
 
     return reserved;
 }
 
-static void Xcp_CtoRelease(void)
+static void Xcp_CtoRelease(Xcp_RuntimeType *runtime)
 {
     XCP_DTO_ENTER_CRITICAL();
-    Xcp_CtoReleaseLocked(&g_xcp_channel.runtime_ptr->tx);
+    Xcp_CtoReleaseLocked(&runtime->tx);
     XCP_DTO_EXIT_CRITICAL();
 }
 
@@ -197,12 +197,12 @@ void Xcp_ProcessCommandQueue(void)
 
     if (runtime->busy_pending != FALSE)
     {
-        if (Xcp_CtoReserve() != FALSE)
+        if (Xcp_CtoReserve(runtime) != FALSE)
         {
             Xcp_SendErrorResponse(XCP_ERR_CMD_BUSY);
 
             runtime->busy_pending = FALSE;
-            Xcp_CtoRelease();
+            Xcp_CtoRelease(runtime);
         }
 
         return;
@@ -212,14 +212,14 @@ void Xcp_ProcessCommandQueue(void)
        with the command still queued and its side effects unapplied. */
     for (budget = (uint8)XCP_CMD_QUEUE_SIZE; budget > 0U; budget--)
     {
-        if (Xcp_CtoReserve() == FALSE)
+        if (Xcp_CtoReserve(runtime) == FALSE)
         {
             break;
         }
 
         if (Xcp_CmdTake(cmd_copy, &cmd_length) == FALSE)
         {
-            Xcp_CtoRelease();
+            Xcp_CtoRelease(runtime);
             break;
         }
 
@@ -230,7 +230,7 @@ void Xcp_ProcessCommandQueue(void)
 
         Xcp_ProcessCommand(cmd_copy, cmd_length);
 
-        Xcp_CtoRelease();
+        Xcp_CtoRelease(runtime);
     }
 
     /* The flag follows the hand-off, not one handler run: while the queue
@@ -682,6 +682,9 @@ void Xcp_SessionOpen(void)
     Xcp_InitBlockTransfer(&g_xcp_channel);
 }
 
+/* Ends the session. Answers already queued for accepted commands stay in the
+   CTO pipe: a DISCONNECT answer still has to reach the master that asked for
+   it, in command order. */
 void Xcp_SessionClose(void)
 {
     Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
@@ -690,11 +693,6 @@ void Xcp_SessionClose(void)
     Xcp_FreeDaqLists(&g_xcp_channel);
 #endif
 
-    runtime->tx.cto_head     = 0U;
-    runtime->tx.cto_tail     = 0U;
-    runtime->tx.cto_count    = 0U;
-    runtime->tx.cto_claimed  = 0U;
-    runtime->tx.cto_inflight = FALSE;
     Xcp_CancelBlockTransfer(&g_xcp_channel);
     runtime->connection_state = XCP_DISCONNECTED;
 
@@ -710,6 +708,29 @@ void Xcp_SessionClose(void)
     runtime->pgm_address   = 0U;
     runtime->pgm_size      = 0U;
 #endif
+}
+
+/* The transport is gone: nothing queued can still reach the master, and an
+   unconfirmed frame must not keep the pipe closed for the next session. */
+void Xcp_SessionLinkDown(void)
+{
+    Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+
+    XCP_DTO_ENTER_CRITICAL();
+
+    runtime->tx.cto_head     = 0U;
+    runtime->tx.cto_tail     = 0U;
+    runtime->tx.cto_count    = 0U;
+    runtime->tx.cto_claimed  = 0U;
+    runtime->tx.cto_inflight = FALSE;
+    if (runtime->tx.state == XCP_TX_CTO)
+    {
+        runtime->tx.state = XCP_TX_IDLE;
+    }
+
+    XCP_DTO_EXIT_CRITICAL();
+
+    Xcp_SessionClose();
 }
 
 uint32 Xcp_GetTimestamp(void)
