@@ -20,4 +20,7 @@ extern boolean test_tx_confirm_in_send;
 /* Set to queue a DTO from inside CanIf_Transmit. */
 extern boolean test_tx_enqueue_in_send;
 
+/* Set to deliver a command from inside CanIf_Transmit. */
+extern boolean test_tx_rx_in_send;
+
 #endif

@@ -4350,6 +4350,11 @@ int main(void)
         uint32 enter0;
         uint32 exit0;
         uint8  i;
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
+        const uint8 enq = (uint8)XCP_CMD_QUEUE_SIZE;
+#else
+        const uint8 enq = 1U;
+#endif
 
         Xcp_Init(NULL_PTR);
         (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
@@ -4443,6 +4448,63 @@ int main(void)
               (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES)
               && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
 
+        /* A command owns the port from the moment its answer is reserved: the
+           block-upload continuation may neither take that room nor overtake
+           the answer. */
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        g_xcp_channel.runtime_ptr->tx.cto_claimed = 1U;
+        g_xcp_channel.runtime_ptr->mta              = RAM_ADDR;
+        g_xcp_channel.runtime_ptr->mta_extension    = 0U;
+        g_xcp_channel.runtime_ptr->block_transfer_active    = TRUE;
+        g_xcp_channel.runtime_ptr->block_transfer_type      = XCP_BLOCK_TYPE_UPLOAD;
+        g_xcp_channel.runtime_ptr->block_transfer_remaining = 8U;
+        enter0 = test_schm_enter_count;
+        CHECK("K39k a reserved answer keeps the block-upload continuation out",
+              (Xcp_ContinueBlockUpload(&g_xcp_channel) == FALSE)
+              && (test_schm_enter_count == enter0)
+              && (xcp_pop_cto(f) == 0U));
+        g_xcp_channel.runtime_ptr->block_transfer_active = FALSE;
+        g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_NONE;
+        g_xcp_channel.runtime_ptr->tx.cto_claimed        = 0U;
+
+        /* An RX that overflows the queue while the busy answer is on the wire
+           must re-arm the notice instead of losing it. */
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        for (i = 0U; i < enq; i++)
+        {
+            xcp_inject(gs_cmd, 1U);
+        }
+        xcp_inject(gs_cmd, 1U);
+        CHECK("K39l an overflowed queue arms the busy notice",
+              g_xcp_channel.runtime_ptr->busy_pending == TRUE);
+
+        test_tx_rx_in_send = TRUE;
+        Xcp_MainFunction();
+        test_tx_rx_in_send = FALSE;
+        CHECK("K39m the busy answer goes out once and a second overflow keeps the notice",
+              (g_xcp_channel.runtime_ptr->busy_pending == TRUE)
+              && (xcp_pop_cto(f) == 2U)
+              && (f[0] == XCP_PID_ERR) && (f[1] == XCP_ERR_CMD_BUSY)
+              && (xcp_pop_cto(f) == 0U));
+
+        Xcp_MainFunction();
+        CHECK("K39n the re-armed notice queues one more busy answer",
+              (g_xcp_channel.runtime_ptr->busy_pending == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39o it leaves as the second busy answer, not a lost notice",
+              (xcp_pop_cto(f) == 2U) && (f[0] == XCP_PID_ERR)
+              && (f[1] == XCP_ERR_CMD_BUSY));
+
+        Xcp_MainFunction();
+        CHECK("K39p the queued commands then run instead of answering busy again",
+              (g_xcp_channel.runtime_ptr->busy_pending == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count > 0U)
+              && (xcp_drain_cto() == 0U));
         xcp_settle();
     }
 

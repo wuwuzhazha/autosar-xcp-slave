@@ -26,8 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   producer that lands inside the lower-layer call neither resends nor
   overwrites that slot
 - K39 pins the session boundary: a `DISCONNECT` accepted behind earlier
-  answers leaves the pipe intact, and both a busy CTO and a busy DTO resume it
-  in command order
+  answers leaves the pipe intact, both a busy CTO and a busy DTO resume it in
+  command order, an in-call confirmation sends one frame and keeps the next,
+  a reserved answer keeps the block-upload continuation out, and an overflow
+  that lands during the busy answer keeps its notice
 
 ### Changed
 - A command burst is answered at bus speed instead of one command per
@@ -53,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same applies to a failed `UNLOCK` and to `PROGRAM_RESET`. Only a closed
   transport drops what is queued (`Xcp_SoAdConnectionClosed` now calls
   `Xcp_SessionLinkDown`), because nothing queued can still reach the master
+- The busy notice is taken together with the room its answer needs, so an RX
+  that overflows the queue again while `ERR_CMD_BUSY` is on the wire re-arms
+  the notice instead of having it cleared under its own frame
+- A response slot reserved for a command's answer keeps the block-upload
+  continuation out of the port, so a confirmation that lands between the
+  reservation and the answer cannot put an upload frame ahead of it
 - `DISCONNECT` is rejected with `ERR_PGM_ACTIVE` while a programming
   sequence is open, so a master cannot silently drop the programming
   session; other status and query commands remain available in that state

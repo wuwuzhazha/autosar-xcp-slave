@@ -33,11 +33,16 @@ boolean test_tx_confirm_in_send = FALSE;
 /* Queue a DTO from inside the transmit call, the way another task context may
    land an event while the lower layer still holds the frame. */
 boolean test_tx_enqueue_in_send = FALSE;
+
+/* Land a command from inside the transmit call, the way the RX interrupt may
+   deliver the next request while the lower layer still holds this frame. */
+boolean test_tx_rx_in_send = FALSE;
 static uint8 test_tx_confirm_depth = 0U;
 
 #if (XCP_DAQ_ENABLED == STD_ON)
 static const uint8 test_tx_in_send_dto[4] = {0xC0U, 0xC1U, 0xC2U, 0xC3U};
 #endif
+static const uint8 test_tx_in_send_cmd[1] = {0xFDU};
 
 /* SchM probe state; defined next to the SchM stubs below. */
 extern uint32   test_schm_depth;
@@ -83,6 +88,16 @@ Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_p
     test_tx_len[test_tx_tail] = pdu_info_ptr->sdu_length;
     test_tx_tail = (uint8)((test_tx_tail + 1U) % TEST_TX_RING);
     test_tx_count++;
+
+    if (test_tx_rx_in_send != FALSE)
+    {
+        PduInfoType rx_info;
+
+        rx_info.sdu_data_ptr  = (uint8 *)test_tx_in_send_cmd;
+        rx_info.sdu_length    = (uint16)sizeof(test_tx_in_send_cmd);
+        rx_info.meta_data_ptr = NULL_PTR;
+        Xcp_HandleRxIndication(&rx_info);
+    }
 
     if ((test_tx_confirm_in_send != FALSE) && (test_tx_confirm_depth == 0U))
     {

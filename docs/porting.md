@@ -125,6 +125,10 @@ Concurrency contract:
   `busy_pending` instead of overwriting when the queue is full; the main loop
   answers `ERR_CMD_BUSY` and clears it. No other context may write those
   fields.
+- The room a command's answer takes is reserved for that answer. A command
+  handler (or the user-command callout it calls) may answer for the command it
+  is running; every other CTO sender must not preempt `Xcp_MainFunction`, and
+  the block-upload continuation is refused while a reservation is open.
 - A main-function call runs every queued command, at most one full queue.
   Before a command runs it reserves the room its answer needs in the CTO
   pipe (`tx.cto_*`, one response per queued command plus the frame in

@@ -99,6 +99,26 @@ static void Xcp_CtoRelease(Xcp_RuntimeType *runtime)
     XCP_DTO_EXIT_CRITICAL();
 }
 
+/* Take the busy notice and the room its answer needs in one region, so an RX
+   that overflows the queue again while the answer is on the wire re-arms the
+   notice instead of having it cleared under its own frame. */
+static boolean Xcp_TakeBusyNotice(Xcp_RuntimeType *runtime)
+{
+    boolean taken = FALSE;
+
+    XCP_DTO_ENTER_CRITICAL();
+
+    if ((runtime->busy_pending != FALSE) && (Xcp_CtoReserveLocked(runtime) != FALSE))
+    {
+        runtime->busy_pending = FALSE;
+        taken = TRUE;
+    }
+
+    XCP_DTO_EXIT_CRITICAL();
+
+    return taken;
+}
+
 /* Copy the oldest queued command out of the queue. The command runs from the
    caller's copy, so the producer may wrap around and reuse the slot while the
    handler still holds the bytes. */
@@ -195,16 +215,9 @@ void Xcp_ProcessCommandQueue(void)
     uint8            cmd_length;
     uint8            budget;
 
-    if (runtime->busy_pending != FALSE)
+    if (Xcp_TakeBusyNotice(runtime) != FALSE)
     {
-        if (Xcp_CtoReserve(runtime) != FALSE)
-        {
-            Xcp_SendErrorResponse(XCP_ERR_CMD_BUSY);
-
-            runtime->busy_pending = FALSE;
-            Xcp_CtoRelease(runtime);
-        }
-
+        Xcp_SendErrorResponse(XCP_ERR_CMD_BUSY);
         return;
     }
 

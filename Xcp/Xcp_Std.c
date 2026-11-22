@@ -302,7 +302,10 @@ boolean Xcp_ContinueBlockUpload(Xcp_Channel *ch)
         return FALSE;
     }
 
-    if ((runtime->tx.state != XCP_TX_IDLE) || (runtime->tx.cto_count > 0U))
+    /* A command owns the port from the moment its answer is reserved: no
+       block-upload frame may take that room or overtake that answer. */
+    if ((runtime->tx.state != XCP_TX_IDLE) || (runtime->tx.cto_count > 0U)
+        || (runtime->tx.cto_claimed > 0U))
     {
         return FALSE;
     }
