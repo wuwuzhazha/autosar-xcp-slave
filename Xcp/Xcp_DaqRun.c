@@ -176,10 +176,6 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
-    boolean send_now  = FALSE;
-    boolean sent      = FALSE;
-    boolean confirmed = FALSE;
-
     XCP_DTO_ENTER_CRITICAL();
 
     if (runtime->tx_mode == XCP_TX_OFF)
@@ -187,53 +183,6 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
         XCP_DTO_EXIT_CRITICAL();
         return;
     }
-
-    if (runtime->tx.state == XCP_TX_IDLE)
-    {
-        storage->dto_busy_watchdog_cnt = 0U;
-        runtime->tx.dto_latch     = TRUE;
-        runtime->tx.state         = XCP_TX_DTO;
-        runtime->tx.dto_in_flight = TRUE;
-        send_now = TRUE;
-    }
-
-    XCP_DTO_EXIT_CRITICAL();
-
-    if (send_now != FALSE)
-    {
-        sent = (Xcp_Tl_SendDto(dto_data, dto_length) == E_OK) ? TRUE : FALSE;
-
-        XCP_DTO_ENTER_CRITICAL();
-
-        runtime->tx.dto_in_flight = FALSE;
-        /* The lower layer may confirm before it returns; that confirmation
-           already retired the pipe and owns the latch from here on. */
-        confirmed = (runtime->tx.state != XCP_TX_DTO) ? TRUE : FALSE;
-
-        if (sent == FALSE)
-        {
-            runtime->tx.dto_latch = FALSE;
-
-            if (confirmed == FALSE)
-            {
-                runtime->tx.state = XCP_TX_IDLE;
-            }
-        }
-
-        XCP_DTO_EXIT_CRITICAL();
-
-        if (sent != FALSE)
-        {
-            if (confirmed != FALSE)
-            {
-                Xcp_DtoSendNext(ch);
-            }
-
-            return;
-        }
-    }
-
-    XCP_DTO_ENTER_CRITICAL();
 
     if (storage->dto_queue_count < (uint8) XCP_DTO_QUEUE_DEPTH)
     {
@@ -256,6 +205,11 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
     }
 
     XCP_DTO_EXIT_CRITICAL();
+
+    /* Every frame takes the same path through the queue, so the order it
+       leaves in is the order it was produced in however the pipe treated an
+       earlier frame. */
+    Xcp_DtoSendNext(ch);
 }
 
 /* Hands the queued tail DTO to the lower layer. The slot stays reserved while
@@ -281,11 +235,18 @@ static boolean Xcp_DtoSendQueued(Xcp_Channel *ch)
         return FALSE;
     }
 
+    /* The latch and the watchdog behind it belong to the frame that owns the
+       pipe, so a drain that finds the pipe busy must leave both alone even
+       when the owning frame is only one the caller simulated. */
+    if ((runtime->tx_mode != XCP_TX_ON) || (runtime->tx.state != XCP_TX_IDLE))
+    {
+        XCP_DTO_EXIT_CRITICAL();
+        return FALSE;
+    }
+
     runtime->tx.dto_latch = FALSE;
 
-    if ((runtime->tx_mode != XCP_TX_ON)
-        || (runtime->tx.state != XCP_TX_IDLE)
-        || (storage->dto_queue_count == 0U))
+    if (storage->dto_queue_count == 0U)
     {
         XCP_DTO_EXIT_CRITICAL();
         return FALSE;
