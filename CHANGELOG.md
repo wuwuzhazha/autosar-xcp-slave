@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pyxcp `push()` end-to-end test covering a multi-block download
 
 ### Fixed
+- `DISCONNECT` is rejected with `ERR_PGM_ACTIVE` while a programming
+  sequence is open, so a master cannot silently drop the programming
+  session; other status and query commands remain available in that state
+- `PROGRAM_START` returns `ERR_DAQ_ACTIVE` while a DAQ list is running
+  instead of silently freeing the DAQ configuration
+- `UNLOCK` returns the remaining resource-protection mask, not the bit
+  that was just unlocked
+- `GET_ID` rejects unsupported identification types with
+  `ERR_OUT_OF_RANGE` instead of returning a successful zero-length ID
 - Block download follows the declared length: byte 1 of `DOWNLOAD` is the
   total block length and byte 1 of `DOWNLOAD_NEXT` the remaining length.
   The slave stays silent on intermediate frames, answers only the frame

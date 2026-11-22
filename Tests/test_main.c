@@ -357,6 +357,7 @@ static uint8  test_ram_var8;
 int main(void)
 {
     uint8  res[64];
+    uint8  unlock_protection_status;
     uint32 l;
     uint8  cmd[16];
     Std_VersionInfoType ver;
@@ -491,8 +492,11 @@ int main(void)
     CHECK("B10 GET_ID type0 -> RES len8, len>0",
           (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] > 0U));
     l = xcp_cmd((const uint8 *)"\xFA\x09", 2U, res);
-    CHECK("B11 GET_ID type9 -> len=0",
-          (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] == 0U));
+    CHECK("B11 GET_ID type9 -> ERR_OUT_OF_RANGE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+    l = xcp_cmd((const uint8 *)"\xFA\x7F", 2U, res);
+    CHECK("B11a GET_ID unsupported type -> ERR_OUT_OF_RANGE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
     l = xcp_cmd((const uint8 *)"\xF5\x07", 2U, res);
     CHECK("B10a UPLOAD after GET_ID -> 'AUTOSAR'",
@@ -611,14 +615,20 @@ int main(void)
         l = xcp_cmd(cmd, 3U, res); memcpy(seed, &res[2], 4U);
         cmd[0] = 0xF7; cmd[1] = 4U;
         for (i = 0U; i < 4U; i++) { cmd[2U + i] = (uint8)(seed[i] ^ 0xFFU); }
-        (void)xcp_cmd(cmd, 6U, res);
+        l = xcp_cmd(cmd, 6U, res);
+        unlock_protection_status = res[1];
+        CHECK("G4a UNLOCK response reports remaining protection mask",
+              (l == 2U) && (res[0] == XCP_PID_RES)
+              && (unlock_protection_status == XCP_RESOURCE_STIM));
         cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_STIM;
         l = xcp_cmd(cmd, 3U, res); memcpy(seed, &res[2], 4U);
         cmd[0] = 0xF7; cmd[1] = 4U;
         for (i = 0U; i < 4U; i++) { cmd[2U + i] = (uint8)(seed[i] ^ 0xFFU); }
-        (void)xcp_cmd(cmd, 6U, res);
+        l = xcp_cmd(cmd, 6U, res);
         CHECK("G5 all resources unlocked",
               g_xcp_channel.runtime_ptr->protection_status == 0U);
+        CHECK("G5a final UNLOCK response reports zero remaining protection",
+              (l == 2U) && (res[0] == XCP_PID_RES) && (res[1] == 0U));
     }
 
     printf("-- C. memory access\n");
@@ -1211,14 +1221,17 @@ int main(void)
     printf("-- F. flash programming\n");
     memset(test_flash_mem, 0xAA, sizeof(test_flash_mem));
 
+    (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
+    (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+    xcp_settle();
     l = xcp_cmd((const uint8 *)"\xCA\x01\xAA", 3U, res);
     CHECK("F0a PROGRAM_NEXT before start -> ERR_SEQUENCE",
           (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
     l = xcp_cmd((const uint8 *)"\xC9\xAA", 2U, res);
     CHECK("F0b PROGRAM_MAX before start -> ERR_SEQUENCE",
           (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
-    l = xcp_cmd((const uint8 *)"\xD2", 1U, res);
 
+    l = xcp_cmd((const uint8 *)"\xD2", 1U, res);
     CHECK("F1 PROGRAM_START bytes",
           frame_is(res, l, (const uint8[]){ 0xFF, 0x00, TST_COMM_OPT, XCP_MAX_CTO,
                                             XCP_MAX_BS, XCP_MIN_ST, TST_QUEUE_SIZE }, 7U));
@@ -2556,18 +2569,25 @@ int main(void)
             g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
         }
 
-        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-        cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 2; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
-        (void)xcp_cmd((const uint8 *)"\xFE", 1U, res);
         CHECK("K20c DISCONNECT frees DAQ (daq_count=0)",
               g_xcp_channel.runtime_ptr->daq_count == 0U);
+
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
+        (void)xcp_cmd((const uint8 *)"\xD2", 1U, res);
+        l = xcp_cmd((const uint8 *)"\xFE", 1U, res);
+        CHECK("K20e DISCONNECT while programming -> ERR_PGM_ACTIVE",
+              (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_PGM_ACTIVE));
+        CHECK("K20f denied DISCONNECT keeps programming session",
+              g_xcp_channel.runtime_ptr->pgm_started == TRUE
+              && g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED);
+        (void)xcp_cmd((const uint8 *)"\xCF", 1U, res);
         (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
         xcp_settle();
 
         g_xcp_channel.runtime_ptr->protection_status &=
             (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM);
         l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
-        CHECK("K20d GET_STATUS fields",
+        CHECK("K20g GET_STATUS fields",
               (l == 6U) && (res[0] == XCP_PID_RES)
               && ((res[1] & (XCP_SS_RESUME | XCP_SS_DAQ_RUNNING))
                   == ((Xcp_IsResumeModeActive(&g_xcp_channel) != FALSE) ? XCP_SS_RESUME : 0x00U))
@@ -2576,12 +2596,12 @@ int main(void)
         {
             uint32 mta_before = g_xcp_channel.runtime_ptr->mta;
             l = xcp_cmd((const uint8 *)"\xFA\x00", 2U, res);
-            CHECK("K20e GET_ID type0 -> len>0 + MTA set",
+            CHECK("K20h GET_ID type0 -> len>0 + MTA set",
                   (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] > 0U)
                   && (g_xcp_channel.runtime_ptr->mta != mta_before));
             l = xcp_cmd((const uint8 *)"\xFA\x01", 2U, res);
-            CHECK("K20f GET_ID type1 -> len0",
-                  (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] == 0U));
+            CHECK("K20i GET_ID type1 -> ERR_OUT_OF_RANGE",
+                  (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_OUT_OF_RANGE));
         }
     }
 
@@ -3834,6 +3854,42 @@ int main(void)
         xcp_settle();
     }
 #endif
+
+    printf("-- L. protocol state gates in a fresh session\n");
+    Xcp_Init(NULL_PTR);
+    (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+    xcp_drain_tx();
+    g_xcp_channel.runtime_ptr->protection_status = 0U;
+
+    cmd[0] = 0xD6; (void)xcp_cmd(cmd, 1U, res);
+    cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
+    cmd[0] = 0xD4; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 1; (void)xcp_cmd(cmd, 5U, res);
+    cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
+    cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    cmd[0] = 0xDE; cmd[1] = 1; cmd[2] = 0; cmd[3] = 0;
+    (void)xcp_cmd(cmd, 4U, res);
+    CHECK("L1 DAQ running before PROGRAM_START",
+          g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
+    l = xcp_cmd((const uint8 *)"\xD2", 1U, res);
+    CHECK("L2 PROGRAM_START with active DAQ -> ERR_DAQ_ACTIVE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_DAQ_ACTIVE));
+    CHECK("L3 rejected PROGRAM_START leaves DAQ running",
+          g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
+    (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
+    (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+    xcp_settle();
+
+    (void)xcp_cmd((const uint8 *)"\xD2", 1U, res);
+    CHECK("L4 PROGRAM_START establishes programming session",
+          Xcp_IsProgrammingActive(&g_xcp_channel) == TRUE);
+    l = xcp_cmd((const uint8 *)"\xFE", 1U, res);
+    CHECK("L5 DISCONNECT while programming -> ERR_PGM_ACTIVE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_PGM_ACTIVE));
+    CHECK("L6 denied DISCONNECT preserves programming session",
+          Xcp_IsProgrammingActive(&g_xcp_channel) == TRUE
+          && g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED);
 
     printf("================ %d passed, %d failed ================\n",
            pass_count, fail_count);

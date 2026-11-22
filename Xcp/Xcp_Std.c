@@ -200,7 +200,7 @@ sint16 Xcp_CmdGetId(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xc
     }
     else
     {
-
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;

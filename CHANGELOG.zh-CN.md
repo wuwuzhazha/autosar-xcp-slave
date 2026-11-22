@@ -16,6 +16,13 @@
 - pyxcp `push()` 端到端测试，覆盖多块下载
 
 ### 修复
+- 编程序列进行中拒绝 `DISCONNECT` 并返回 `ERR_PGM_ACTIVE`，主站无法在
+  无提示的情况下丢弃编程会话；该状态下状态查询类命令仍可用
+- `PROGRAM_START` 遇到运行中的 DAQ 列表返回 `ERR_DAQ_ACTIVE`，不再静默
+  释放 DAQ 配置
+- `UNLOCK` 返回剩余资源保护掩码，而不是刚刚解锁的位
+- `GET_ID` 对不支持的标识类型返回 `ERR_OUT_OF_RANGE`，不再返回成功的
+  零长度标识
 - 块下载按声明长度执行：`DOWNLOAD` byte 1 为整块长度，`DOWNLOAD_NEXT`
   byte 1 为剩余长度。从站对中间帧保持静默，只在耗尽整块的最后一帧应答，
   越界帧返回 `ERR_SEQUENCE`；普通 `DOWNLOAD` 与 `DOWNLOAD_MAX` 均为

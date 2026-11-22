@@ -312,6 +312,7 @@ static inline uint8 *Xcp_MemPtrWrite(Xcp_Channel *ch, uint8 ext, uint32 addr, ui
 
 #define XCP_GUARD_NONE                (0U)
 #define XCP_GUARD_ALLOW_DISCONNECTED  (1U)
+#define XCP_GUARD_BLOCK_PGM_ACTIVE    (2U)
 
 typedef struct
 {
