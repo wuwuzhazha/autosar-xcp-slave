@@ -4571,6 +4571,26 @@ int main(void)
               (test_tx_pop(dto, &dl) == (uint32)sizeof(f_b)) && (dto[0] == f_b[0])
               && (g_xcp_channel.storage_ptr->dto_queue_count == 0U));
 
+        /* Only a busy pipe keeps the latch. With the pipe idle no frame owns
+           it, so a drain must release it even while transmission is off, and
+           the frame it could not send keeps its place for when TX resumes. */
+        test_dto_pipe_reset();
+        test_tx_fail_next = TRUE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, f_a, (uint8)sizeof(f_a));
+        g_xcp_channel.runtime_ptr->tx_mode      = XCP_TX_OFF;
+        g_xcp_channel.runtime_ptr->tx.dto_latch = TRUE;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        CHECK("T3f an idle pipe drops a stale latch while TX is off",
+              (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 1U)
+              && (test_tx_pending() == 0U));
+        g_xcp_channel.runtime_ptr->tx_mode = XCP_TX_ON;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        CHECK("T3g the kept frame leaves once TX is back on",
+              (test_tx_pop(dto, &dl) == (uint32)sizeof(f_a)) && (dto[0] == f_a[0]));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+
         test_dto_pipe_reset();
     }
 #endif

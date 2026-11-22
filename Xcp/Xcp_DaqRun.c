@@ -237,8 +237,9 @@ static boolean Xcp_DtoSendQueued(Xcp_Channel *ch)
 
     /* The latch and the watchdog behind it belong to the frame that owns the
        pipe, so a drain that finds the pipe busy must leave both alone even
-       when the owning frame is only one the caller simulated. */
-    if ((runtime->tx_mode != XCP_TX_ON) || (runtime->tx.state != XCP_TX_IDLE))
+       when the owning frame is only one the caller simulated. An idle pipe
+       has no owner, so its latch goes whether or not TX may send now. */
+    if (runtime->tx.state != XCP_TX_IDLE)
     {
         XCP_DTO_EXIT_CRITICAL();
         return FALSE;
@@ -246,7 +247,7 @@ static boolean Xcp_DtoSendQueued(Xcp_Channel *ch)
 
     runtime->tx.dto_latch = FALSE;
 
-    if (storage->dto_queue_count == 0U)
+    if ((runtime->tx_mode != XCP_TX_ON) || (storage->dto_queue_count == 0U))
     {
         XCP_DTO_EXIT_CRITICAL();
         return FALSE;
