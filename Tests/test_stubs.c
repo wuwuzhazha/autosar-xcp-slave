@@ -37,17 +37,21 @@ boolean test_tx_enqueue_in_send = FALSE;
 /* Land a command from inside the transmit call, the way the RX interrupt may
    deliver the next request while the lower layer still holds this frame. */
 boolean test_tx_rx_in_send = FALSE;
+
+#ifndef XCP_TEST_EXTERNAL_CANIF_TRANSMIT
 static uint8 test_tx_confirm_depth = 0U;
 
 #if (XCP_DAQ_ENABLED == STD_ON)
 static const uint8 test_tx_in_send_dto[4] = {0xC0U, 0xC1U, 0xC2U, 0xC3U};
 #endif
 static const uint8 test_tx_in_send_cmd[1] = {0xFDU};
+#endif
 
 /* SchM probe state; defined next to the SchM stubs below. */
 extern uint32   test_schm_depth;
 extern boolean  test_schm_tx_under_lock;
 
+#ifndef XCP_TEST_EXTERNAL_CANIF_TRANSMIT
 Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_ptr)
 {
     (void)tx_pdu_id;
@@ -108,6 +112,7 @@ Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_p
 
     return E_OK;
 }
+#endif /* XCP_TEST_EXTERNAL_CANIF_TRANSMIT */
 
 Std_ReturnType FrIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_ptr)
 {
