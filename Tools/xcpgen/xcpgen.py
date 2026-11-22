@@ -254,6 +254,12 @@ def check_range(name, v, p):
     if v < lo or (hi is not None and v > hi):
         raise SchemaError(f"{name}: {v} out of range [{lo},{hi}]")
 
+def _table_int(value, label, errors):
+    if isinstance(value, bool) or not isinstance(value, int):
+        errors.append(f"{label}: expects an integer, got {value!r}")
+        return None
+    return value
+
 def apply_link(vals, name):
     up = str(name).upper()
     if up not in LINK_NAMES:
@@ -359,15 +365,24 @@ def normalize(cfg, sets):
         if s.get("length", 0) < 1:
             errs.append(f"flash_sectors[{i}].length >= 1")
     for i, s in enumerate(t["static_daq_lists"]):
-        oc, ec2 = s.get("odt_count", 0), s.get("odt_entry_count", 0)
         ents = s.get("entries", [])
-        if oc < 1 or ec2 < 1:
-            errs.append(f"static_daq_lists[{i}]: odt_count/odt_entry_count >= 1")
-        if len(ents) not in (0, oc * ec2):
-            errs.append(f"static_daq_lists[{i}].entries count ({len(ents)}) != odt_count*odt_entry_count ({oc*ec2})")
+        label = f"static_daq_lists[{i}]"
+        oc = _table_int(s.get("odt_count", 0), label + ".odt_count", errs)
+        ec2 = _table_int(s.get("odt_entry_count", 0), label + ".odt_entry_count", errs)
+        if oc is not None and ec2 is not None:
+            if oc < 1 or ec2 < 1:
+                errs.append(f"{label}: odt_count/odt_entry_count >= 1")
+            if oc > 255 or ec2 > 255:
+                errs.append(f"{label}: odt_count/odt_entry_count must fit uint8")
+            if oc > vals["XcpOdtCount"]:
+                errs.append(f"{label}.odt_count ({oc}) > XCP_MAX_ODT ({vals['XcpOdtCount']})")
+            if ec2 > vals["XcpOdtEntriesCount"]:
+                errs.append(f"{label}.odt_entry_count ({ec2}) > XCP_MAX_ODT_ENTRIES ({vals['XcpOdtEntriesCount']})")
+            if len(ents) != oc * ec2:
+                errs.append(f"{label}.entries count ({len(ents)}) != odt_count*odt_entry_count ({oc*ec2})")
         for j, en in enumerate(ents):
             if "address" not in en or "size" not in en:
-                errs.append(f"static_daq_lists[{i}].entries[{j}] missing address/size")
+                errs.append(f"{label}.entries[{j}] missing address/size")
     if errs:
         raise SchemaError("\n".join(errs))
     return vals, t
