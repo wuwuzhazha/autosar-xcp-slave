@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   command order, an in-call confirmation sends one frame and keeps the next,
   a reserved answer keeps the block-upload continuation out, and an overflow
   that lands during the busy answer keeps its notice
+- K8c/K8d pin the DTO watchdog to the frame that owns the pipe: a queue that
+  never empties with every frame confirmed on the next main cycle keeps one
+  frame in flight and never adds up the waits of different frames
 
 ### Changed
 - A command burst is answered at bus speed instead of one command per
@@ -121,6 +124,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its own payload and the list counter stays exact. A confirmation that
   arrives inside the call no longer resends or releases the slot that call
   still owns, and the frame that call sends is drained exactly once
+- The DTO busy watchdog measures the frame that owns the pipe: its wait
+  starts when that frame is handed to the lower layer, so a queue that is
+  never empty no longer adds up the waits of successive frames and force-
+  releases a frame that was confirmed on time. A frame that really stays
+  unconfirmed still recovers at the same `XCP_DTO_BUSY_TIMEOUT_CYCLES`
 
 ## [0.3.2] — 2026-11-20
 

@@ -190,6 +190,7 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
 
     if (runtime->tx.state == XCP_TX_IDLE)
     {
+        storage->dto_busy_watchdog_cnt = 0U;
         runtime->tx.dto_latch     = TRUE;
         runtime->tx.state         = XCP_TX_DTO;
         runtime->tx.dto_in_flight = TRUE;
@@ -294,6 +295,7 @@ static boolean Xcp_DtoSendQueued(Xcp_Channel *ch)
     dto_len = storage->dto_queue_len[tail];
     (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
 
+    storage->dto_busy_watchdog_cnt = 0U;
     runtime->tx.dto_latch     = TRUE;
     runtime->tx.state         = XCP_TX_DTO;
     runtime->tx.dto_in_flight = TRUE;

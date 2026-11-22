@@ -2076,6 +2076,81 @@ int main(void)
         }
         CHECK("K8b queue drains and idle after watchdog",
               g_xcp_channel.storage_ptr->dto_queue_count == 0U);
+
+        /* A queue that never empties and is confirmed every main cycle: the
+           watchdog must measure the frame that owns the pipe, not the sum of
+           the waits of every frame that passed through it. */
+        {
+            uint8   frame[4] = {0xC0U, 0xC1U, 0xC2U, 0xC3U};
+            uint8   popped[8];
+            uint32  popped_len;
+            uint32  sent = 0U;
+            uint32  acks = 0U;
+            uint32  wi;
+            uint8   settle;
+            boolean one_in_flight = TRUE;
+            boolean per_frame_wait = TRUE;
+
+            xcp_quiet_pipe();
+            g_xcp_channel.runtime_ptr->tx_mode       = XCP_TX_ON;
+            g_xcp_channel.runtime_ptr->tx.state      = XCP_TX_IDLE;
+            g_xcp_channel.runtime_ptr->tx.dto_latch  = FALSE;
+            g_xcp_channel.storage_ptr->dto_queue_count = 0U;
+            g_xcp_channel.storage_ptr->dto_queue_head  = 0U;
+            g_xcp_channel.storage_ptr->dto_queue_tail  = 0U;
+            g_xcp_channel.storage_ptr->dto_busy_watchdog_cnt = 0U;
+
+            Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, frame, (uint8)sizeof(frame));
+            Xcp_DtoSendOrQueue(&g_xcp_channel, 1U, frame, (uint8)sizeof(frame));
+
+            for (wi = 0U; wi < 300U; wi++)
+            {
+                Xcp_MainFunction();
+
+                while (test_tx_pop(popped, &popped_len) > 0U)
+                {
+                    sent++;
+                }
+                if (g_xcp_channel.storage_ptr->dto_busy_watchdog_cnt > 1U)
+                {
+                    per_frame_wait = FALSE;
+                }
+                if ((sent - acks) > 1U)
+                {
+                    one_in_flight = FALSE;
+                }
+
+                acks++;
+                Xcp_Tl_TxConfirmation(0U, E_OK);
+                Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, frame, (uint8)sizeof(frame));
+                while (test_tx_pop(popped, &popped_len) > 0U)
+                {
+                    sent++;
+                }
+            }
+
+            for (settle = 0U; settle < (uint8)(XCP_DTO_QUEUE_DEPTH + 2U); settle++)
+            {
+                if (g_xcp_channel.runtime_ptr->tx.state != XCP_TX_DTO)
+                {
+                    break;
+                }
+                acks++;
+                Xcp_Tl_TxConfirmation(0U, E_OK);
+                while (test_tx_pop(popped, &popped_len) > 0U)
+                {
+                    sent++;
+                }
+            }
+
+            CHECK("K8c a busy queue with prompt confirmations keeps one frame in flight",
+                  (one_in_flight != FALSE) && (sent == acks)
+                  && (g_xcp_channel.storage_ptr->dto_queue_count == 0U)
+                  && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+                  && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+            CHECK("K8d the watchdog measures each frame, not the busy queue",
+                  per_frame_wait != FALSE);
+        }
     }
 
     {
