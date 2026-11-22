@@ -25,7 +25,7 @@ TRANSPORTS = ["Xcp/XcpOnCan.c", "Xcp/XcpOnFr.c", "Xcp/XcpOnEth.c", "Xcp/XcpOnCdd
 FLAGS = [
     "-std=c99", "-g", "-Wall", "-Wextra", "-Wno-unused-parameter",
     "-Werror=implicit-function-declaration",
-    "-ITests/stubs", "-Itests", "-IXcp", "-include", "Tests/test_config.h",
+    "-ITests/stubs", "-ITests", "-IXcp", "-include", "Tests/test_config.h",
     "-DXCP_TEST_EXTERNAL_CANIF_TRANSMIT",
 ]
 SCENARIOS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S6B", "S7B", "S10", "S11",
