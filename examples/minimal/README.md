@@ -47,7 +47,7 @@ DISCONNECT         FF
   XCP frame (CTO or STIM DTO) through it.
 - `Xcp_MainFunction()` services the pending command queue.
 - `Xcp_HandleTxConfirmation(E_OK)` simulates the lower layer confirming the
-  transmit, which releases the next CTO in `tx.parked` / `dto_queue`.
+  transmit, which releases the next CTO from the response FIFO or `dto_queue`.
 - `test_tx_pop` is the stub's TX capture — on real hardware this is your
   `CanIf_Transmit` / `SoAd_IfTransmit` etc.
 
