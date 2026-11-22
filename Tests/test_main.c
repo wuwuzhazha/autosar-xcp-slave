@@ -3065,7 +3065,26 @@ int main(void)
               g_xcp_channel.storage_ptr->daq_list[0].state != XCP_DAQ_STATE_RUNNING);
         CHECK("K24c socket close idle -> FALSE",
               Xcp_SoAdConnectionClosed() == FALSE);
-        l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        xcp_quiet_pipe();
+
+        test_tx_fail_count = 8U;
+        xcp_inject((const uint8 *)"\xFE", 1U);
+        Xcp_MainFunction();
+        CHECK("K24d DISCONNECT leaves its unsent answer queued",
+              (g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U));
+        CHECK("K24e socket close discards the queued DISCONNECT answer",
+              (Xcp_SoAdConnectionClosed() == TRUE)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        test_tx_fail_count = 0U;
+        xcp_inject((const uint8 *)"\xFF\x00", 2U);
+        Xcp_MainFunction();
+        l = xcp_pop_cto(res);
+        CHECK("K24f reconnect sends CONNECT answer without stale CTO",
+              (l == 8U) && (res[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
         xcp_drain_tx();
     }
 #endif
