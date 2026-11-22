@@ -111,6 +111,8 @@ typedef struct
     Xcp_OdtEntryType odt_entry[XCP_MAX_DAQ * XCP_MAX_ODT * XCP_MAX_ODT_ENTRIES];
     uint8  dto_queue[XCP_DTO_QUEUE_DEPTH][XCP_MAX_DTO];
     uint8  dto_queue_len[XCP_DTO_QUEUE_DEPTH];
+    uint16 dto_queue_list[XCP_DTO_QUEUE_DEPTH];
+    uint8  dto_queued[XCP_MAX_DAQ];
     uint8  dto_queue_count;
     uint8  dto_queue_head;
     uint8  dto_queue_tail;
@@ -340,7 +342,7 @@ void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length);
 
 void Xcp_ProcessCommandQueue(void);
 
-void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length);
+void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_data, uint8 dto_length);
 
 void Xcp_DtoSendNext(Xcp_Channel *ch);
 

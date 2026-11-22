@@ -1685,27 +1685,50 @@ int main(void)
 
     {
 
-        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-        cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
-        cmd[0] = 0xD4; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 1; (void)xcp_cmd(cmd, 5U, res);
-        cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 1; (void)xcp_cmd(cmd, 6U, res);
-        cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
-        cmd[0] = 0xE1; cmd[1] = 0xFF;  cmd[2] = 4; cmd[3] = 0;
-        memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
-        (void)xcp_cmd(cmd, 8U, res);
-        cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
-        (void)xcp_cmd(cmd, 8U, res);
-        cmd[0] = 0xDE; cmd[1] = 1; cmd[2] = 0; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
+        uint8 l2;
+        uint8 o2;
 
-        test_sim_dto_inflight();
-        xcp_drain_tx();
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 2; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
         {
-            uint32 qi;
-            for (qi = 0U; qi < (XCP_MAX_ODT + 2U); qi++)
+            for (l2 = 0U; l2 < 2U; l2++)
             {
-                Xcp_Event(0U);
+                cmd[0] = 0xD4; cmd[1] = 0; cmd[2] = l2; cmd[3] = 0;
+                cmd[4] = (uint8)XCP_MAX_ODT;
+                (void)xcp_cmd(cmd, 5U, res);
+                for (o2 = 0U; o2 < (uint8)XCP_MAX_ODT; o2++)
+                {
+                    cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = l2; cmd[3] = 0;
+                    cmd[4] = o2; cmd[5] = 1;
+                    (void)xcp_cmd(cmd, 6U, res);
+                    cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = l2; cmd[3] = 0;
+                    cmd[4] = o2; cmd[5] = 0;
+                    (void)xcp_cmd(cmd, 6U, res);
+                    cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
+                    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
+                    (void)xcp_cmd(cmd, 8U, res);
+                }
             }
         }
+        for (l2 = 0U; l2 < 2U; l2++)
+        {
+            cmd[0] = 0xE0; cmd[1] = 0; cmd[2] = l2; cmd[3] = 0; cmd[4] = 0;
+            cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+            (void)xcp_cmd(cmd, 8U, res);
+            cmd[0] = 0xDE; cmd[1] = 1; cmd[2] = l2; cmd[3] = 0;
+            (void)xcp_cmd(cmd, 4U, res);
+        }
+        xcp_pump(8U);
+        xcp_settle();
+
+        /* The periodic scheduler may already have overflowed while the lists
+           were being started; measure the event below from a clean slate. */
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        g_xcp_channel.storage_ptr->overload_ev_cooldown = 0U;
+
+        /* Two lists on one channel need more slots than the queue has. */
+        test_sim_dto_inflight();
+        Xcp_Event(0U);
         CHECK("K1a DTO queue count capped at XCP_MAX_ODT",
               g_xcp_channel.storage_ptr->dto_queue_count == XCP_MAX_ODT);
 
@@ -1723,6 +1746,7 @@ int main(void)
         }
 
         cmd[0] = 0xDE; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
+        cmd[0] = 0xDE; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
         (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
         xcp_settle();
     }
@@ -3513,7 +3537,7 @@ int main(void)
            the lock released. */
         g_xcp_channel.runtime_ptr->tx_mode = XCP_TX_ON;
         g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
-        Xcp_DtoSendOrQueue(&g_xcp_channel, dto_payload, 8U);
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, dto_payload, 8U);
         CHECK("K32a DTO queued behind a busy pipe",
               g_xcp_channel.storage_ptr->dto_queue_count == 1U);
         g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
@@ -3674,8 +3698,8 @@ int main(void)
               (g_xcp_channel.storage_ptr->dto_queue_count == (uint8)XCP_MAX_ODT)
               && (g_xcp_channel.storage_ptr->dto_overload_pending == FALSE));
         Xcp_Event(2U);
-        CHECK("K33h a second burst finds no free slot and is dropped",
-              (g_xcp_channel.storage_ptr->dto_overload_pending == TRUE)
+        CHECK("K33h a second burst is held, not queued behind the first",
+              (g_xcp_channel.storage_ptr->dto_overload_pending == FALSE)
               && (g_xcp_channel.storage_ptr->dto_queue_count
                   == (uint8)XCP_DTO_QUEUE_DEPTH));
         g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
@@ -3683,6 +3707,130 @@ int main(void)
         g_xcp_channel.storage_ptr->dto_queue_count = 0U;
         g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
         (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
+        xcp_settle();
+    }
+#endif
+
+#if (XCP_DAQ_ENABLED == STD_ON) && (XCP_IDENTIFICATION_FIELD_TYPE == XCP_ABSOLUTE)
+    printf("-- K35. an event burst is not repeated across periods (issue #22)\n");
+    {
+        uint8  pid[8];
+        uint8  n;
+        uint8  odt;
+        uint8  list;
+
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_DAQ;
+        (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
+        xcp_pump(8U);
+        xcp_settle();
+
+        /* Two lists on one event channel, two ODTs each. */
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x02\x00", 4U, res);
+        test_ram[0] = 0x5AU;
+        for (list = 0U; list < 2U; list++)
+        {
+            cmd[0] = 0xD4; cmd[1] = 0; cmd[2] = list; cmd[3] = 0; cmd[4] = 2U;
+            (void)xcp_cmd(cmd, 5U, res);
+            for (odt = 0U; odt < 2U; odt++)
+            {
+                cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = list; cmd[3] = 0; cmd[4] = odt; cmd[5] = 1;
+                (void)xcp_cmd(cmd, 6U, res);
+                cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = list; cmd[3] = 0; cmd[4] = odt; cmd[5] = 0;
+                (void)xcp_cmd(cmd, 6U, res);
+                cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 1; cmd[3] = 0;
+                memcpy(&cmd[4], &(uint32){RAM_ADDR}, 4U);
+                (void)xcp_cmd(cmd, 8U, res);
+            }
+            cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = list; cmd[3] = 0; cmd[4] = 2;
+            cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+            (void)xcp_cmd(cmd, 8U, res);
+        }
+        cmd[0] = 0xDE; cmd[1] = 1; cmd[2] = 0; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
+        cmd[0] = 0xDE; cmd[1] = 1; cmd[2] = 1; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
+        xcp_pump(8U);
+        xcp_settle();
+
+        /* Both lists are behind their own burst; one event queues both. */
+        test_sim_dto_inflight();
+        Xcp_Event(2U);
+        n = g_xcp_channel.storage_ptr->dto_queue_count;
+        {
+            uint8 i;
+            uint8 tail = g_xcp_channel.storage_ptr->dto_queue_tail;
+            for (i = 0U; i < n; i++)
+            {
+                pid[i] = g_xcp_channel.storage_ptr->dto_queue[(uint8)((tail + i) % (uint8)XCP_DTO_QUEUE_DEPTH)][0];
+            }
+        }
+        CHECK("K35a one event queues every list on the channel",
+              (n == 4U) && (pid[0] == 0U) && (pid[1] == 1U)
+              && (pid[2] == 2U) && (pid[3] == 3U));
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        xcp_pump(8U);
+        xcp_settle();
+
+        /* One list, three ODTs: the next event must not append a second set. */
+        (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xDE\x00\x01\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+        (void)xcp_cmd((const uint8 *)"\xD5\x00\x01\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xD4\x00\x00\x00\x03", 5U, res);
+        for (odt = 0U; odt < 3U; odt++)
+        {
+            cmd[0] = 0xD3; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = odt; cmd[5] = 1;
+            (void)xcp_cmd(cmd, 6U, res);
+            cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = odt; cmd[5] = 0;
+            (void)xcp_cmd(cmd, 6U, res);
+            cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 1; cmd[3] = 0;
+            memcpy(&cmd[4], &(uint32){RAM_ADDR}, 4U);
+            (void)xcp_cmd(cmd, 8U, res);
+        }
+        cmd[0] = 0xE0; cmd[1] = 0x00; cmd[2] = 0; cmd[3] = 0; cmd[4] = 2;
+        cmd[5] = 0; cmd[6] = 1; cmd[7] = 0;
+        (void)xcp_cmd(cmd, 8U, res);
+        (void)xcp_cmd((const uint8 *)"\xDE\x01\x00\x00", 4U, res);
+        xcp_pump(8U);
+        xcp_settle();
+
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        test_sim_dto_inflight();
+        Xcp_Event(2U);
+        Xcp_Event(2U);
+        n = g_xcp_channel.storage_ptr->dto_queue_count;
+        {
+            uint8 i;
+            uint8 tail = g_xcp_channel.storage_ptr->dto_queue_tail;
+            for (i = 0U; i < n; i++)
+            {
+                pid[i] = g_xcp_channel.storage_ptr->dto_queue[(uint8)((tail + i) % (uint8)XCP_DTO_QUEUE_DEPTH)][0];
+            }
+        }
+        CHECK("K35b a second event does not append a duplicate burst",
+              (n == 3U) && (pid[0] == 0U) && (pid[1] == 1U) && (pid[2] == 2U));
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        xcp_pump(8U);
+        xcp_settle();
+
+        /* A CTO inserted mid-burst delays the tail; the next event must still
+           be skipped rather than queueing a second set behind the remainder. */
+        test_sim_dto_inflight();
+        Xcp_Event(2U);
+        xcp_inject((const uint8 *)"\xFD", 1U);
+        Xcp_MainFunction();
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        n = g_xcp_channel.storage_ptr->dto_queue_count;
+        Xcp_Event(2U);
+        CHECK("K35c a CTO mid-burst does not let the next event duplicate the tail",
+              (n == 2U) && (g_xcp_channel.storage_ptr->dto_queue_count == 2U));
+        xcp_pump(8U);
+        xcp_settle();
+
+        (void)xcp_cmd((const uint8 *)"\xDE\x00\x00\x00", 4U, res);
+        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
         xcp_settle();
     }
 #endif

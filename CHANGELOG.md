@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Block mode is usable out of the box: `xcpgen` rejects
   `XcpBlockTransferEnabled=1` with `XcpMaxBs=0`, and the defaults are
   `MAX_BS=4` and `MIN_ST=1 ms` (one main-loop cycle per block frame)
+- An event burst is atomic per DAQ list: while the previous burst still has
+  frames queued, the list is skipped for that event instead of queueing a
+  second ODT set whose absolute PIDs repeat inside one window. The skip is
+  not reported as a DAQ overload, because the master reads that event as
+  data loss
 - A DTO is transmitted at the length of its ODT (identification field,
   optional timestamp and entries), not padded to `XCP_MAX_DTO`. The queue
   stores that length and both drain paths use it. `XcpDtoQueueDepth` must

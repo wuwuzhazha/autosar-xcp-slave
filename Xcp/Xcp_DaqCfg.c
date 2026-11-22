@@ -235,6 +235,8 @@ void Xcp_FreeDaqLists(Xcp_Channel *ch)
     ch->storage_ptr->dto_queue_count = 0U;
     ch->storage_ptr->dto_queue_head  = 0U;
     ch->storage_ptr->dto_queue_tail  = 0U;
+    (void) memset(&ch->storage_ptr->dto_queued[0], 0,
+                  sizeof(ch->storage_ptr->dto_queued));
     XCP_DTO_EXIT_CRITICAL();
 
     Xcp_ResetEventChannelCounters(&g_xcp_channel);
