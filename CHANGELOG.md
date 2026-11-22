@@ -14,8 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - K33i pins that confirming a CTO resumes a queued ODT burst in the same
   confirmation, instead of leaving it until the next main-function period
 - pyxcp `push()` end-to-end test covering a multi-block download
+- K36 pins the burst drain and the response pipe: one main tick runs a full
+  queue, every command keeps the response slot it needs, a full pipe leaves
+  the next command queued with its side effects unapplied, and repeated ticks
+  without a confirmation change nothing. K37 pins that a refused transmit
+  keeps its response at the head and that the queued responses leave in
+  command order
+
+### Changed
+- A command burst is answered at bus speed instead of one command per
+  `XcpMainFunctionPeriod`: `Xcp_MainFunction` runs every queued command in
+  one call (at most one `XcpCmdQueueSize` deep) and no longer waits for an
+  idle mailbox. Each command reserves the room its response needs before it
+  runs, so a full response pipe leaves it queued instead of consuming it
+- A frame that arrives while the single-command handler runs is queued
+  instead of answered `ERR_CMD_BUSY`: the handler works on its own copy of the
+  bytes, so the frame no longer overlaps the queue slot. A frame that arrives
+  while a command is still queued is still answered `ERR_CMD_BUSY`
 
 ### Fixed
+- Responses waiting behind a busy mailbox are no longer dropped: the CTO pipe
+  keeps one response per admitted command (`XcpCmdQueueSize + 1` slots) in
+  command order, and a transmit the lower layer refuses — including the first
+  one on an idle mailbox — stays at the head of the pipe and is retried by the
+  next confirmation or main-function call instead of being discarded after its
+  command already ran
 - `DISCONNECT` is rejected with `ERR_PGM_ACTIVE` while a programming
   sequence is open, so a master cannot silently drop the programming
   session; other status and query commands remain available in that state

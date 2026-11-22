@@ -59,8 +59,10 @@ extern Xcp_Channel g_xcp_channel;
 - **`g_xcp_channel`** is the only module-level singleton. Everything else hangs
   off `storage`/`runtime`/`config` so re-init is a `memset` + re-bind.
 - **`Xcp_TxPipe`** (in `Xcp_RuntimeType`) — one TX slot shared between CTO and
-  DTO. `state` ∈ {`IDLE`, `CTO`, `DTO`}, `parked` holds one deferred CTO, and
-  `dto_latch` is the watchdog flag.
+  DTO. `state` ∈ {`IDLE`, `CTO`, `DTO`}, `cto_*` is the FIFO that holds one
+  deferred response per queued command (`cto_claimed` counts the slots a
+  command already reserved, `cto_inflight` marks the entry handed to the lower
+  layer), and `dto_latch` is the watchdog flag.
 - **`Xcp_ActiveDaqIndices`/`Count`** — rebuild index lists so `Xcp_ProcessDaq`
   walks only `RUNNING` lists.
 - **`Xcp_SegmentRuntime[]`** — per-segment `active_page_ecu`/`active_page_xcp`.
@@ -76,14 +78,15 @@ User code (DAQ event)             Command dispatch
         ▼                                 ▼
   state=DTO ──send──► bus   OR   state=CTO ──send──► bus
         │                                 │
-        └───────►  park CTO in tx.parked ◄───────┘
+        └──────►  append CTO to tx.cto_* ◄───────┘
                             │
-              TxConfirmation releases parked → DTO queue next
+              TxConfirmation releases the head → DTO queue next
 ```
 
 The dispatcher is the only CTO sender. `Xcp_SendPendingCto` is called by
 `Xcp_ReportDtoOverload` + `TxConfirmation` so a deferred RES/ERR eventually
-goes out even when a DTO won the bus.
+goes out even when a DTO won the bus, and the FIFO keeps them in command
+order: a refused transmit stays at the head and is retried, never rewritten.
 
 ## Memory addressing
 
