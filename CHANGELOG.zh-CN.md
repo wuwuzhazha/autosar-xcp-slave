@@ -42,6 +42,9 @@
 - 块模式开箱可用：xcpgen 拒绝 `XcpBlockTransferEnabled=1` 且
   `XcpMaxBs=0`；默认值为 `MAX_BS=4`、`MIN_ST=1 ms`（每个块帧
   一个主循环周期）
+- 事件突发按 DAQ 列表保持原子：上一段突发仍有帧在队列里时，这一次事件
+  跳过该列表，不再追加一组绝对 PID 在同一窗口内重复的 ODT。跳过不按 DAQ
+  过载上报，因为主站会把该事件当作数据丢失
 - DTO 按 ODT 的实际长度发送（标识域、可选时间戳和条目），不再填充到
   `XCP_MAX_DTO`。队列记下该长度，两条出队路径都使用它。
   `XcpDtoQueueDepth` 必须不小于 `XcpOdtCount`，因为管道忙时整段突发

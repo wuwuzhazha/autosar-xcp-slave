@@ -67,6 +67,12 @@ to publish the ID string address.
 - `XcpDtoQueueDepth` must be at least `XcpOdtCount`. A busy mailbox queues
   every ODT of the event, and one frame already on the wire does not occupy
   a slot.
+- A list is not sampled again while its previous burst still has frames in
+  the queue. The event is skipped for that list, so the master never sees a
+  second copy of the same absolute PIDs inside one window. The skip is not
+  reported as a DAQ overload: the master reads that event as data loss and
+  may abort the measurement. A channel whose configured load does not fit
+  its period therefore shows missing cycles, not duplicates.
 - A parked command response is sent before any queued DTO. This is a
   scheduling choice, not a wire-format rule: it bounds the response latency
   to one frame time, and resuming the queue on every confirmation path

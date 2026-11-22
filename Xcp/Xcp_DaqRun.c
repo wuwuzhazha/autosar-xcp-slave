@@ -69,6 +69,14 @@ void Xcp_ProcessDaq(Xcp_Channel *ch, uint16 event_channel)
                 daq->prescaler_counter = 0U;
             }
 #endif
+            /* An absolute PID carries no cycle number, so a second copy of the
+               same ODT set in the same window reads as a duplicate to the
+               master. Hold the list until its previous burst has drained. */
+            if (ch->storage_ptr->dto_queued[daqIdx] != 0U)
+            {
+                continue;
+            }
+
             for (odtIdx = 0U; odtIdx < daq->odt_count; odtIdx++)
             {
                 Xcp_TransmitDto(&g_xcp_channel, daqIdx, odtIdx);
@@ -160,10 +168,10 @@ void Xcp_TransmitDto(Xcp_Channel *ch, uint16 daq_list_no, uint8 odt_no)
 
     local_buffer_length = buffer_idx;
 
-    Xcp_DtoSendOrQueue(&g_xcp_channel, local_dto_buffer, local_buffer_length);
+    Xcp_DtoSendOrQueue(&g_xcp_channel, daq_list_no, local_dto_buffer, local_buffer_length);
 }
 
-void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length)
+void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_data, uint8 dto_length)
 {
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
@@ -207,7 +215,9 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, const uint8 *dto_data, uint8 dto_length
         uint8 head = storage->dto_queue_head;
 
         (void) memcpy(storage->dto_queue[head], dto_data, dto_length);
-        storage->dto_queue_len[head] = dto_length;
+        storage->dto_queue_len[head]  = dto_length;
+        storage->dto_queue_list[head] = daq_list_no;
+        storage->dto_queued[daq_list_no]++;
         storage->dto_queue_head = (head + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
         storage->dto_queue_count++;
     }
@@ -244,6 +254,7 @@ void Xcp_DtoSendNext(Xcp_Channel *ch)
         tail = storage->dto_queue_tail;
         dto_len = storage->dto_queue_len[tail];
         (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
+        storage->dto_queued[storage->dto_queue_list[tail]]--;
         storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
         storage->dto_queue_count--;
 
@@ -264,6 +275,7 @@ void Xcp_DtoSendNext(Xcp_Channel *ch)
         XCP_DTO_ENTER_CRITICAL();
         runtime->tx.dto_latch = FALSE;
         runtime->tx.state     = XCP_TX_IDLE;
+        storage->dto_queued[storage->dto_queue_list[tail]]++;
         storage->dto_queue_tail = tail;
         storage->dto_queue_count++;
         XCP_DTO_EXIT_CRITICAL();
@@ -317,6 +329,7 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
             tail = storage->dto_queue_tail;
             dto_len = storage->dto_queue_len[tail];
             (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
+            storage->dto_queued[storage->dto_queue_list[tail]]--;
             storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
             storage->dto_queue_count--;
 
@@ -339,6 +352,7 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
             XCP_DTO_ENTER_CRITICAL();
             runtime->tx.dto_latch = FALSE;
             runtime->tx.state     = XCP_TX_IDLE;
+            storage->dto_queued[storage->dto_queue_list[tail]]++;
             storage->dto_queue_tail = tail;
             storage->dto_queue_count++;
             XCP_DTO_EXIT_CRITICAL();
