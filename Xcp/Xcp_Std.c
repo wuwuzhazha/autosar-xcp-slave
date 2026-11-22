@@ -200,7 +200,7 @@ sint16 Xcp_CmdGetId(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, Xc
     }
     else
     {
-
+        return Xcp_ResErr(res, XCP_ERR_OUT_OF_RANGE);
     }
 
     ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
@@ -302,7 +302,10 @@ boolean Xcp_ContinueBlockUpload(Xcp_Channel *ch)
         return FALSE;
     }
 
-    if ((runtime->tx.state != XCP_TX_IDLE) || (runtime->tx.parked != FALSE))
+    /* A command owns the port from the moment its answer is reserved: no
+       block-upload frame may take that room or overtake that answer. */
+    if ((runtime->tx.state != XCP_TX_IDLE) || (runtime->tx.cto_count > 0U)
+        || (runtime->tx.cto_claimed > 0U))
     {
         return FALSE;
     }

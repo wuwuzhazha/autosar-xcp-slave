@@ -130,7 +130,7 @@ sint16 Xcp_CmdUnlock(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_length, X
         ch->runtime_ptr->seed_requested = FALSE;
 
         ch->storage_ptr->cto_buffer[0] = XCP_PID_RES;
-        ch->storage_ptr->cto_buffer[1] = unlocked_resource;
+        ch->storage_ptr->cto_buffer[1] = ch->runtime_ptr->protection_status;
 
         return (sint16)(2U);
     }

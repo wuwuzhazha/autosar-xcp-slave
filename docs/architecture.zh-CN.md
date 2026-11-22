@@ -59,8 +59,9 @@ extern Xcp_Channel g_xcp_channel;
 - **`g_xcp_channel`** 是唯一的模块级单例。其余一切都挂在
   `storage`/`runtime`/`config` 上，因此重新初始化就是一次 `memset` 加重新绑定。
 - **`Xcp_TxPipe`**（位于 `Xcp_RuntimeType` 中）—— CTO 与 DTO 共用的一个发送槽。
-  `state` ∈ {`IDLE`, `CTO`, `DTO`}，`parked` 保存一个被推迟的 CTO，
-  `dto_latch` 是看门狗标志。
+  `state` ∈ {`IDLE`, `CTO`, `DTO`}，`cto_*` 是保存被推迟应答的 FIFO（每条排队
+  命令一条，`cto_claimed` 记录已为某条命令预留、`cto_inflight` 标记已交给下层
+  的那条），`dto_latch` 是看门狗标志。
 - **`Xcp_ActiveDaqIndices`/`Count`** —— 重建索引列表，使 `Xcp_ProcessDaq`
   只遍历处于 `RUNNING` 状态的列表。
 - **`Xcp_SegmentRuntime[]`** —— 每个段的 `active_page_ecu`/`active_page_xcp`。
@@ -76,14 +77,14 @@ User code (DAQ event)             Command dispatch
         ▼                                 ▼
   state=DTO ──send──► bus   OR   state=CTO ──send──► bus
         │                                 │
-        └───────►  park CTO in tx.parked ◄───────┘
+        └──────►  追加 CTO 到 tx.cto_*  ◄───────┘
                             │
-              TxConfirmation releases parked → DTO queue next
+              TxConfirmation 释放队头 → 继续 DTO 队列
 ```
 
 调度器是唯一的 CTO 发送方。`Xcp_SendPendingCto` 由 `Xcp_ReportDtoOverload`
 和 `TxConfirmation` 调用，因此即使 DTO 抢占了总线，被推迟的 RES/ERR
-最终也会发出。
+最终也会发出；FIFO 保持命令顺序：发送失败的那条留在队头重试，不会被改写。
 
 ## 内存寻址
 

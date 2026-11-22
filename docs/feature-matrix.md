@@ -15,7 +15,7 @@ described in [docs/testing.md](testing.md).
 | 0xFD | GET_STATUS | ✓ |
 | 0xFC | SYNCH | ✓ |
 | 0xFB | GET_COMM_MODE_INFO | ✓ |
-| 0xFA | GET_ID (type 0) | ✓ |
+| 0xFA | GET_ID (type 0; other types -> ERR_OUT_OF_RANGE) | ✓ |
 | 0xF9 | SET_REQUEST | ✓ |
 | 0xF8 | GET_SEED (mode 0 first / mode 1 continue) | ✓ |
 | 0xF7 | UNLOCK | ✓ |

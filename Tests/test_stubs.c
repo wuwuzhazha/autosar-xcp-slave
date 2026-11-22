@@ -24,6 +24,25 @@ uint8  test_tx_tail = 0;
 uint32 test_tx_count = 0;
 uint32 test_tx_drop  = 0;
 boolean test_tx_fail_next = FALSE;
+uint32  test_tx_fail_count = 0U;
+
+/* Deliver the confirmation from inside the transmit call, the way a lower
+   layer may report a frame it already handed to the hardware. */
+boolean test_tx_confirm_in_send = FALSE;
+
+/* Queue a DTO from inside the transmit call, the way another task context may
+   land an event while the lower layer still holds the frame. */
+boolean test_tx_enqueue_in_send = FALSE;
+
+/* Land a command from inside the transmit call, the way the RX interrupt may
+   deliver the next request while the lower layer still holds this frame. */
+boolean test_tx_rx_in_send = FALSE;
+static uint8 test_tx_confirm_depth = 0U;
+
+#if (XCP_DAQ_ENABLED == STD_ON)
+static const uint8 test_tx_in_send_dto[4] = {0xC0U, 0xC1U, 0xC2U, 0xC3U};
+#endif
+static const uint8 test_tx_in_send_cmd[1] = {0xFDU};
 
 /* SchM probe state; defined next to the SchM stubs below. */
 extern uint32   test_schm_depth;
@@ -36,9 +55,27 @@ Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_p
     {
         test_schm_tx_under_lock = TRUE;
     }
-    if (test_tx_fail_next)
+
+#if (XCP_DAQ_ENABLED == STD_ON)
+    if ((test_tx_enqueue_in_send != FALSE) && (test_tx_confirm_depth == 0U))
     {
-        test_tx_fail_next = FALSE;
+        test_tx_confirm_depth++;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, test_tx_in_send_dto,
+                           (uint8)sizeof(test_tx_in_send_dto));
+        test_tx_confirm_depth--;
+    }
+#endif
+
+    if ((test_tx_fail_next) || (test_tx_fail_count > 0U))
+    {
+        if (test_tx_fail_next)
+        {
+            test_tx_fail_next = FALSE;
+        }
+        else
+        {
+            test_tx_fail_count--;
+        }
         test_tx_drop++;
         return E_NOT_OK;
     }
@@ -51,6 +88,24 @@ Std_ReturnType CanIf_Transmit(PduIdType tx_pdu_id, const PduInfoType *pdu_info_p
     test_tx_len[test_tx_tail] = pdu_info_ptr->sdu_length;
     test_tx_tail = (uint8)((test_tx_tail + 1U) % TEST_TX_RING);
     test_tx_count++;
+
+    if (test_tx_rx_in_send != FALSE)
+    {
+        PduInfoType rx_info;
+
+        rx_info.sdu_data_ptr  = (uint8 *)test_tx_in_send_cmd;
+        rx_info.sdu_length    = (uint16)sizeof(test_tx_in_send_cmd);
+        rx_info.meta_data_ptr = NULL_PTR;
+        Xcp_HandleRxIndication(&rx_info);
+    }
+
+    if ((test_tx_confirm_in_send != FALSE) && (test_tx_confirm_depth == 0U))
+    {
+        test_tx_confirm_depth++;
+        Xcp_HandleTxConfirmation(E_OK);
+        test_tx_confirm_depth--;
+    }
+
     return E_OK;
 }
 
@@ -352,12 +407,17 @@ Std_ReturnType XCP_CDD_TRANSMIT_NAME(PduIdType pdu_id, const PduInfoType *pdu_in
 uint32 test_schm_enter_count = 0U;
 uint32 test_schm_exit_count  = 0U;
 uint32 test_schm_depth       = 0U;
+uint32 test_schm_nested_count = 0U;
 boolean test_schm_tx_under_lock = FALSE;
 
 void SchM_Enter_Xcp(uint8 exclusive_area)
 {
     (void)exclusive_area;
     test_schm_enter_count++;
+    if (test_schm_depth > 0U)
+    {
+        test_schm_nested_count++;
+    }
     test_schm_depth++;
 }
 

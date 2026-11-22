@@ -14,8 +14,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - K33i pins that confirming a CTO resumes a queued ODT burst in the same
   confirmation, instead of leaving it until the next main-function period
 - pyxcp `push()` end-to-end test covering a multi-block download
+- K36 pins the burst drain and the response pipe: one main tick runs a full
+  queue, every command keeps the response slot it needs, a full pipe leaves
+  the next command queued with its side effects unapplied, and repeated ticks
+  without a confirmation change nothing. K37 pins that a refused transmit
+  keeps its response at the head and that the queued responses leave in
+  command order
+- K38 pins DTO queue ownership: a successful direct send pairs every lock and
+  transmits outside it, a rejected direct send requeues the frame, a rejected
+  drain keeps the head slot and its FIFO place, and a confirmation or a
+  producer that lands inside the lower-layer call neither resends nor
+  overwrites that slot
+- K39 pins the session boundary: a `DISCONNECT` accepted behind earlier
+  answers leaves the pipe intact, both a busy CTO and a busy DTO resume it in
+  command order, an in-call confirmation sends one frame and keeps the next,
+  a reserved answer keeps the block-upload continuation out, and an overflow
+  that lands during the busy answer keeps its notice
+
+### Changed
+- A command burst is answered at bus speed instead of one command per
+  `XcpMainFunctionPeriod`: `Xcp_MainFunction` runs every queued command in
+  one call (at most one `XcpCmdQueueSize` deep) and no longer waits for an
+  idle mailbox. Each command reserves the room its response needs before it
+  runs, so a full response pipe leaves it queued instead of consuming it
+- A frame that arrives while the single-command handler runs is queued
+  instead of answered `ERR_CMD_BUSY`: the handler works on its own copy of the
+  bytes, so the frame no longer overlaps the queue slot. A frame that arrives
+  while a command is still queued is still answered `ERR_CMD_BUSY`
 
 ### Fixed
+- Responses waiting behind a busy mailbox are no longer dropped: the CTO pipe
+  keeps one response per admitted command (`XcpCmdQueueSize + 1` slots) in
+  command order, and a transmit the lower layer refuses — including the first
+  one on an idle mailbox — stays at the head of the pipe and is retried by the
+  next confirmation or main-function call instead of being discarded after its
+  command already ran
+- `DISCONNECT` no longer drops answers it did not produce: ending the session
+  leaves the CTO pipe alone, so the answers of commands the slave had already
+  accepted still leave in command order, the DISCONNECT answer included. The
+  same applies to a failed `UNLOCK` and to `PROGRAM_RESET`. Only a closed
+  transport drops what is queued (`Xcp_SoAdConnectionClosed` now calls
+  `Xcp_SessionLinkDown`), because nothing queued can still reach the master
+- The busy notice is taken together with the room its answer needs, so an RX
+  that overflows the queue again while `ERR_CMD_BUSY` is on the wire re-arms
+  the notice instead of having it cleared under its own frame
+- A response slot reserved for a command's answer keeps the block-upload
+  continuation out of the port, so a confirmation that lands between the
+  reservation and the answer cannot put an upload frame ahead of it
+- `DISCONNECT` is rejected with `ERR_PGM_ACTIVE` while a programming
+  sequence is open, so a master cannot silently drop the programming
+  session; other status and query commands remain available in that state
+- `PROGRAM_START` returns `ERR_DAQ_ACTIVE` while a DAQ list is running
+  instead of silently freeing the DAQ configuration
+- `UNLOCK` returns the remaining resource-protection mask, not the bit
+  that was just unlocked
+- `GET_ID` rejects unsupported identification types with
+  `ERR_OUT_OF_RANGE` instead of returning a successful zero-length ID
 - Block download follows the declared length: byte 1 of `DOWNLOAD` is the
   total block length and byte 1 of `DOWNLOAD_NEXT` the remaining length.
   The slave stays silent on intermediate frames, answers only the frame
@@ -61,6 +115,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optional timestamp and entries), not padded to `XCP_MAX_DTO`. The queue
   stores that length and both drain paths use it. `XcpDtoQueueDepth` must
   be at least `XcpOdtCount`, because a busy pipe queues the whole burst
+- A queued DTO keeps its slot, its list count and its FIFO place until the
+  lower-layer call returns: a rejected drain no longer rewinds a slot that a
+  producer may have refilled in the meantime, so the retried frame carries
+  its own payload and the list counter stays exact. A confirmation that
+  arrives inside the call no longer resends or releases the slot that call
+  still owns, and the frame that call sends is drained exactly once
 
 ## [0.3.2] — 2026-11-20
 

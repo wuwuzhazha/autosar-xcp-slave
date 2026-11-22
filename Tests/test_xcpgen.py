@@ -53,6 +53,33 @@ def cfg_file(tmp, mutate):
     p.write_text(json.dumps(cfg, ensure_ascii=False, indent=1), encoding="utf-8")
     return p
 
+def static_bound_cfg(tmp, odt_count, odt_entry_count,
+                     descriptor_odt_count=None, descriptor_odt_entry_count=None):
+    if not 1 <= odt_count <= 4:
+        raise ValueError("XcpOdtCount must stay within DTO queue depth")
+    if not 1 <= odt_entry_count <= 255:
+        raise ValueError("XcpOdtEntriesCount must fit uint8")
+    def mutate(c):
+        c["general"]["XcpDaqConfigType"] = "DAQ_STATIC"
+        c["general"]["XcpMinDaq"] = 1
+        c["general"]["XcpOdtCount"] = odt_count
+        c["general"]["XcpOdtEntriesCount"] = odt_entry_count
+        first = c["static_daq_lists"][0]
+        first["odt_count"] = descriptor_odt_count or odt_count
+        first["odt_entry_count"] = descriptor_odt_entry_count or odt_entry_count
+        first["entries"] = [
+            {"address": 0x20000000 + 4 * i, "address_extension": 0,
+             "size": 4, "bit_offset": "XCP_BIT_OFFSET_NONE"}
+            for i in range(odt_count * odt_entry_count)
+        ]
+        c["static_daq_lists"] = [first]
+    return cfg_file(tmp, mutate)
+
+def run_with_cfg(name, cfg, out):
+    r = run(cfg=cfg, out=out)
+    ok(r.returncode == 0, name, r.stderr[:200])
+    return r
+
 def load_base():
     if not hasattr(load_base, "_c"):
         spec = importlib.util.spec_from_file_location("xg", XCPGEN)
@@ -128,6 +155,32 @@ def main():
         ok(defines(out / "Xcp_Cfg.h").get("XCP_DAQ_CONFIG_TYPE") == "XCP_DAQ_STATIC",
            "static daq type")
         ok(".xcp_static_daq_list" in (out / "Xcp_Cfg.c").read_text(), "static list ref")
+
+        # --- static DAQ descriptor bounds: runtime ODT and entry pools ---
+        out = tmp / "static_bound"
+        run_with_cfg("static boundary valid rc",
+                     static_bound_cfg(tmp, odt_count=4, odt_entry_count=7), out)
+        body = (out / "Xcp_Cfg.c").read_text()
+        ok("xcp_static_daq_0_entries[28U]" in body, "static boundary entries")
+        ok("{ 0U, 0U, 0x00U, 4U, 7U," in body, "static boundary descriptor")
+
+        out = tmp / "static_bound_entries"
+        run_with_cfg("static entry boundary valid rc",
+                     static_bound_cfg(tmp, odt_count=4, odt_entry_count=255), out)
+        body = (out / "Xcp_Cfg.c").read_text()
+        ok("xcp_static_daq_0_entries[1020U]" in body, "static entry boundary entries")
+        ok("{ 0U, 0U, 0x00U, 4U, 255U," in body, "static entry boundary descriptor")
+
+        for label, descriptor_odt_count, descriptor_odt_entry_count, needle in (
+            ("odt", 5, 7, "static_daq_lists[0].odt_count (5) > XCP_MAX_ODT (4)"),
+            ("entries", 4, 8,
+             "static_daq_lists[0].odt_entry_count (8) > XCP_MAX_ODT_ENTRIES (7)"),
+        ):
+            expect_err("neg static " + label + " bound", needle,
+                       cfg=static_bound_cfg(tmp, 4, 7,
+                                            descriptor_odt_count=descriptor_odt_count,
+                                            descriptor_odt_entry_count=descriptor_odt_entry_count),
+                       out=tmp)
 
         # --- warn: table rows truncated to declared count ---
         out = tmp / "trunc"

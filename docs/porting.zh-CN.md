@@ -87,10 +87,14 @@ XCP 地址是 32 位。`ext == 0` 时核心通过 `XCP_MEM_PTR(addr)`（默认
 
 ## 线程 / 临界区
 
-`XCP_DTO_ENTER_CRITICAL` / `XCP_DTO_EXIT_CRITICAL` 保护 DTO 队列和每一次
-`tx.state` 迁移（包括 `Xcp_HandleTxConfirmation`）。默认映射到
+`XCP_DTO_ENTER_CRITICAL` / `XCP_DTO_EXIT_CRITICAL` 保护 DTO 队列、命令交接和
+每一次 `tx.state` 迁移（包括 `Xcp_HandleTxConfirmation`）。默认映射到
 `SchM_Enter_Xcp/SchM_Exit_Xcp(XCP_EXCLUSIVE_AREA_0)`——可通过
 `Xcp_Cfg.h` 覆盖，或将其定义为你自己的锁原语。
+
+RX 与 TX 确认回调与主函数任务都会进入这对宏，因此它必须保存并恢复中断状态
+（Cortex-M 上即 PRIMASK），不能是 `cpsid i` / `cpsie i` 这样的盲开关：任务
+上下文中的临界区仍打开时，RX 回调会再开一层。
 
 `Xcp_Tl_SendCto`/`SendDto` 位于临界区**之外**（这些调用可能较慢）。
 
@@ -99,14 +103,28 @@ XCP 地址是 32 位。`ext == 0` 时核心通过 `XCP_MEM_PTR(addr)`（默认
 - 只有 `Xcp_CanIfRxIndication` / `Xcp_CanIfTxConfirmation`（以及 Fr/Eth/Cdd
   对应回调）可能在中断上下文运行。它们只入队帧并更新 TX 状态，不直接调用
   下层发送函数。
+- `Xcp_Tl_SendDto` 可能在返回之前就给出确认。该帧占用的队列槽位在调用返回前
+  始终归队列所有，因此这类确认既不会释放也不会重发它。被拒绝的发送会把帧留在
+  FIFO 头部；直发被拒绝时，只要队列还有容量就重新入队。
 - `Xcp_MainFunction` 处理命令队列、DAQ 事件与块上传，只能在一个任务上下文调用。
-- 命令交接是单生产者/单消费者：RX 回调写 `cmd_queue_buffer`/`cmd_pending`，
-  主循环读取并清除 `cmd_pending`。命令未处理时生产者置 `busy_pending`
-  而不是覆盖，主循环应答 `ERR_CMD_BUSY` 后清除。其他上下文不得写这些字段。
-- 主循环尚未处理上一条命令时到达的新命令会得到 `ERR_CMD_BUSY`。块模式主站
-  必须按通告的 `MIN_ST`（默认 1 ms）控制帧间隔；启用
-  `XcpInterleavedModeEnabled` 时改为排队而不是应答 busy。在本实现中该开关
-  只改变这一交接方式：DTO 帧布局与 CTO/DTO 顺序在开、关两种情况下都相同。
+- 命令交接是单生产者/单消费者：RX 回调在临界区内写队列与 `cmd_pending`，
+  主循环在同一临界区内取走一条命令，并在没有待执行命令时清除
+  `cmd_pending`。队列满时生产者置 `busy_pending` 而不是覆盖，主循环应答
+  `ERR_CMD_BUSY` 后清除。其他上下文不得写这些字段。
+- 命令应答所占的容量归该应答所有：命令处理器（及其调用的用户命令回调）可以
+  为自己正在执行的命令作答；其余 CTO 发送方不得抢占 `Xcp_MainFunction`，
+  预留未消费期间块上传续帧一律被拒绝。
+- 一次主函数调用执行队列里的每一条命令，最多一整个队列。命令执行前先为它的
+  应答在 CTO 管道（`tx.cto_*`，深度为每条排队命令一条应答加一个在途帧）中
+  预留位置；预留失败时本次调用结束，命令仍留在队列中、副作用未生效，而不是
+  被消费却没有应答。
+- 应答按对应命令到达的顺序离开管道。下层拒绝发送的帧留在管道头部，由下一次
+  确认或主函数调用重试，因此已接受的命令不会丢掉应答；只有管道已满才返回
+  `E_NOT_OK`。
+- 队列里仍有命令时到达的新命令会得到 `ERR_CMD_BUSY`。启用
+  `XcpInterleavedModeEnabled` 时改为接纳整个队列而不是一条命令；在本实现中
+  该开关只改变这一交接方式，DTO 帧布局与 CTO/DTO 顺序在开、关两种情况下都
+  相同。
 
 ## 会话生命周期
 
@@ -114,6 +132,10 @@ XCP 地址是 32 位。`ext == 0` 时核心通过 `XCP_MEM_PTR(addr)`（默认
 - `Xcp_SessionOpen` / `Xcp_SessionClose` ——由 `CONNECT`/`DISCONNECT` 调用；
   当 socket 打开/关闭时你也可以直接调用它们（Ethernet 场景参见
   `Xcp_SoAdConnectionClosed`）。
+- `Xcp_SessionClose` 结束会话但保留 CTO 管道：此前已被接受的命令的应答仍按
+  命令顺序发出，因此 `DISCONNECT` 的应答不会连带丢弃它之前的应答。
+- `Xcp_SessionLinkDown` 在结束会话前丢弃尚在排队的内容——传输链路本身消失时
+  使用它（`Xcp_SoAdConnectionClosed` 即是），因为队列中的内容已无法送达主站。
 - `Xcp_HandleRxIndication(pdu)` ——把每个收到的帧送入这里；PID ≥ 0xC0 是
   命令，PID < 0xC0 是 STIM DTO。
 - `Xcp_HandleTxConfirmation(result)` ——当下层确认一次 TX 时调用。

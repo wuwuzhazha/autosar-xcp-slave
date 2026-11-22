@@ -140,13 +140,21 @@ typedef enum
     XCP_TX_DTO  = 2
 } Xcp_TxStateType;
 
+/* One response per command the queue admits, plus the frame in flight. */
+#define XCP_CTO_QUEUE_DEPTH (XCP_CMD_QUEUE_SIZE + 1U)
+
 typedef struct
 {
     volatile Xcp_TxStateType state;
-    volatile boolean         parked;
-    volatile uint8           parked_len;
-    uint8                    parked_data[XCP_MAX_CTO];
+    volatile uint8           cto_head;
+    volatile uint8           cto_tail;
+    volatile uint16          cto_count;
+    volatile uint16          cto_claimed;
+    volatile boolean         cto_inflight;
+    uint8                    cto_len[XCP_CTO_QUEUE_DEPTH];
+    uint8                    cto_data[XCP_CTO_QUEUE_DEPTH][XCP_MAX_CTO];
     volatile boolean         dto_latch;
+    volatile boolean         dto_in_flight;
     uint8                    last_error;
 } Xcp_TxPipe;
 
@@ -187,9 +195,6 @@ typedef struct
     uint8   seed_total;
     boolean seed_requested;
 
-#if (XCP_CALIBRATION_PAGE_ENABLED == STD_ON)
-#endif
-
 #if (XCP_FLASH_PROGRAMMING_ENABLED == STD_ON)
 
     boolean pgm_started;
@@ -198,18 +203,18 @@ typedef struct
     uint32  pgm_size;
 #endif
 
-    uint8  cmd_queue_buffer[XCP_MAX_CTO];
-    uint8  cmd_queue_length;
-    boolean cmd_pending;
-    boolean busy_pending;
+    uint8            cmd_queue_buffer[XCP_MAX_CTO];
+    uint8            cmd_queue_length;
+    volatile boolean cmd_pending;
+    volatile boolean busy_pending;
 
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
 
-    uint8   cmd_queue[XCP_CMD_QUEUE_SIZE][XCP_MAX_CTO];
-    uint8   cmd_queue_len[XCP_CMD_QUEUE_SIZE];
-    uint8   cmd_queue_head;
-    uint8   cmd_queue_tail;
-    uint8   cmd_queue_count;
+    uint8            cmd_queue[XCP_CMD_QUEUE_SIZE][XCP_MAX_CTO];
+    uint8            cmd_queue_len[XCP_CMD_QUEUE_SIZE];
+    volatile uint8   cmd_queue_head;
+    volatile uint8   cmd_queue_tail;
+    volatile uint8   cmd_queue_count;
 #endif
 
 #if (XCP_STIM_TIMEOUT_ENABLED == STD_ON)
@@ -231,6 +236,16 @@ struct Xcp_Channel
 };
 
 extern Xcp_Channel g_xcp_channel;
+
+/* No queued command is left waiting for the main function. */
+static inline boolean Xcp_CmdQueueEmpty(const Xcp_RuntimeType *runtime)
+{
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
+    return (runtime->cmd_queue_count == 0U) ? TRUE : FALSE;
+#else
+    return (runtime->cmd_pending == FALSE) ? TRUE : FALSE;
+#endif
+}
 
 static inline sint16 Xcp_ResErr(Xcp_ResFrame *fr, uint8 error_code)
 {
@@ -312,6 +327,7 @@ static inline uint8 *Xcp_MemPtrWrite(Xcp_Channel *ch, uint8 ext, uint32 addr, ui
 
 #define XCP_GUARD_NONE                (0U)
 #define XCP_GUARD_ALLOW_DISCONNECTED  (1U)
+#define XCP_GUARD_BLOCK_PGM_ACTIVE    (2U)
 
 typedef struct
 {
@@ -337,6 +353,8 @@ void Xcp_ProcessCommand(const uint8 *cmd_data, uint8 cmd_length);
 void Xcp_SessionOpen(void);
 
 void Xcp_SessionClose(void);
+
+void Xcp_SessionLinkDown(void);
 
 void Xcp_EnqueueCommand(const uint8 *cmd_data, uint8 cmd_length);
 

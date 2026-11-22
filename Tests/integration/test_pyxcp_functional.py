@@ -187,10 +187,13 @@ def main() -> int:
                 ident.length == 17 and ident_data == b"AUTOSAR XCP Slave",
                 f"len={ident.length} data={ident_data!r}",
             )
-            suite.check(
-                "GET_ID modes 1..9 return length 0",
-                all(xcp.getId(mode).length == 0 for mode in range(1, 10)),
-            )
+            for mode in range(1, 10):
+                suite.error(
+                    f"GET_ID mode {mode} -> ERR_OUT_OF_RANGE",
+                    xcp.getId,
+                    mode,
+                    code="ERR_OUT_OF_RANGE",
+                )
 
             synch = xcp.synch()
             suite.check("SYNCH returns ERR_CMD_SYNCH", synch == b"\x00", f"{synch!r}")

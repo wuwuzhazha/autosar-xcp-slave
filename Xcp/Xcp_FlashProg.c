@@ -60,8 +60,17 @@ sint16 Xcp_CmdProgramStart(Xcp_Channel *ch, const uint8 *cmd_data, uint8 cmd_len
     }
 
 #if (XCP_DAQ_ENABLED == STD_ON)
+    {
+        uint16 i;
 
-    Xcp_FreeDaqLists(&g_xcp_channel);
+        for (i = 0U; i < ch->runtime_ptr->daq_count; i++)
+        {
+            if (ch->storage_ptr->daq_list[i].state == XCP_DAQ_STATE_RUNNING)
+            {
+                return Xcp_ResErr(res, XCP_ERR_DAQ_ACTIVE);
+            }
+        }
+    }
 #endif
 
     ch->runtime_ptr->pgm_started = TRUE;

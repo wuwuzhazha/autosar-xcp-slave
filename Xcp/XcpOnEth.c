@@ -122,12 +122,16 @@ static Std_ReturnType Xcp_EthSend(const uint8 *data, uint8 length)
 
 boolean Xcp_SoAdConnectionClosed(void)
 {
-    if ((g_xcp_channel.runtime_ptr == NULL_PTR)
-        || (g_xcp_channel.runtime_ptr->connection_state != XCP_CONNECTED))
+    const Xcp_RuntimeType *runtime = g_xcp_channel.runtime_ptr;
+
+    if ((runtime == NULL_PTR)
+        || ((runtime->connection_state != XCP_CONNECTED)
+            && (runtime->tx.cto_count == 0U)
+            && (runtime->tx.state != XCP_TX_CTO)))
     {
         return FALSE;
     }
-    Xcp_SessionClose();
+    Xcp_SessionLinkDown();
     return TRUE;
 }
 

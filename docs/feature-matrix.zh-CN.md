@@ -16,7 +16,7 @@
 | 0xFD | GET_STATUS | ✓ |
 | 0xFC | SYNCH | ✓ |
 | 0xFB | GET_COMM_MODE_INFO | ✓ |
-| 0xFA | GET_ID（类型 0） | ✓ |
+| 0xFA | GET_ID（类型 0；其他类型返回 ERR_OUT_OF_RANGE） | ✓ |
 | 0xF9 | SET_REQUEST | ✓ |
 | 0xF8 | GET_SEED（mode 0 首次 / mode 1 续传） | ✓ |
 | 0xF7 | UNLOCK | ✓ |

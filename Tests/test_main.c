@@ -121,6 +121,62 @@ static void xcp_inject(const uint8 *buf, uint32 len)
     Xcp_Tl_RxIndication(0U, &info);
 }
 
+/* Pop frames until a command response (RES/ERR) shows up; returns its length. */
+static uint32 xcp_pop_cto(uint8 *f)
+{
+    uint32 fl;
+
+    while (test_tx_pop(f, &fl) > 0U)
+    {
+        if ((f[0] == XCP_PID_RES) || (f[0] == XCP_PID_ERR))
+        {
+            return fl;
+        }
+    }
+    return 0U;
+}
+
+/* Count the command responses the port produced, discarding DTOs and events. */
+static uint32 xcp_drain_cto(void)
+{
+    uint8  f[64];
+    uint32 fl;
+    uint32 n = 0U;
+
+    while (test_tx_pop(f, &fl) > 0U)
+    {
+        if ((f[0] == XCP_PID_RES) || (f[0] == XCP_PID_ERR))
+        {
+            n++;
+        }
+    }
+    return n;
+}
+
+/* Responses an earlier command left in the pipe are flushed and dropped before
+   the next command runs, so each xcp_cmd call reports only what its own
+   command produced -- the pipe a real master waits to see drain. */
+static void xcp_quiet_pipe(void)
+{
+    uint8  tmp[64];
+    uint32 l;
+    uint8  i;
+
+    for (i = 0U; i < (uint8)(XCP_CTO_QUEUE_DEPTH + 4U); i++)
+    {
+        if ((g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+            && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U))
+        {
+            break;
+        }
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        Xcp_MainFunction();
+    }
+    while (test_tx_pop(tmp, &l) > 0U)
+    {
+    }
+}
+
 static uint32 xcp_cmd(const uint8 *cmd, uint32 len, uint8 *res)
 {
     PduInfoType info;
@@ -146,17 +202,25 @@ static uint32 xcp_cmd(const uint8 *cmd, uint32 len, uint8 *res)
 #endif
     info.meta_data_ptr = NULL;
 
+    xcp_quiet_pipe();
     Xcp_Tl_RxIndication(0U, &info);
-    Xcp_Tl_TxConfirmation(0U, E_OK);
-    Xcp_MainFunction();
-#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
-
-    while (g_xcp_channel.runtime_ptr->cmd_queue_count > 0U)
+    /* Confirm one frame per turn until the command and every response it
+       produced have left the pipe, as a real bus would. */
     {
-        Xcp_Tl_TxConfirmation(0U, E_OK);
-        Xcp_MainFunction();
+        uint8 pi;
+
+        for (pi = 0U; pi < (uint8)(XCP_CMD_QUEUE_SIZE + XCP_CTO_QUEUE_DEPTH + 2U); pi++)
+        {
+            Xcp_Tl_TxConfirmation(0U, E_OK);
+            Xcp_MainFunction();
+            if ((g_xcp_channel.runtime_ptr->cmd_pending == FALSE)
+                && (g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
+                && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U))
+            {
+                break;
+            }
+        }
     }
-#endif
     return xcp_pop_pdu(res, &len);
 }
 
@@ -196,7 +260,7 @@ static void xcp_settle(void)
         Xcp_MainFunction();
         if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
             && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
-            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE)
+            && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U)
             && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
             && (g_xcp_channel.runtime_ptr->cmd_pending == FALSE))
         {
@@ -220,7 +284,7 @@ static void xcp_quiesce(void)
         }
         if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
             && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
-            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE)
+            && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U)
             && (g_xcp_channel.storage_ptr->dto_queue_count == 0U))
         {
             break;
@@ -291,7 +355,7 @@ static uint32 xcp_cmd_reply(const uint8 *c, uint32 len, uint8 *res)
         Xcp_Tl_TxConfirmation(0U, E_OK);
         Xcp_MainFunction();
         if ((g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO)
-            && (g_xcp_channel.runtime_ptr->tx.parked == FALSE)
+            && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U)
             && (g_xcp_channel.runtime_ptr->cmd_pending == FALSE)
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
             && (g_xcp_channel.runtime_ptr->cmd_queue_count == 0U)
@@ -357,6 +421,7 @@ static uint8  test_ram_var8;
 int main(void)
 {
     uint8  res[64];
+    uint8  unlock_protection_status;
     uint32 l;
     uint8  cmd[16];
     Std_VersionInfoType ver;
@@ -491,8 +556,11 @@ int main(void)
     CHECK("B10 GET_ID type0 -> RES len8, len>0",
           (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] > 0U));
     l = xcp_cmd((const uint8 *)"\xFA\x09", 2U, res);
-    CHECK("B11 GET_ID type9 -> len=0",
-          (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] == 0U));
+    CHECK("B11 GET_ID type9 -> ERR_OUT_OF_RANGE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_OUT_OF_RANGE));
+    l = xcp_cmd((const uint8 *)"\xFA\x7F", 2U, res);
+    CHECK("B11a GET_ID unsupported type -> ERR_OUT_OF_RANGE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_OUT_OF_RANGE));
 
     l = xcp_cmd((const uint8 *)"\xF5\x07", 2U, res);
     CHECK("B10a UPLOAD after GET_ID -> 'AUTOSAR'",
@@ -611,14 +679,20 @@ int main(void)
         l = xcp_cmd(cmd, 3U, res); memcpy(seed, &res[2], 4U);
         cmd[0] = 0xF7; cmd[1] = 4U;
         for (i = 0U; i < 4U; i++) { cmd[2U + i] = (uint8)(seed[i] ^ 0xFFU); }
-        (void)xcp_cmd(cmd, 6U, res);
+        l = xcp_cmd(cmd, 6U, res);
+        unlock_protection_status = res[1];
+        CHECK("G4a UNLOCK response reports remaining protection mask",
+              (l == 2U) && (res[0] == XCP_PID_RES)
+              && (unlock_protection_status == XCP_RESOURCE_STIM));
         cmd[0] = 0xF8; cmd[1] = 0; cmd[2] = XCP_RESOURCE_STIM;
         l = xcp_cmd(cmd, 3U, res); memcpy(seed, &res[2], 4U);
         cmd[0] = 0xF7; cmd[1] = 4U;
         for (i = 0U; i < 4U; i++) { cmd[2U + i] = (uint8)(seed[i] ^ 0xFFU); }
-        (void)xcp_cmd(cmd, 6U, res);
+        l = xcp_cmd(cmd, 6U, res);
         CHECK("G5 all resources unlocked",
               g_xcp_channel.runtime_ptr->protection_status == 0U);
+        CHECK("G5a final UNLOCK response reports zero remaining protection",
+              (l == 2U) && (res[0] == XCP_PID_RES) && (res[1] == 0U));
     }
 
     printf("-- C. memory access\n");
@@ -1211,14 +1285,17 @@ int main(void)
     printf("-- F. flash programming\n");
     memset(test_flash_mem, 0xAA, sizeof(test_flash_mem));
 
+    (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
+    (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+    xcp_settle();
     l = xcp_cmd((const uint8 *)"\xCA\x01\xAA", 3U, res);
     CHECK("F0a PROGRAM_NEXT before start -> ERR_SEQUENCE",
           (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
     l = xcp_cmd((const uint8 *)"\xC9\xAA", 2U, res);
     CHECK("F0b PROGRAM_MAX before start -> ERR_SEQUENCE",
           (l == 2U) && (res[1] == XCP_ERR_SEQUENCE));
-    l = xcp_cmd((const uint8 *)"\xD2", 1U, res);
 
+    l = xcp_cmd((const uint8 *)"\xD2", 1U, res);
     CHECK("F1 PROGRAM_START bytes",
           frame_is(res, l, (const uint8[]){ 0xFF, 0x00, TST_COMM_OPT, XCP_MAX_CTO,
                                             XCP_MAX_BS, XCP_MIN_ST, TST_QUEUE_SIZE }, 7U));
@@ -1621,31 +1698,58 @@ int main(void)
 #if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
     xcp_pump((uint32)XCP_CMD_QUEUE_SIZE + 2U);
     xcp_drain_tx();
+#endif
     {
-        PduInfoType i5;
-        uint8 c5[2] = {0xFD, 0};
-        i5.sdu_data_ptr = c5; i5.sdu_length = 1; i5.meta_data_ptr = NULL;
-        test_tx_fail_next = TRUE;
-        Xcp_Tl_RxIndication(0U, &i5);
-        Xcp_Tl_TxConfirmation(0U, E_OK);
+        uint8  f[64];
+        uint32 fl;
+
+        xcp_settle();
+
+        /* A response the lower layer refuses is retried, never dropped: the
+           command stays answered and the frame leaves once the pipe takes it. */
+        test_tx_fail_count = 3U;
+        xcp_inject((const uint8 *)"\xFD", 1U);
         Xcp_MainFunction();
-        CHECK("J5 TX fail -> no frame, busy cleared",
-              (test_tx_pop(res, &l) == 0U) && (g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO));
+        CHECK("J5a a failed transmit keeps the response queued",
+              (test_tx_pop(f, &fl) == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U));
+        Xcp_MainFunction();
+        CHECK("J5b the retry keeps it queued while transmits fail",
+              (test_tx_pop(f, &fl) == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE));
+        test_tx_fail_count = 0U;
+        Xcp_MainFunction();
+        fl = test_tx_pop(f, &fl);
+        CHECK("J5c the queued response goes out when the pipe recovers",
+              (fl == 6U) && (f[0] == XCP_PID_RES));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
     }
-    test_tx_fail_next = FALSE;
+
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
     l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
     CHECK("J6 TX recovers", (l == 6U) && (res[0] == XCP_PID_RES));
 #else
-    test_tx_fail_next = TRUE;
-    l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
-    CHECK("J5 TX fail -> no frame, busy cleared",
-          (l == 0U) && (g_xcp_channel.runtime_ptr->tx.state != XCP_TX_CTO));
+    {
+        uint8  f[64];
+        uint32 fl;
 
-    l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
-    CHECK("J6a overlapped -> ERR_CMD_BUSY", (l == 2U) && (res[0] == XCP_PID_ERR));
-    xcp_pump(1U);
-    l = test_tx_pop(res, &l);
-    CHECK("J6 deferred cmd RES delivered", (l == 6U) && (res[0] == XCP_PID_RES));
+        xcp_settle();
+        xcp_inject((const uint8 *)"\xFD", 1U);
+        xcp_inject((const uint8 *)"\xFD", 1U);
+        CHECK("J6a a second frame before the main loop -> busy_pending",
+              g_xcp_channel.runtime_ptr->busy_pending == TRUE);
+        Xcp_MainFunction();
+        fl = test_tx_pop(f, &fl);
+        CHECK("J6b the busy answer comes out first",
+              (fl == 2U) && (f[0] == XCP_PID_ERR) && (f[1] == XCP_ERR_CMD_BUSY));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        Xcp_MainFunction();
+        fl = test_tx_pop(f, &fl);
+        CHECK("J6c the pending command is answered after busy",
+              (fl == 6U) && (f[0] == XCP_PID_RES));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+    }
 #endif
 
     l = xcp_cmd((const uint8 *)"\xFF\x77", 2U, res);
@@ -1899,12 +2003,12 @@ int main(void)
             Xcp_MainFunction();
         }
         CHECK("K6b RES deferred while DTO busy -> pending",
-              g_xcp_channel.runtime_ptr->tx.parked == TRUE
+              g_xcp_channel.runtime_ptr->tx.cto_count > 0U
               && g_xcp_channel.runtime_ptr->tx.dto_latch == TRUE);
 
         Xcp_Tl_TxConfirmation(0U, E_OK);
         CHECK("K6c DTO conf -> pending CTO sent (cto_busy)",
-              g_xcp_channel.runtime_ptr->tx.parked == FALSE
+              g_xcp_channel.runtime_ptr->tx.cto_count == 0U
               && g_xcp_channel.runtime_ptr->tx.state == XCP_TX_CTO);
 
         Xcp_Tl_TxConfirmation(0U, E_OK);
@@ -2556,18 +2660,25 @@ int main(void)
             g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
         }
 
-        (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
-        cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 2; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
-        (void)xcp_cmd((const uint8 *)"\xFE", 1U, res);
         CHECK("K20c DISCONNECT frees DAQ (daq_count=0)",
               g_xcp_channel.runtime_ptr->daq_count == 0U);
+
+        g_xcp_channel.runtime_ptr->protection_status &= (uint8)~XCP_RESOURCE_PGM;
+        (void)xcp_cmd((const uint8 *)"\xD2", 1U, res);
+        l = xcp_cmd((const uint8 *)"\xFE", 1U, res);
+        CHECK("K20e DISCONNECT while programming -> ERR_PGM_ACTIVE",
+              (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_PGM_ACTIVE));
+        CHECK("K20f denied DISCONNECT keeps programming session",
+              g_xcp_channel.runtime_ptr->pgm_started == TRUE
+              && g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED);
+        (void)xcp_cmd((const uint8 *)"\xCF", 1U, res);
         (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
         xcp_settle();
 
         g_xcp_channel.runtime_ptr->protection_status &=
             (uint8)~(XCP_RESOURCE_DAQ | XCP_RESOURCE_STIM);
         l = xcp_cmd((const uint8 *)"\xFD", 1U, res);
-        CHECK("K20d GET_STATUS fields",
+        CHECK("K20g GET_STATUS fields",
               (l == 6U) && (res[0] == XCP_PID_RES)
               && ((res[1] & (XCP_SS_RESUME | XCP_SS_DAQ_RUNNING))
                   == ((Xcp_IsResumeModeActive(&g_xcp_channel) != FALSE) ? XCP_SS_RESUME : 0x00U))
@@ -2576,12 +2687,12 @@ int main(void)
         {
             uint32 mta_before = g_xcp_channel.runtime_ptr->mta;
             l = xcp_cmd((const uint8 *)"\xFA\x00", 2U, res);
-            CHECK("K20e GET_ID type0 -> len>0 + MTA set",
+            CHECK("K20h GET_ID type0 -> len>0 + MTA set",
                   (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] > 0U)
                   && (g_xcp_channel.runtime_ptr->mta != mta_before));
             l = xcp_cmd((const uint8 *)"\xFA\x01", 2U, res);
-            CHECK("K20f GET_ID type1 -> len0",
-                  (l == 8U) && (res[0] == XCP_PID_RES) && (res[4] == 0U));
+            CHECK("K20i GET_ID type1 -> ERR_OUT_OF_RANGE",
+                  (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_OUT_OF_RANGE));
         }
     }
 
@@ -2954,7 +3065,26 @@ int main(void)
               g_xcp_channel.storage_ptr->daq_list[0].state != XCP_DAQ_STATE_RUNNING);
         CHECK("K24c socket close idle -> FALSE",
               Xcp_SoAdConnectionClosed() == FALSE);
-        l = xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        xcp_quiet_pipe();
+
+        test_tx_fail_count = 8U;
+        xcp_inject((const uint8 *)"\xFE", 1U);
+        Xcp_MainFunction();
+        CHECK("K24d DISCONNECT leaves its unsent answer queued",
+              (g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U));
+        CHECK("K24e socket close discards the queued DISCONNECT answer",
+              (Xcp_SoAdConnectionClosed() == TRUE)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        test_tx_fail_count = 0U;
+        xcp_inject((const uint8 *)"\xFF\x00", 2U);
+        Xcp_MainFunction();
+        l = xcp_pop_cto(res);
+        CHECK("K24f reconnect sends CONNECT answer without stale CTO",
+              (l == 8U) && (res[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
         xcp_drain_tx();
     }
 #endif
@@ -3541,7 +3671,7 @@ int main(void)
         CHECK("K32a DTO queued behind a busy pipe",
               g_xcp_channel.storage_ptr->dto_queue_count == 1U);
         g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
-        g_xcp_channel.runtime_ptr->tx.parked = FALSE;
+        g_xcp_channel.runtime_ptr->tx.cto_count = 0U;
         test_schm_tx_under_lock = FALSE;
         Xcp_ReportDtoOverload(&g_xcp_channel);
         CHECK("K32b ReportDtoOverload transmits outside the critical section",
@@ -3550,7 +3680,7 @@ int main(void)
 
         /* SendResponse on an idle pipe transitions tx.state under the lock. */
         g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
-        g_xcp_channel.runtime_ptr->tx.parked = FALSE;
+        g_xcp_channel.runtime_ptr->tx.cto_count = 0U;
         enter0 = test_schm_enter_count;
         exit0  = test_schm_exit_count;
         test_schm_tx_under_lock = FALSE;
@@ -3560,20 +3690,22 @@ int main(void)
               && ((test_schm_exit_count - exit0) == 1U)
               && (test_schm_tx_under_lock == FALSE));
 
-        /* A parked CTO replayed by SendPendingCto behaves the same way. */
+        /* A queued CTO replayed by SendPendingCto is taken under the lock and
+           retired under it once the lower layer accepted the frame. */
         g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
         (void)Xcp_SendResponse(dto_payload, 8U);
         CHECK("K32d busy pipe parks the response",
-              g_xcp_channel.runtime_ptr->tx.parked == TRUE);
+              g_xcp_channel.runtime_ptr->tx.cto_count > 0U);
         g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
         enter0 = test_schm_enter_count;
         exit0  = test_schm_exit_count;
         test_schm_tx_under_lock = FALSE;
         Xcp_SendPendingCto();
-        CHECK("K32e SendPendingCto transitions under the lock, sends outside",
-              ((test_schm_enter_count - enter0) == 1U)
-              && ((test_schm_exit_count - exit0) == 1U)
-              && (test_schm_tx_under_lock == FALSE));
+        CHECK("K32e SendPendingCto sends outside the lock, retires under it",
+              ((test_schm_enter_count - enter0) == 2U)
+              && ((test_schm_exit_count - exit0) == 2U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
         Xcp_Tl_TxConfirmation(0U, E_OK);
         xcp_drain_tx();
     }
@@ -3643,7 +3775,7 @@ int main(void)
         xcp_inject((const uint8 *)"\xFD", 1U);
         Xcp_MainFunction();
         CHECK("K33d GET_STATUS parks while the burst is queued",
-              (g_xcp_channel.runtime_ptr->tx.parked == TRUE)
+              (g_xcp_channel.runtime_ptr->tx.cto_count > 0U)
               && (g_xcp_channel.storage_ptr->dto_queue_count == 3U));
         Xcp_Tl_TxConfirmation(0U, E_OK);
         CHECK("K33e the parked CTO goes out before the queued ODTs",
@@ -3834,6 +3966,608 @@ int main(void)
         xcp_settle();
     }
 #endif
+
+    printf("-- K36. burst drain and the response FIFO (issue #24)\n");
+    {
+        uint8  i;
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
+        const uint8 enq = (uint8)XCP_CMD_QUEUE_SIZE;
+#else
+        const uint8 enq = 1U;
+#endif
+
+        xcp_settle();
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+
+        /* Every queued command runs in one main-function call, and each one
+           keeps the response slot its answer needs. */
+        for (i = 0U; i < enq; i++)
+        {
+            cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+            memcpy(&cmd[4], &(uint32){RAM_ADDR + (uint32)i}, 4U);
+            xcp_inject(cmd, 8U);
+        }
+        CHECK("K36a a burst of commands waits for one main tick",
+              g_xcp_channel.runtime_ptr->cmd_pending == TRUE);
+        Xcp_MainFunction();
+        CHECK("K36b one main tick drains the whole burst",
+              (g_xcp_channel.runtime_ptr->cmd_pending == FALSE)
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
+              && (g_xcp_channel.runtime_ptr->cmd_queue_count == 0U)
+#endif
+              );
+        CHECK("K36c one response went out, the rest keep their slot",
+              (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_CTO)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == (uint8)(enq - 1U)));
+        CHECK("K36d the burst ran in arrival order",
+              g_xcp_channel.runtime_ptr->mta == (RAM_ADDR + (uint32)(enq - 1U)));
+        CHECK("K36e only one response left the port", xcp_drain_cto() == 1U);
+
+        /* Fill every response slot without confirming a single frame. */
+        xcp_settle();
+        for (i = 0U; i < (uint8)(XCP_CTO_QUEUE_DEPTH + 1U); i++)
+        {
+            cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+            memcpy(&cmd[4], &(uint32){RAM_ADDR + 0x40U + (uint32)i}, 4U);
+            xcp_inject(cmd, 8U);
+            Xcp_MainFunction();
+        }
+        CHECK("K36f unconfirmed responses fill the pipe",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == XCP_CTO_QUEUE_DEPTH)
+              && (g_xcp_channel.runtime_ptr->mta == (RAM_ADDR + 0x40U
+                  + (uint32)XCP_CTO_QUEUE_DEPTH))
+              && (xcp_drain_cto() == 1U));
+
+        /* The pipe is full: the next command must not run at all. */
+        cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+        memcpy(&cmd[4], &(uint32){RAM_ADDR + 0x900U}, 4U);
+        xcp_inject(cmd, 8U);
+        Xcp_MainFunction();
+        CHECK("K36g a command with no response room is not consumed",
+              (g_xcp_channel.runtime_ptr->cmd_pending == TRUE)
+              && (g_xcp_channel.runtime_ptr->mta != (RAM_ADDR + 0x900U)));
+        CHECK("K36h and it produces no response", xcp_drain_cto() == 0U);
+        for (i = 0U; i < 5U; i++)
+        {
+            Xcp_MainFunction();
+        }
+        CHECK("K36i repeated ticks without a confirmation change nothing",
+              (g_xcp_channel.runtime_ptr->cmd_pending == TRUE)
+              && (g_xcp_channel.runtime_ptr->mta != (RAM_ADDR + 0x900U))
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == XCP_CTO_QUEUE_DEPTH)
+              && (xcp_drain_cto() == 0U));
+
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        Xcp_MainFunction();
+        CHECK("K36j one confirmation frees one slot and the command runs",
+              (g_xcp_channel.runtime_ptr->cmd_pending == FALSE)
+              && (g_xcp_channel.runtime_ptr->mta == (RAM_ADDR + 0x900U))
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == XCP_CTO_QUEUE_DEPTH));
+
+        /* Nothing was dropped: draining the pipe yields one frame per command. */
+        {
+            for (i = 0U; i < (uint8)(XCP_CTO_QUEUE_DEPTH + 4U); i++)
+            {
+                Xcp_Tl_TxConfirmation(0U, E_OK);
+                Xcp_MainFunction();
+            }
+            CHECK("K36k every queued response still leaves the port",
+                  (xcp_drain_cto() == (uint32)(XCP_CTO_QUEUE_DEPTH + 1U))
+                  && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+        }
+        xcp_settle();
+    }
+
+    printf("-- K37. ordered retry of queued responses (issue #24)\n");
+    {
+        static const uint8 lens[3] = {1U, 2U, 3U};
+        uint8  f[64];
+        uint8  i;
+
+        xcp_settle();
+        cmd[0] = 0xF6; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0;
+        memcpy(&cmd[4], &(uint32){RAM_ADDR}, 4U);
+        (void)xcp_cmd(cmd, 8U, res);
+
+        /* One command per tick, none confirmed: the first answer leaves, the
+           next two wait in the response FIFO. */
+        for (i = 0U; i < 3U; i++)
+        {
+            cmd[0] = 0xF5; cmd[1] = lens[i];
+            xcp_inject(cmd, 2U);
+            Xcp_MainFunction();
+        }
+        CHECK("K37a the first response leaves, two wait in order",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 2U)
+              && (xcp_pop_cto(f) == (uint32)(1U + lens[0])));
+
+        test_tx_fail_count = 2U;
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        Xcp_MainFunction();
+        CHECK("K37b a refused transmission keeps the response at the head",
+              (xcp_drain_cto() == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 2U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE));
+
+        test_tx_fail_count = 0U;
+        Xcp_MainFunction();
+        CHECK("K37c the retry sends the oldest response",
+              xcp_pop_cto(f) == (uint32)(1U + lens[1]));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K37d the last response follows it",
+              xcp_pop_cto(f) == (uint32)(1U + lens[2]));
+        CHECK("K37e nothing was lost or reordered",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 0U)
+              && (xcp_drain_cto() == 0U));
+        xcp_settle();
+    }
+#if (XCP_DAQ_ENABLED == STD_ON)
+    printf("-- K38. DTO queue ownership across failed and interleaved sends\n");
+    {
+        uint8  first[4]  = {0xA0U, 0xA1U, 0xA2U, 0xA3U};
+        uint8  second[4] = {0xB0U, 0xB1U, 0xB2U, 0xB3U};
+        uint8  frames[4][8];
+        uint32 frame_len[4];
+        uint8  nframes;
+        uint8  popped[8];
+        uint32 popped_len;
+        uint32 got;
+        uint32 enter0;
+        uint32 exit0;
+        uint32 drop0;
+        uint8  tail0;
+        uint8  i;
+
+        g_xcp_channel.runtime_ptr->tx_mode      = XCP_TX_ON;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.cto_count   = 0U;
+        g_xcp_channel.runtime_ptr->tx.cto_inflight = FALSE;
+        g_xcp_channel.runtime_ptr->cmd_pending  = FALSE;
+        g_xcp_channel.storage_ptr->dto_queue_count      = 0U;
+        g_xcp_channel.storage_ptr->dto_queue_head       = 0U;
+        g_xcp_channel.storage_ptr->dto_queue_tail       = 0U;
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        (void)memset(&g_xcp_channel.storage_ptr->dto_queued[0], 0,
+                     sizeof(g_xcp_channel.storage_ptr->dto_queued));
+        while (test_tx_pop(popped, &popped_len) > 0U)
+        {
+        }
+
+        /* A direct send the lower layer accepts owns the pipe and one frame.
+           Both lock scopes are paired and the transmit stays outside them. */
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38a a direct DTO send pairs every lock and transmits outside them",
+              ((test_schm_enter_count - enter0) == 2U)
+              && ((test_schm_exit_count - exit0) == 2U)
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (got == (uint32)sizeof(first))
+              && (popped[0] == first[0])
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == TRUE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U));
+
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K38b the confirmation retires the direct frame",
+              (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        /* A rejected direct send releases the pipe and requeues the frame. */
+        drop0  = test_tx_drop;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        test_tx_fail_next = TRUE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 1U, second, (uint8)sizeof(second));
+        tail0 = g_xcp_channel.storage_ptr->dto_queue_tail;
+        CHECK("K38c a failed direct send releases the pipe and requeues the frame",
+              ((test_tx_drop - drop0) == 1U)
+              && ((test_schm_enter_count - enter0) == 3U)
+              && ((test_schm_exit_count - exit0) == 3U)
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queue_list[tail0] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queue_len[tail0] == (uint8)sizeof(second))
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], second,
+                         sizeof(second)) == 0));
+
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        CHECK("K38d a busy pipe queues the next frame behind the requeued one",
+              (g_xcp_channel.storage_ptr->dto_queue_count == 2U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 1U));
+
+        /* A drain the lower layer rejects must leave the head slot, its list
+           count and its FIFO place untouched: there is no rewind to get wrong. */
+        test_tx_fail_next = TRUE;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38e a failed drain keeps the head slot and the FIFO",
+              ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (got == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 2U)
+              && (g_xcp_channel.storage_ptr->dto_queue_tail == tail0)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queue_list[tail0] == 1U)
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], second,
+                         sizeof(second)) == 0)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        /* The retained slot still occupies capacity: the queue drops instead of
+           overwriting the frame the failed drain still owns. */
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        test_sim_dto_inflight();
+        for (i = 0U; i < (uint8)XCP_DTO_QUEUE_DEPTH; i++)
+        {
+            Xcp_DtoSendOrQueue(&g_xcp_channel, 1U, first, (uint8)sizeof(first));
+        }
+        CHECK("K38f a full queue keeps the retained slot and reports the overload",
+              (g_xcp_channel.storage_ptr->dto_queue_count == (uint8)XCP_DTO_QUEUE_DEPTH)
+              && (g_xcp_channel.storage_ptr->dto_queued[1]
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 1U))
+              && (g_xcp_channel.storage_ptr->dto_queue_list[tail0] == 1U)
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], second,
+                         sizeof(second)) == 0)
+              && (g_xcp_channel.storage_ptr->dto_overload_pending == TRUE));
+
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38g the retained head goes out first once the lower layer accepts",
+              (got == (uint32)sizeof(second))
+              && (popped[0] == second[0])
+              && (g_xcp_channel.storage_ptr->dto_queue_count
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 1U))
+              && (g_xcp_channel.storage_ptr->dto_queued[1]
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 2U))
+              && (g_xcp_channel.storage_ptr->dto_queue_tail
+                  == (uint8)((tail0 + 1U) % (uint8)XCP_DTO_QUEUE_DEPTH))
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO));
+
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38h the confirmation drains the next slot in FIFO order",
+              (got == (uint32)sizeof(first))
+              && (popped[0] == first[0])
+              && (g_xcp_channel.storage_ptr->dto_queue_count
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 2U)));
+
+        for (i = 0U; i < (uint8)XCP_DTO_QUEUE_DEPTH; i++)
+        {
+            Xcp_Tl_TxConfirmation(0U, E_OK);
+        }
+        while (test_tx_pop(popped, &popped_len) > 0U)
+        {
+        }
+        CHECK("K38i the burst drains to an empty queue and an idle pipe",
+              (g_xcp_channel.storage_ptr->dto_queue_count == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        /* A lower layer that confirms before its transmit call returns must not
+           resend the slot that call still owns. */
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, second, (uint8)sizeof(second));
+        CHECK("K38j two frames wait behind the busy pipe",
+              g_xcp_channel.storage_ptr->dto_queue_count == 2U);
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        test_tx_confirm_in_send = TRUE;
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        test_tx_confirm_in_send = FALSE;
+        nframes = 0U;
+        while ((nframes < 4U)
+               && (test_tx_pop(frames[nframes], &frame_len[nframes]) > 0U))
+        {
+            nframes++;
+        }
+        CHECK("K38k an in-call confirmation sends each queued slot once, in order",
+              ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (nframes == 2U)
+              && (frame_len[0] == (uint32)sizeof(first))
+              && (frames[0][0] == first[0])
+              && (frame_len[1] == (uint32)sizeof(second))
+              && (frames[1][0] == second[0]));
+
+        /* The same interleaving on the direct path: the queued frame must go
+           out exactly once, after the direct one. */
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, second, (uint8)sizeof(second));
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        test_tx_confirm_in_send = TRUE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        test_tx_confirm_in_send = FALSE;
+        nframes = 0U;
+        while ((nframes < 4U)
+               && (test_tx_pop(frames[nframes], &frame_len[nframes]) > 0U))
+        {
+            nframes++;
+        }
+        CHECK("K38l an in-call confirmation during a direct send drains once, in order",
+              ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (nframes == 2U)
+              && (frame_len[0] == (uint32)sizeof(first))
+              && (frames[0][0] == first[0])
+              && (frame_len[1] == (uint32)sizeof(second))
+              && (frames[1][0] == second[0]));
+
+        /* A producer that runs while the lower layer still holds the frame must
+           not overwrite the slot the failed drain keeps, and must not push the
+           list counter past the queue depth. */
+        test_sim_dto_inflight();
+        for (i = 0U; i < (uint8)XCP_DTO_QUEUE_DEPTH; i++)
+        {
+            Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        }
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        tail0 = g_xcp_channel.storage_ptr->dto_queue_tail;
+        test_tx_fail_next = TRUE;
+        test_tx_enqueue_in_send = TRUE;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        test_tx_enqueue_in_send = FALSE;
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38m a producer inside the transmit call cannot overwrite the kept slot",
+              (got == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == (uint8)XCP_DTO_QUEUE_DEPTH)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == (uint8)XCP_DTO_QUEUE_DEPTH)
+              && (g_xcp_channel.storage_ptr->dto_queue_tail == tail0)
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], first,
+                         sizeof(first)) == 0)
+              && (g_xcp_channel.storage_ptr->dto_overload_pending == TRUE)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+    }
+#endif
+
+    printf("-- K39. DISCONNECT keeps the answers it already accepted (issue #24)\n");
+    {
+        static const uint8 gs_cmd[1]  = {0xFDU};
+        static const uint8 dis_cmd[1] = {0xFEU};
+        uint8  f[64];
+        uint32 enter0;
+        uint32 exit0;
+        uint8  i;
+#if (XCP_INTERLEAVED_MODE_ENABLED == STD_ON)
+        const uint8 enq = (uint8)XCP_CMD_QUEUE_SIZE;
+#else
+        const uint8 enq = 1U;
+#endif
+
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        /* A frame is on the wire and unconfirmed, so the next answers are
+           accepted into the pipe. Closing the session must not take the answer
+           that was accepted before the DISCONNECT down with it. */
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
+        xcp_inject(gs_cmd, 1U);
+        Xcp_MainFunction();
+        CHECK("K39a an answer accepted behind a busy mailbox waits in the pipe",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 1U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_CTO));
+
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        xcp_inject(dis_cmd, 1U);
+        Xcp_MainFunction();
+        CHECK("K39b DISCONNECT closes the session and keeps both answers queued",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 2U)
+              && (g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED)
+              && ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE));
+
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        Xcp_SendPendingCto();
+        CHECK("K39c the answer accepted before DISCONNECT leaves first",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39d the DISCONNECT answer follows it, in command order",
+              (xcp_pop_cto(f) == 1U) && (f[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        /* The same burst while a DTO owns the mailbox. */
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        g_xcp_channel.runtime_ptr->tx.dto_latch = TRUE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_DTO;
+        xcp_inject(gs_cmd, 1U);
+        Xcp_MainFunction();
+        xcp_inject(dis_cmd, 1U);
+        Xcp_MainFunction();
+        CHECK("K39e a DTO in flight keeps both answers queued as well",
+              (g_xcp_channel.runtime_ptr->tx.cto_count == 2U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO)
+              && (g_xcp_channel.runtime_ptr->connection_state == XCP_DISCONNECTED));
+
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39f the DTO confirmation resumes the pipe from its head",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39g and the DISCONNECT answer still follows it",
+              (xcp_pop_cto(f) == 1U) && (f[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        /* A confirmation that lands inside the transmit call: the frame that
+           call owns leaves exactly once and the answer behind it is not lost
+           with the wakeup. */
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_CTO;
+        for (i = 0U; i < 2U; i++)
+        {
+            xcp_inject(gs_cmd, 1U);
+            Xcp_MainFunction();
+        }
+        CHECK("K39h two answers wait in the pipe",
+              g_xcp_channel.runtime_ptr->tx.cto_count == 2U);
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+
+        test_tx_confirm_in_send = TRUE;
+        Xcp_SendPendingCto();
+        test_tx_confirm_in_send = FALSE;
+        CHECK("K39i an in-call confirmation sends the frame once and keeps the next",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES)
+              && (xcp_pop_cto(f) == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE));
+        Xcp_SendPendingCto();
+        CHECK("K39j the retained answer leaves on the retry, unchanged",
+              (xcp_pop_cto(f) == 6U) && (f[0] == XCP_PID_RES)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 0U));
+
+        /* A command owns the port from the moment its answer is reserved: the
+           block-upload continuation may neither take that room nor overtake
+           the answer. */
+        g_xcp_channel.runtime_ptr->tx.state = XCP_TX_IDLE;
+        g_xcp_channel.runtime_ptr->tx.cto_claimed = 1U;
+        g_xcp_channel.runtime_ptr->mta              = RAM_ADDR;
+        g_xcp_channel.runtime_ptr->mta_extension    = 0U;
+        g_xcp_channel.runtime_ptr->block_transfer_active    = TRUE;
+        g_xcp_channel.runtime_ptr->block_transfer_type      = XCP_BLOCK_TYPE_UPLOAD;
+        g_xcp_channel.runtime_ptr->block_transfer_remaining = 8U;
+        enter0 = test_schm_enter_count;
+        CHECK("K39k a reserved answer keeps the block-upload continuation out",
+              (Xcp_ContinueBlockUpload(&g_xcp_channel) == FALSE)
+              && (test_schm_enter_count == enter0)
+              && (xcp_pop_cto(f) == 0U));
+        g_xcp_channel.runtime_ptr->block_transfer_active = FALSE;
+        g_xcp_channel.runtime_ptr->block_transfer_type   = XCP_BLOCK_TYPE_NONE;
+        g_xcp_channel.runtime_ptr->tx.cto_claimed        = 0U;
+
+        /* An RX that overflows the queue while the busy answer is on the wire
+           must re-arm the notice instead of losing it. */
+        Xcp_Init(NULL_PTR);
+        (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+        g_xcp_channel.runtime_ptr->protection_status = 0U;
+        xcp_quiet_pipe();
+
+        for (i = 0U; i < enq; i++)
+        {
+            xcp_inject(gs_cmd, 1U);
+        }
+        xcp_inject(gs_cmd, 1U);
+        CHECK("K39l an overflowed queue arms the busy notice",
+              g_xcp_channel.runtime_ptr->busy_pending == TRUE);
+
+        test_tx_rx_in_send = TRUE;
+        Xcp_MainFunction();
+        test_tx_rx_in_send = FALSE;
+        CHECK("K39m the busy answer goes out once and a second overflow keeps the notice",
+              (g_xcp_channel.runtime_ptr->busy_pending == TRUE)
+              && (xcp_pop_cto(f) == 2U)
+              && (f[0] == XCP_PID_ERR) && (f[1] == XCP_ERR_CMD_BUSY)
+              && (xcp_pop_cto(f) == 0U));
+
+        Xcp_MainFunction();
+        CHECK("K39n the re-armed notice queues one more busy answer",
+              (g_xcp_channel.runtime_ptr->busy_pending == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count == 1U));
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K39o it leaves as the second busy answer, not a lost notice",
+              (xcp_pop_cto(f) == 2U) && (f[0] == XCP_PID_ERR)
+              && (f[1] == XCP_ERR_CMD_BUSY));
+
+        Xcp_MainFunction();
+        CHECK("K39p the queued commands then run instead of answering busy again",
+              (g_xcp_channel.runtime_ptr->busy_pending == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.cto_count > 0U)
+              && (xcp_drain_cto() == 0U));
+        xcp_settle();
+    }
+
+    printf("-- L. protocol state gates in a fresh session\n");
+    Xcp_Init(NULL_PTR);
+    (void)xcp_cmd((const uint8 *)"\xFF\x00", 2U, res);
+    xcp_drain_tx();
+    g_xcp_channel.runtime_ptr->protection_status = 0U;
+
+    cmd[0] = 0xD6; (void)xcp_cmd(cmd, 1U, res);
+    cmd[0] = 0xD5; cmd[1] = 0; cmd[2] = 1; cmd[3] = 0; (void)xcp_cmd(cmd, 4U, res);
+    cmd[0] = 0xD4; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 1; (void)xcp_cmd(cmd, 5U, res);
+    cmd[0] = 0xE2; cmd[1] = 0; cmd[2] = 0; cmd[3] = 0; cmd[4] = 0; cmd[5] = 0; (void)xcp_cmd(cmd, 6U, res);
+    cmd[0] = 0xE1; cmd[1] = 0xFF; cmd[2] = 4; cmd[3] = 0;
+    memcpy(&cmd[4], &(uint32){TEST_ADDR(test_ram_var32)}, 4U);
+    (void)xcp_cmd(cmd, 8U, res);
+    cmd[0] = 0xDE; cmd[1] = 1; cmd[2] = 0; cmd[3] = 0;
+    (void)xcp_cmd(cmd, 4U, res);
+    CHECK("L1 DAQ running before PROGRAM_START",
+          g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
+    l = xcp_cmd((const uint8 *)"\xD2", 1U, res);
+    CHECK("L2 PROGRAM_START with active DAQ -> ERR_DAQ_ACTIVE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_DAQ_ACTIVE));
+    CHECK("L3 rejected PROGRAM_START leaves DAQ running",
+          g_xcp_channel.storage_ptr->daq_list[0].state == XCP_DAQ_STATE_RUNNING);
+    (void)xcp_cmd((const uint8 *)"\xDD\x00", 2U, res);
+    (void)xcp_cmd((const uint8 *)"\xD6", 1U, res);
+    xcp_settle();
+
+    (void)xcp_cmd((const uint8 *)"\xD2", 1U, res);
+    CHECK("L4 PROGRAM_START establishes programming session",
+          Xcp_IsProgrammingActive(&g_xcp_channel) == TRUE);
+    l = xcp_cmd((const uint8 *)"\xFE", 1U, res);
+    CHECK("L5 DISCONNECT while programming -> ERR_PGM_ACTIVE",
+          (l == 2U) && (res[0] == XCP_PID_ERR) && (res[1] == XCP_ERR_PGM_ACTIVE));
+    CHECK("L6 denied DISCONNECT preserves programming session",
+          Xcp_IsProgrammingActive(&g_xcp_channel) == TRUE
+          && g_xcp_channel.runtime_ptr->connection_state == XCP_CONNECTED);
+
+    CHECK("Z1 the critical section never nests",
+          test_schm_nested_count == 0U);
+    CHECK("Z2 the critical section is entered and left in pairs",
+          (test_schm_enter_count == test_schm_exit_count)
+          && (test_schm_depth == 0U));
 
     printf("================ %d passed, %d failed ================\n",
            pass_count, fail_count);

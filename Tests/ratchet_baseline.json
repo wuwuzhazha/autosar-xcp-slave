@@ -1,19 +1,19 @@
 {
   "version": 1,
   "g_xcp_channel": {
-    "total": 171,
+    "total": 139,
     "files": {
-      "Xcp/Xcp.c": 99,
+      "Xcp/Xcp.c": 69,
       "Xcp/XcpOnCan.c": 2,
       "Xcp/XcpOnCdd.c": 2,
-      "Xcp/XcpOnEth.c": 7,
+      "Xcp/XcpOnEth.c": 6,
       "Xcp/XcpOnFr.c": 6,
       "Xcp/Xcp_CalPage.c": 4,
       "Xcp/Xcp_Cmd.c": 1,
       "Xcp/Xcp_DaqCfg.c": 15,
       "Xcp/Xcp_DaqRun.c": 3,
       "Xcp/Xcp_DaqStim.c": 3,
-      "Xcp/Xcp_FlashProg.c": 13,
+      "Xcp/Xcp_FlashProg.c": 12,
       "Xcp/Xcp_Internal.h": 7,
       "Xcp/Xcp_Resume.c": 3,
       "Xcp/Xcp_Std.c": 6
@@ -24,7 +24,7 @@
     "files": {}
   },
   "xcp_preprocessor": {
-    "total": 167,
+    "total": 168,
     "files": {
       "Xcp/Xcp.c": 27,
       "Xcp/Xcp.h": 3,
@@ -35,7 +35,7 @@
       "Xcp/Xcp_CalPage.c": 3,
       "Xcp/Xcp_CalPage.h": 1,
       "Xcp/Xcp_Callback.h": 7,
-      "Xcp/Xcp_Cmd.c": 4,
+      "Xcp/Xcp_Cmd.c": 5,
       "Xcp/Xcp_Daq.h": 2,
       "Xcp/Xcp_DaqCfg.c": 29,
       "Xcp/Xcp_DaqInt.h": 17,

@@ -93,10 +93,16 @@ If `XcpResumeModeEnabled`:
 
 ## Threads / critical sections
 
-`XCP_DTO_ENTER_CRITICAL` / `XCP_DTO_EXIT_CRITICAL` guard the DTO queue and every
-`tx.state` transition (including `Xcp_HandleTxConfirmation`). Default maps to
+`XCP_DTO_ENTER_CRITICAL` / `XCP_DTO_EXIT_CRITICAL` guard the DTO queue, the
+command hand-off and every `tx.state` transition (including
+`Xcp_HandleTxConfirmation`). Default maps to
 `SchM_Enter_Xcp/SchM_Exit_Xcp(XCP_EXCLUSIVE_AREA_0)` — override via
 `Xcp_Cfg.h` or define them to your own locking primitive.
+
+The pair is entered from the RX and TX-confirmation callbacks as well as from
+the main-function task, so it must save and restore the interrupt state (e.g.
+PRIMASK on Cortex-M) rather than being a blind `cpsid i` / `cpsie i` pair: an
+RX section can open while a task section is still logically open.
 
 `Xcp_Tl_SendCto`/`SendDto` are **outside** the critical region (calls may be slow).
 
@@ -106,19 +112,36 @@ Concurrency contract:
   equivalents) are the only callbacks that may run in interrupt context.
   They enqueue a frame and update the TX state; they never call the lower
   layer's transmit function directly.
+- `Xcp_Tl_SendDto` may report the confirmation before it returns. The frame's
+  queue slot stays owned until that call returns, so such a confirmation
+  neither releases nor resends it. A rejected send keeps the frame at the FIFO
+  head; a rejected direct send is requeued while the queue has room.
 - `Xcp_MainFunction` processes the queued command, DAQ events and block
   upload. Call it from one task context only.
 - The command hand-off is single-producer/single-consumer: the RX callback
-  writes `cmd_queue_buffer`/`cmd_pending`, the main loop reads them and
-  clears `cmd_pending`. The producer sets `busy_pending` instead of
-  overwriting while a command is pending; the main loop answers
-  `ERR_CMD_BUSY` and clears it. No other context may write those fields.
-- A second command that arrives before the main loop processed the first is
-  answered `ERR_CMD_BUSY`. Block-mode masters must pace their frames with
-  the advertised `MIN_ST` (1 ms by default); `XcpInterleavedModeEnabled`
-  queues commands instead of answering busy. In this stack the flag changes
-  only that hand-off: the DTO frame layout and the CTO/DTO ordering are the
-  same with it on or off.
+  writes the queue and `cmd_pending` under the critical section, the main
+  loop takes one command out under the same section and clears
+  `cmd_pending` once no command is left to run. The producer sets
+  `busy_pending` instead of overwriting when the queue is full; the main loop
+  answers `ERR_CMD_BUSY` and clears it. No other context may write those
+  fields.
+- The room a command's answer takes is reserved for that answer. A command
+  handler (or the user-command callout it calls) may answer for the command it
+  is running; every other CTO sender must not preempt `Xcp_MainFunction`, and
+  the block-upload continuation is refused while a reservation is open.
+- A main-function call runs every queued command, at most one full queue.
+  Before a command runs it reserves the room its answer needs in the CTO
+  pipe (`tx.cto_*`, one response per queued command plus the frame in
+  flight). Running out of room ends the call with the command still queued
+  and its side effects unapplied, instead of consuming it without a response.
+- Responses leave that pipe in the order their commands arrived. A transmit
+  the lower layer refuses stays at the head of the pipe and is retried by the
+  next confirmation or main-function call, so an accepted command never loses
+  its answer; only a pipe that is full reports `E_NOT_OK`.
+- A command that arrives while the queue still holds one is answered
+  `ERR_CMD_BUSY`. `XcpInterleavedModeEnabled` admits a whole queue instead of
+  one command; in this stack the flag changes only that hand-off — the DTO
+  frame layout and the CTO/DTO ordering are the same with it on or off.
 
 ## Session lifecycle
 
@@ -126,6 +149,12 @@ Concurrency contract:
 - `Xcp_SessionOpen` / `Xcp_SessionClose` — called by `CONNECT`/`DISCONNECT`; you can
   also call them directly when the socket opens/closes (see `Xcp_SoAdConnectionClosed`
   for the Ethernet case).
+- `Xcp_SessionClose` ends the session but leaves the CTO pipe alone: the answers
+  of the commands that were already accepted still leave, in command order, so
+  a `DISCONNECT` answer does not drop the answers that preceded it.
+- `Xcp_SessionLinkDown` drops what is still queued before it closes the session
+  — call it when the transport itself is gone (`Xcp_SoAdConnectionClosed` does),
+  because nothing queued can reach the master any more.
 - `Xcp_HandleRxIndication(pdu)` — feed every received frame here; PID ≥ 0xC0 is a
   command, PID < 0xC0 is a STIM DTO.
 - `Xcp_HandleTxConfirmation(result)` — call when the lower layer confirms a TX.

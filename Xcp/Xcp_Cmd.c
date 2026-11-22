@@ -12,7 +12,7 @@ static sint16 Xcp_DispatchUserCmd(Xcp_Channel *ch, const uint8 *cmd_data, uint8 
 
 static const Xcp_CmdEntryType XCP_CMD_TABLE[] = {
     { XCP_CMD_CONNECT,              2U, 0U,                    XCP_GUARD_ALLOW_DISCONNECTED, Xcp_CmdConnect },
-    { XCP_CMD_DISCONNECT,           1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdDisconnect },
+    { XCP_CMD_DISCONNECT,           1U, 0U,                    (XCP_GUARD_ALLOW_DISCONNECTED | XCP_GUARD_BLOCK_PGM_ACTIVE), Xcp_CmdDisconnect },
     { XCP_CMD_GET_STATUS,           1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdGetStatus },
     { XCP_CMD_SYNCH,                1U, 0U,                    XCP_GUARD_ALLOW_DISCONNECTED, Xcp_CmdSynch },
     { XCP_CMD_GET_COMM_MODE_INFO,   1U, 0U,                    XCP_GUARD_NONE,               Xcp_CmdGetCommModeInfo },
@@ -118,11 +118,20 @@ void Xcp_ProcessCommand(const uint8 *cmd_data, uint8 cmd_length)
                 return;
             }
 
-            if ((entry->guard != XCP_GUARD_ALLOW_DISCONNECTED)
+            if (((entry->guard & XCP_GUARD_ALLOW_DISCONNECTED) == 0U)
                 && (man->runtime_ptr->connection_state != XCP_CONNECTED))
             {
                 return;
             }
+
+#if (XCP_FLASH_PROGRAMMING_ENABLED == STD_ON)
+            if (((entry->guard & XCP_GUARD_BLOCK_PGM_ACTIVE) != 0U)
+                && Xcp_IsProgrammingActive(man))
+            {
+                Xcp_SendErrorResponse(XCP_ERR_PGM_ACTIVE);
+                return;
+            }
+#endif
 
             if ((entry->resource != 0U)
                 && ((man->runtime_ptr->protection_status & entry->resource) != 0U))
