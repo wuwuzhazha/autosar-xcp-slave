@@ -14,4 +14,10 @@ extern uint32 test_schm_nested_count;
 extern boolean test_schm_tx_under_lock;
 extern uint32 test_tx_fail_count;
 
+/* Set to deliver Xcp_HandleTxConfirmation(E_OK) from inside CanIf_Transmit. */
+extern boolean test_tx_confirm_in_send;
+
+/* Set to queue a DTO from inside CanIf_Transmit. */
+extern boolean test_tx_enqueue_in_send;
+
 #endif

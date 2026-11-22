@@ -154,6 +154,7 @@ typedef struct
     uint8                    cto_len[XCP_CTO_QUEUE_DEPTH];
     uint8                    cto_data[XCP_CTO_QUEUE_DEPTH][XCP_MAX_CTO];
     volatile boolean         dto_latch;
+    volatile boolean         dto_in_flight;
     uint8                    last_error;
 } Xcp_TxPipe;
 

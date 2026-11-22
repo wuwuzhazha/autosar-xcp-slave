@@ -176,7 +176,9 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
-    boolean send_now = FALSE;
+    boolean send_now  = FALSE;
+    boolean sent      = FALSE;
+    boolean confirmed = FALSE;
 
     XCP_DTO_ENTER_CRITICAL();
 
@@ -188,8 +190,9 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
 
     if (runtime->tx.state == XCP_TX_IDLE)
     {
-        runtime->tx.dto_latch = TRUE;
-        runtime->tx.state     = XCP_TX_DTO;
+        runtime->tx.dto_latch     = TRUE;
+        runtime->tx.state         = XCP_TX_DTO;
+        runtime->tx.dto_in_flight = TRUE;
         send_now = TRUE;
     }
 
@@ -197,15 +200,36 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
 
     if (send_now != FALSE)
     {
-        if (Xcp_Tl_SendDto(dto_data, dto_length) == E_OK)
-        {
-            return;
-        }
+        sent = (Xcp_Tl_SendDto(dto_data, dto_length) == E_OK) ? TRUE : FALSE;
 
         XCP_DTO_ENTER_CRITICAL();
-        runtime->tx.dto_latch = FALSE;
-        runtime->tx.state     = XCP_TX_IDLE;
+
+        runtime->tx.dto_in_flight = FALSE;
+        /* The lower layer may confirm before it returns; that confirmation
+           already retired the pipe and owns the latch from here on. */
+        confirmed = (runtime->tx.state != XCP_TX_DTO) ? TRUE : FALSE;
+
+        if (sent == FALSE)
+        {
+            runtime->tx.dto_latch = FALSE;
+
+            if (confirmed == FALSE)
+            {
+                runtime->tx.state = XCP_TX_IDLE;
+            }
+        }
+
         XCP_DTO_EXIT_CRITICAL();
+
+        if (sent != FALSE)
+        {
+            if (confirmed != FALSE)
+            {
+                Xcp_DtoSendNext(ch);
+            }
+
+            return;
+        }
     }
 
     XCP_DTO_ENTER_CRITICAL();
@@ -233,52 +257,85 @@ void Xcp_DtoSendOrQueue(Xcp_Channel *ch, uint16 daq_list_no, const uint8 *dto_da
     XCP_DTO_EXIT_CRITICAL();
 }
 
-void Xcp_DtoSendNext(Xcp_Channel *ch)
+/* Hands the queued tail DTO to the lower layer. The slot stays reserved while
+   the call runs, so a failed send needs no rewind and keeps its FIFO place.
+   Returns TRUE only when the frame is both sent and already confirmed, so the
+   caller may drain again. */
+static boolean Xcp_DtoSendQueued(Xcp_Channel *ch)
 {
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
 
-    uint8  dto_copy[XCP_MAX_DTO];
-    uint8  tail = 0U;
-    uint8  dto_len = 0U;
-    boolean send_now = FALSE;
+    uint8   dto_copy[XCP_MAX_DTO];
+    uint8   tail;
+    uint8   dto_len;
+    boolean sent      = FALSE;
+    boolean confirmed = FALSE;
 
     XCP_DTO_ENTER_CRITICAL();
 
+    if (runtime->tx.dto_in_flight != FALSE)
+    {
+        XCP_DTO_EXIT_CRITICAL();
+        return FALSE;
+    }
+
     runtime->tx.dto_latch = FALSE;
 
-    if ((runtime->tx_mode == XCP_TX_ON)
-        && (runtime->tx.state == XCP_TX_IDLE)
-        && (storage->dto_queue_count > 0U))
+    if ((runtime->tx_mode != XCP_TX_ON)
+        || (runtime->tx.state != XCP_TX_IDLE)
+        || (storage->dto_queue_count == 0U))
     {
-        tail = storage->dto_queue_tail;
-        dto_len = storage->dto_queue_len[tail];
-        (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
-        storage->dto_queued[storage->dto_queue_list[tail]]--;
-        storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
-        storage->dto_queue_count--;
+        XCP_DTO_EXIT_CRITICAL();
+        return FALSE;
+    }
 
-        runtime->tx.dto_latch = TRUE;
-        runtime->tx.state     = XCP_TX_DTO;
-        send_now = TRUE;
+    tail    = storage->dto_queue_tail;
+    dto_len = storage->dto_queue_len[tail];
+    (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
+
+    runtime->tx.dto_latch     = TRUE;
+    runtime->tx.state         = XCP_TX_DTO;
+    runtime->tx.dto_in_flight = TRUE;
+
+    XCP_DTO_EXIT_CRITICAL();
+
+    sent = (Xcp_Tl_SendDto(dto_copy, dto_len) == E_OK) ? TRUE : FALSE;
+
+    XCP_DTO_ENTER_CRITICAL();
+
+    runtime->tx.dto_in_flight = FALSE;
+    /* A confirmation that lands inside the call retires the pipe first and
+       must not release or resend the slot this call still owns. */
+    confirmed = (runtime->tx.state != XCP_TX_DTO) ? TRUE : FALSE;
+
+    if (sent != FALSE)
+    {
+        storage->dto_queued[storage->dto_queue_list[tail]]--;
+        storage->dto_queue_tail = (uint8) ((tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH);
+        storage->dto_queue_count--;
+    }
+    else
+    {
+        runtime->tx.dto_latch = FALSE;
+
+        if (confirmed == FALSE)
+        {
+            runtime->tx.state = XCP_TX_IDLE;
+        }
     }
 
     XCP_DTO_EXIT_CRITICAL();
 
-    if (send_now != FALSE)
-    {
-        if (Xcp_Tl_SendDto(dto_copy, dto_len) == E_OK)
-        {
-            return;
-        }
+    return ((sent != FALSE) && (confirmed != FALSE)) ? TRUE : FALSE;
+}
 
-        XCP_DTO_ENTER_CRITICAL();
-        runtime->tx.dto_latch = FALSE;
-        runtime->tx.state     = XCP_TX_IDLE;
-        storage->dto_queued[storage->dto_queue_list[tail]]++;
-        storage->dto_queue_tail = tail;
-        storage->dto_queue_count++;
-        XCP_DTO_EXIT_CRITICAL();
+void Xcp_DtoSendNext(Xcp_Channel *ch)
+{
+    /* Drain while every frame is retired before its transmit call returns; an
+       unconfirmed frame stops the burst until its confirmation arrives. */
+    while (Xcp_DtoSendQueued(ch) != FALSE)
+    {
     }
 }
 
@@ -287,9 +344,6 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
     uint16           i;
     Xcp_StorageType *storage = ch->storage_ptr;
     Xcp_RuntimeType *runtime = ch->runtime_ptr;
-    uint8            dto_copy[XCP_MAX_DTO];
-    uint8            tail = 0U;
-    uint8            dto_len = 0U;
     boolean          send_pending_cto = FALSE;
     boolean          send_dto = FALSE;
 
@@ -326,15 +380,6 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
         }
         else if (storage->dto_queue_count > 0U)
         {
-            tail = storage->dto_queue_tail;
-            dto_len = storage->dto_queue_len[tail];
-            (void)memcpy(dto_copy, storage->dto_queue[tail], dto_len);
-            storage->dto_queued[storage->dto_queue_list[tail]]--;
-            storage->dto_queue_tail = (tail + 1U) % (uint8) XCP_DTO_QUEUE_DEPTH;
-            storage->dto_queue_count--;
-
-            runtime->tx.dto_latch = TRUE;
-            runtime->tx.state     = XCP_TX_DTO;
             send_dto = TRUE;
         }
     }
@@ -347,16 +392,7 @@ void Xcp_ReportDtoOverload(Xcp_Channel *ch)
     }
     else if (send_dto != FALSE)
     {
-        if (Xcp_Tl_SendDto(dto_copy, dto_len) != E_OK)
-        {
-            XCP_DTO_ENTER_CRITICAL();
-            runtime->tx.dto_latch = FALSE;
-            runtime->tx.state     = XCP_TX_IDLE;
-            storage->dto_queued[storage->dto_queue_list[tail]]++;
-            storage->dto_queue_tail = tail;
-            storage->dto_queue_count++;
-            XCP_DTO_EXIT_CRITICAL();
-        }
+        (void)Xcp_DtoSendQueued(ch);
     }
 
     if (storage->overload_ev_cooldown > 0U)

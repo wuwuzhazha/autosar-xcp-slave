@@ -348,6 +348,12 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
     if (runtime->tx.state == XCP_TX_DTO)
     {
         runtime->tx.state = XCP_TX_IDLE;
+
+        if (result != E_OK)
+        {
+            runtime->tx.dto_latch = FALSE;
+        }
+
         confirmed = XCP_TX_DTO;
     }
     else if (runtime->tx.state == XCP_TX_CTO)
@@ -377,8 +383,6 @@ void Xcp_HandleTxConfirmation(Std_ReturnType result)
         }
         else
         {
-            runtime->tx.dto_latch = FALSE;
-
             if (runtime->tx.cto_count > 0U)
             {
                 Xcp_SendPendingCto();

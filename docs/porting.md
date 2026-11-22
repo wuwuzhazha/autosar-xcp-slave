@@ -112,6 +112,10 @@ Concurrency contract:
   equivalents) are the only callbacks that may run in interrupt context.
   They enqueue a frame and update the TX state; they never call the lower
   layer's transmit function directly.
+- `Xcp_Tl_SendDto` may report the confirmation before it returns. The frame's
+  queue slot stays owned until that call returns, so such a confirmation
+  neither releases nor resends it. A rejected send keeps the frame at the FIFO
+  head; a rejected direct send is requeued while the queue has room.
 - `Xcp_MainFunction` processes the queued command, DAQ events and block
   upload. Call it from one task context only.
 - The command hand-off is single-producer/single-consumer: the RX callback

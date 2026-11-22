@@ -4082,6 +4082,265 @@ int main(void)
               && (xcp_drain_cto() == 0U));
         xcp_settle();
     }
+#if (XCP_DAQ_ENABLED == STD_ON)
+    printf("-- K38. DTO queue ownership across failed and interleaved sends\n");
+    {
+        uint8  first[4]  = {0xA0U, 0xA1U, 0xA2U, 0xA3U};
+        uint8  second[4] = {0xB0U, 0xB1U, 0xB2U, 0xB3U};
+        uint8  frames[4][8];
+        uint32 frame_len[4];
+        uint8  nframes;
+        uint8  popped[8];
+        uint32 popped_len;
+        uint32 got;
+        uint32 enter0;
+        uint32 exit0;
+        uint32 drop0;
+        uint8  tail0;
+        uint8  i;
+
+        g_xcp_channel.runtime_ptr->tx_mode      = XCP_TX_ON;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.cto_count   = 0U;
+        g_xcp_channel.runtime_ptr->tx.cto_inflight = FALSE;
+        g_xcp_channel.runtime_ptr->cmd_pending  = FALSE;
+        g_xcp_channel.storage_ptr->dto_queue_count      = 0U;
+        g_xcp_channel.storage_ptr->dto_queue_head       = 0U;
+        g_xcp_channel.storage_ptr->dto_queue_tail       = 0U;
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        (void)memset(&g_xcp_channel.storage_ptr->dto_queued[0], 0,
+                     sizeof(g_xcp_channel.storage_ptr->dto_queued));
+        while (test_tx_pop(popped, &popped_len) > 0U)
+        {
+        }
+
+        /* A direct send the lower layer accepts owns the pipe and one frame.
+           Both lock scopes are paired and the transmit stays outside them. */
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38a a direct DTO send pairs every lock and transmits outside them",
+              ((test_schm_enter_count - enter0) == 2U)
+              && ((test_schm_exit_count - exit0) == 2U)
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (got == (uint32)sizeof(first))
+              && (popped[0] == first[0])
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == TRUE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U));
+
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        CHECK("K38b the confirmation retires the direct frame",
+              (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        /* A rejected direct send releases the pipe and requeues the frame. */
+        drop0  = test_tx_drop;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        test_tx_fail_next = TRUE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 1U, second, (uint8)sizeof(second));
+        tail0 = g_xcp_channel.storage_ptr->dto_queue_tail;
+        CHECK("K38c a failed direct send releases the pipe and requeues the frame",
+              ((test_tx_drop - drop0) == 1U)
+              && ((test_schm_enter_count - enter0) == 3U)
+              && ((test_schm_exit_count - exit0) == 3U)
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queue_list[tail0] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queue_len[tail0] == (uint8)sizeof(second))
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], second,
+                         sizeof(second)) == 0));
+
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        CHECK("K38d a busy pipe queues the next frame behind the requeued one",
+              (g_xcp_channel.storage_ptr->dto_queue_count == 2U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 1U));
+
+        /* A drain the lower layer rejects must leave the head slot, its list
+           count and its FIFO place untouched: there is no rewind to get wrong. */
+        test_tx_fail_next = TRUE;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38e a failed drain keeps the head slot and the FIFO",
+              ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (got == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 2U)
+              && (g_xcp_channel.storage_ptr->dto_queue_tail == tail0)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 1U)
+              && (g_xcp_channel.storage_ptr->dto_queue_list[tail0] == 1U)
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], second,
+                         sizeof(second)) == 0)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        /* The retained slot still occupies capacity: the queue drops instead of
+           overwriting the frame the failed drain still owns. */
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        test_sim_dto_inflight();
+        for (i = 0U; i < (uint8)XCP_DTO_QUEUE_DEPTH; i++)
+        {
+            Xcp_DtoSendOrQueue(&g_xcp_channel, 1U, first, (uint8)sizeof(first));
+        }
+        CHECK("K38f a full queue keeps the retained slot and reports the overload",
+              (g_xcp_channel.storage_ptr->dto_queue_count == (uint8)XCP_DTO_QUEUE_DEPTH)
+              && (g_xcp_channel.storage_ptr->dto_queued[1]
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 1U))
+              && (g_xcp_channel.storage_ptr->dto_queue_list[tail0] == 1U)
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], second,
+                         sizeof(second)) == 0)
+              && (g_xcp_channel.storage_ptr->dto_overload_pending == TRUE));
+
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38g the retained head goes out first once the lower layer accepts",
+              (got == (uint32)sizeof(second))
+              && (popped[0] == second[0])
+              && (g_xcp_channel.storage_ptr->dto_queue_count
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 1U))
+              && (g_xcp_channel.storage_ptr->dto_queued[1]
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 2U))
+              && (g_xcp_channel.storage_ptr->dto_queue_tail
+                  == (uint8)((tail0 + 1U) % (uint8)XCP_DTO_QUEUE_DEPTH))
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_DTO));
+
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38h the confirmation drains the next slot in FIFO order",
+              (got == (uint32)sizeof(first))
+              && (popped[0] == first[0])
+              && (g_xcp_channel.storage_ptr->dto_queue_count
+                  == (uint8)(XCP_DTO_QUEUE_DEPTH - 2U)));
+
+        for (i = 0U; i < (uint8)XCP_DTO_QUEUE_DEPTH; i++)
+        {
+            Xcp_Tl_TxConfirmation(0U, E_OK);
+        }
+        while (test_tx_pop(popped, &popped_len) > 0U)
+        {
+        }
+        CHECK("K38i the burst drains to an empty queue and an idle pipe",
+              (g_xcp_channel.storage_ptr->dto_queue_count == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[1] == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        /* A lower layer that confirms before its transmit call returns must not
+           resend the slot that call still owns. */
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, second, (uint8)sizeof(second));
+        CHECK("K38j two frames wait behind the busy pipe",
+              g_xcp_channel.storage_ptr->dto_queue_count == 2U);
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        test_tx_confirm_in_send = TRUE;
+        Xcp_Tl_TxConfirmation(0U, E_OK);
+        test_tx_confirm_in_send = FALSE;
+        nframes = 0U;
+        while ((nframes < 4U)
+               && (test_tx_pop(frames[nframes], &frame_len[nframes]) > 0U))
+        {
+            nframes++;
+        }
+        CHECK("K38k an in-call confirmation sends each queued slot once, in order",
+              ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (nframes == 2U)
+              && (frame_len[0] == (uint32)sizeof(first))
+              && (frames[0][0] == first[0])
+              && (frame_len[1] == (uint32)sizeof(second))
+              && (frames[1][0] == second[0]));
+
+        /* The same interleaving on the direct path: the queued frame must go
+           out exactly once, after the direct one. */
+        test_sim_dto_inflight();
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, second, (uint8)sizeof(second));
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        enter0 = test_schm_enter_count;
+        exit0  = test_schm_exit_count;
+        test_schm_tx_under_lock = FALSE;
+        test_tx_confirm_in_send = TRUE;
+        Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        test_tx_confirm_in_send = FALSE;
+        nframes = 0U;
+        while ((nframes < 4U)
+               && (test_tx_pop(frames[nframes], &frame_len[nframes]) > 0U))
+        {
+            nframes++;
+        }
+        CHECK("K38l an in-call confirmation during a direct send drains once, in order",
+              ((test_schm_enter_count - enter0) == (test_schm_exit_count - exit0))
+              && (test_schm_depth == 0U)
+              && (test_schm_tx_under_lock == FALSE)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == 0U)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE)
+              && (nframes == 2U)
+              && (frame_len[0] == (uint32)sizeof(first))
+              && (frames[0][0] == first[0])
+              && (frame_len[1] == (uint32)sizeof(second))
+              && (frames[1][0] == second[0]));
+
+        /* A producer that runs while the lower layer still holds the frame must
+           not overwrite the slot the failed drain keeps, and must not push the
+           list counter past the queue depth. */
+        test_sim_dto_inflight();
+        for (i = 0U; i < (uint8)XCP_DTO_QUEUE_DEPTH; i++)
+        {
+            Xcp_DtoSendOrQueue(&g_xcp_channel, 0U, first, (uint8)sizeof(first));
+        }
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+        g_xcp_channel.runtime_ptr->tx.dto_latch = FALSE;
+        g_xcp_channel.runtime_ptr->tx.state     = XCP_TX_IDLE;
+        tail0 = g_xcp_channel.storage_ptr->dto_queue_tail;
+        test_tx_fail_next = TRUE;
+        test_tx_enqueue_in_send = TRUE;
+        Xcp_DtoSendNext(&g_xcp_channel);
+        test_tx_enqueue_in_send = FALSE;
+        got = test_tx_pop(popped, &popped_len);
+        CHECK("K38m a producer inside the transmit call cannot overwrite the kept slot",
+              (got == 0U)
+              && (g_xcp_channel.storage_ptr->dto_queue_count == (uint8)XCP_DTO_QUEUE_DEPTH)
+              && (g_xcp_channel.storage_ptr->dto_queued[0] == (uint8)XCP_DTO_QUEUE_DEPTH)
+              && (g_xcp_channel.storage_ptr->dto_queue_tail == tail0)
+              && (memcmp(&g_xcp_channel.storage_ptr->dto_queue[tail0][0], first,
+                         sizeof(first)) == 0)
+              && (g_xcp_channel.storage_ptr->dto_overload_pending == TRUE)
+              && (g_xcp_channel.runtime_ptr->tx.state == XCP_TX_IDLE)
+              && (g_xcp_channel.runtime_ptr->tx.dto_latch == FALSE));
+
+        g_xcp_channel.storage_ptr->dto_overload_pending = FALSE;
+    }
+#endif
 
     printf("-- L. protocol state gates in a fresh session\n");
     Xcp_Init(NULL_PTR);

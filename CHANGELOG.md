@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without a confirmation change nothing. K37 pins that a refused transmit
   keeps its response at the head and that the queued responses leave in
   command order
+- K38 pins DTO queue ownership: a successful direct send pairs every lock and
+  transmits outside it, a rejected direct send requeues the frame, a rejected
+  drain keeps the head slot and its FIFO place, and a confirmation or a
+  producer that lands inside the lower-layer call neither resends nor
+  overwrites that slot
 
 ### Changed
 - A command burst is answered at bus speed instead of one command per
@@ -93,6 +98,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optional timestamp and entries), not padded to `XCP_MAX_DTO`. The queue
   stores that length and both drain paths use it. `XcpDtoQueueDepth` must
   be at least `XcpOdtCount`, because a busy pipe queues the whole burst
+- A queued DTO keeps its slot, its list count and its FIFO place until the
+  lower-layer call returns: a rejected drain no longer rewinds a slot that a
+  producer may have refilled in the meantime, so the retried frame carries
+  its own payload and the list counter stays exact. A confirmation that
+  arrives inside the call no longer resends or releases the slot that call
+  still owns, and the frame that call sends is drained exactly once
 
 ## [0.3.2] — 2026-11-20
 
