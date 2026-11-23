@@ -47,7 +47,7 @@ DISCONNECT         FF
   XCP 帧（CTO 或 STIM DTO）都送入它。
 - `Xcp_MainFunction()` 处理待执行的命令队列。
 - `Xcp_HandleTxConfirmation(E_OK)` 模拟下层确认发送完成，
-  从而释放 `tx.parked` / `dto_queue` 中的下一个 CTO。
+  从而释放响应 FIFO 或 `dto_queue` 中的下一个 CTO。
 - `test_tx_pop` 是 stub 的 TX 捕获点——在真实硬件上，这里对应你的
   `CanIf_Transmit` / `SoAd_IfTransmit` 等。
 
